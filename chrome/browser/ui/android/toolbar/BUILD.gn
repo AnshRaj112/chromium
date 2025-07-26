@@ -155,7 +155,7 @@ android_library("java") {
     "//chrome/browser/fullscreen/android:java",
     "//chrome/browser/hub:java",
     "//chrome/browser/incognito:java",
-    "//chrome/browser/keyboard_accessory/android/java:java",
+    "//chrome/browser/keyboard_accessory/android/java",
     "//chrome/browser/language/android:java",
     "//chrome/browser/ntp_customization:java",
     "//chrome/browser/paint_preview/android:java",
@@ -240,6 +240,7 @@ android_library("java") {
     sources += [
       "java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionButtonProperties.java",
       "java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionButtonViewBinder.java",
+      "java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListContainer.java",
       "java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListCoordinator.java",
       "java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionListMediator.java",
       "java/src/org/chromium/chrome/browser/toolbar/extensions/ExtensionActionPopup.java",

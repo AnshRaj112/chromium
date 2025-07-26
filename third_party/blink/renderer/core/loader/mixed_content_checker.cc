@@ -590,7 +590,7 @@ bool MixedContentChecker::ShouldBlockFetch(
   // permission for the LNA request to go through.
   //
   // Reference:
-  // https://github.com/explainers-by-googlers/local-network-access
+  // https://wicg.github.io/local-network-access/
   //
   // This only checks for mixed content subresources; subframe navigation mixed
   // content is checked in
@@ -615,31 +615,6 @@ bool MixedContentChecker::ShouldBlockFetch(
             network::mojom::blink::IPAddressSpace::kLoopback ||
         network::ParsePrivateIpFromUrl(GURL(url)) ||
         network::IsRFC6762LocalDomain(GURL(url))) {
-      allowed = true;
-    }
-  }
-
-  // Skip mixed content check for private and local targets.
-  // `target_address_space` here is private/local only when resource request
-  // has explicitly set `targetAddressSpace` fetch option.
-  // TODO(lyf): check the IP address space for initiator, only skip when the
-  // initiator is more public.
-  if (base::FeatureList::IsEnabled(
-          network::features::kPrivateNetworkAccessPermissionPrompt) &&
-      RuntimeEnabledFeatures::PrivateNetworkAccessPermissionPromptEnabled(
-          frame->DomWindow())) {
-    // TODO(crbug.com/323583084): Re-enable PNA permission prompt for documents
-    // fetched via service worker.
-    if (!frame->Loader()
-             .GetDocumentLoader()
-             ->GetResponse()
-             .WasFetchedViaServiceWorker() &&
-        (target_address_space ==
-             network::mojom::blink::IPAddressSpace::kLocal ||
-         target_address_space ==
-             network::mojom::blink::IPAddressSpace::kLoopback)) {
-      UseCounter::Count(frame->GetDocument(),
-                        WebFeature::kPrivateNetworkAccessPermissionPrompt);
       allowed = true;
     }
   }
@@ -947,7 +922,7 @@ bool MixedContentChecker::ShouldAutoupgrade(
   // considered secure and not mixed content.
   //
   // Reference:
-  // https://github.com/explainers-by-googlers/local-network-access
+  // https://wicg.github.io/local-network-access/
   //
   // TODO(crbug.com/395895368): check the IP address space for initiator, only
   // skip when the initiator is more public.

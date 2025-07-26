@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {type WebClientInitialState} from '../glic.mojom-webui.js';
-import type {ActInFocusedTabParams, ActInFocusedTabResult, AnnotatedPageData, ChromeVersion, DraggableArea, ErrorReasonTypes, ErrorWithReason, FocusedTabDataHasFocus, FocusedTabDataHasNoFocus, GetPinCandidatesOptions, HostCapability, Journal, OpenPanelInfo, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, PdfDocumentData, PinCandidate, Screenshot, ScrollToParams, TabContextOptions, TabContextResult, TabData, UserProfileInfo, ZeroStateSuggestions, ZeroStateSuggestionsOptions, ZeroStateSuggestionsV2} from '../glic_api/glic_api.js';
+import type {ActInFocusedTabParams, ActInFocusedTabResult, ActorTaskState, AnnotatedPageData, ChromeVersion, DraggableArea, ErrorReasonTypes, ErrorWithReason, FocusedTabDataHasFocus, FocusedTabDataHasNoFocus, GetPinCandidatesOptions, HostCapability, Journal, OpenPanelInfo, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, PdfDocumentData, PinCandidate, Screenshot, ScrollToParams, TabContextOptions, TabContextResult, TabData, UserProfileInfo, ViewChangedNotification, ViewChangeRequest, ZeroStateSuggestions, ZeroStateSuggestionsOptions, ZeroStateSuggestionsV2} from '../glic_api/glic_api.js';
 
 /*
 This file defines messages sent over postMessage in-between the Glic WebUI
@@ -270,6 +270,12 @@ export declare interface HostRequestTypes {
   glicBrowserOnResponseStarted: {};
   glicBrowserOnResponseStopped: {};
   glicBrowserOnSessionTerminated: {};
+  glicBrowserOnTurnCompleted: {
+    request: {
+      model: number,
+      duration: number,
+    },
+  };
   glicBrowserOnResponseRated: {
     request: {
       positive: boolean,
@@ -334,6 +340,11 @@ export declare interface HostRequestTypes {
       suggestions?: ZeroStateSuggestionsV2,
     },
   };
+  glicBrowserOnViewChanged: {
+    request: {
+      notification: ViewChangedNotification,
+    },
+  };
 }
 
 // Types of requests to the GlicWebClient.
@@ -351,6 +362,11 @@ export declare interface WebClientRequestTypes {
   glicWebClientPanelStateChanged: {
     request: {
       panelState: PanelState,
+    },
+  };
+  glicWebClientRequestViewChange: {
+    request: {
+      request: ViewChangeRequest,
     },
   };
   glicWebClientCanAttachStateChanged: {
@@ -430,6 +446,12 @@ export declare interface WebClientRequestTypes {
       options: ZeroStateSuggestionsOptions,
     },
   };
+  glicWebClientNotifyActorTaskStateChanged: {
+    request: {
+      taskId: number,
+      state: ActorTaskState,
+    },
+  };
 }
 
 
@@ -483,11 +505,12 @@ type HostRequestEnumNamesType = {
     JournalStop: 0,
     JournalRecordFeedback: 0,
     OnUserInputSubmitted: 0,
+    OnResponseRated: 0,
     OnRequestStarted: 0,
     OnResponseStarted: 0,
     OnResponseStopped: 0,
     OnSessionTerminated: 0,
-    OnResponseRated: 0,
+    OnTurnCompleted: 0,
     ScrollTo: 0,
     SetSyntheticExperimentState: 0,
     OpenOsPermissionSettingsMenu: 0,
@@ -505,6 +528,7 @@ type HostRequestEnumNamesType = {
     OnClosedCaptionsShown: 0,
     CreateTask: 0,
     PerformActions: 0,
+    OnViewChanged: 0,
   };
   return apiRequestTypes;
   // LINT.ThenChange(//tools/metrics/histograms/metadata/glic/histograms.xml:ApiRequestType)

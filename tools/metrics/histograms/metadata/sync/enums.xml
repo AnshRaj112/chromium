@@ -352,6 +352,8 @@ chromium-metrics-reviews@google.com.
   <int value="87" label="OmniboxShowSearchTools"/>
   <int value="88" label="AutofillHomeMetadata"/>
   <int value="89" label="AutofillWorkMetadata"/>
+  <int value="90" label="FacilitatedPaymentsA2AEnabled"/>
+  <int value="91" label="FacilitatedPaymentsA2ATriggeredOnce"/>
 <!-- LINT.ThenChange(/components/sync_preferences/common_syncable_prefs_database.cc:CommonSyncablePref)-->
 
 <!-- LINT.IfChange(ChromeSyncablePref) -->
@@ -720,6 +722,7 @@ chromium-metrics-reviews@google.com.
   <int value="100327" label="PinSplitTabButton"/>
   <int value="100328" label="GlicRolloutEligibility"/>
   <int value="100329" label="ShelfNotebookLmAppPinRolls"/>
+  <int value="100330" label="VerticalTabsEnabled"/>
 <!-- LINT.ThenChange(/chrome/browser/sync/prefs/chrome_syncable_prefs_database.cc:ChromeSyncablePref)-->
 
 <!-- LINT.IfChange(IosSyncablePref) -->
@@ -899,6 +902,7 @@ chromium-metrics-reviews@google.com.
   <int value="68" label="Plus Address Settings"/>
   <int value="69" label="Autofill Valuable"/>
   <int value="70" label="Shared Tab Group Account Data"/>
+  <int value="71" label="SharedComment"/>
 </enum>
 
 <!-- LINT.ThenChange(/components/sync/base/data_type.h:SyncDataTypes) -->

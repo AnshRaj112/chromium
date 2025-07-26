@@ -63,17 +63,11 @@ BASE_FEATURE(kAutofillEnableBuyNowPayLaterSyncing,
              "AutofillEnableBuyNowPayLaterSyncing",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// When enabled, buy now pay later (BNPL) data for Klarna will be synced to
-// Chrome clients.
-BASE_FEATURE(kAutofillEnableBuyNowPayLaterSyncingForKlarna,
-             "AutofillEnableBuyNowPayLaterSyncingForKlarna",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // When enabled, card benefits offered by American Express will be shown in
 // Payments Autofill UI.
 BASE_FEATURE(kAutofillEnableCardBenefitsForAmericanExpress,
              "AutofillEnableCardBenefitsForAmericanExpress",
-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+#if BUILDFLAG(IS_IOS)
              base::FEATURE_DISABLED_BY_DEFAULT);
 #else
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -241,7 +235,7 @@ BASE_FEATURE(kAutofillEnableSeparatePixPreferenceItem,
 // UI message.
 BASE_FEATURE(kAutofillEnableShowSaveCardSecurelyMessage,
              "AutofillEnableShowSaveCardSecurelyMessage",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, Pix bank accounts are synced from Chrome Sync backend and
 // stored in the local db.
@@ -347,7 +341,7 @@ const base::FeatureParam<int> kAutofillVcnEnrollStrikeExpiryTimeDays{
 // and displayed on the payment methods settings page.
 BASE_FEATURE(kAutofillSyncEwalletAccounts,
              "AutofillSyncEwalletAccounts",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_ANDROID)
 
 // If enabled, the Autofill strike system will not block features. Intended for

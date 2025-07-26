@@ -8,7 +8,7 @@
 
 #include "base/command_line.h"
 #include "base/feature_list.h"
-#include "base/lazy_instance.h"
+#include "base/no_destructor.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
@@ -80,7 +80,7 @@ extern sandbox::TargetServices* g_utility_target_services;
 #include "sandbox/policy/sandbox_type.h"
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && (BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX))
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && BUILDFLAG(IS_CHROMEOS)
 #include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"  // nogncheck
 #include "services/shape_detection/shape_detection_service.h"  // nogncheck
 #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING) && BUILDFLAG(IS_CHROMEOS)
@@ -122,8 +122,10 @@ extern sandbox::TargetServices* g_utility_target_services;
 #endif  // BUILDFLAG(ENABLE_GPU_CHANNEL_MEDIA_CAPTURE)
 
 namespace content {
-base::LazyInstance<NetworkBinderCreationCallback>::Leaky
-    g_network_binder_creation_callback_for_testing = LAZY_INSTANCE_INITIALIZER;
+NetworkBinderCreationCallback& GetNetworkBinderCreationCallbackForTesting() {
+  static base::NoDestructor<NetworkBinderCreationCallback> callback;
+  return *callback;
+}
 
 namespace {
 
@@ -188,9 +190,8 @@ class UtilityThreadVideoCaptureServiceImpl final
 auto RunNetworkService(
     mojo::PendingReceiver<network::mojom::NetworkService> receiver) {
   auto binders = std::make_unique<service_manager::BinderRegistry>();
-  if (g_network_binder_creation_callback_for_testing.Get()) {
-    std::move(g_network_binder_creation_callback_for_testing.Get())
-        .Run(binders.get());
+  if (GetNetworkBinderCreationCallbackForTesting()) {
+    std::move(GetNetworkBinderCreationCallbackForTesting()).Run(binders.get());
   }
   return std::make_unique<network::NetworkService>(
       std::move(binders), std::move(receiver),
@@ -256,7 +257,7 @@ auto RunAudio(mojo::PendingReceiver<audio::mojom::AudioService> receiver) {
   return audio::CreateStandaloneService(std::move(receiver));
 }
 
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && (BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX))
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && BUILDFLAG(IS_CHROMEOS)
 auto RunShapeDetectionService(
     mojo::PendingReceiver<shape_detection::mojom::ShapeDetectionService>
         receiver) {
@@ -398,7 +399,7 @@ auto RunVideoEncodeAcceleratorProviderFactory(
 
 void SetNetworkBinderCreationCallbackForTesting(  // IN-TEST
     NetworkBinderCreationCallback callback) {
-  g_network_binder_creation_callback_for_testing.Get() = std::move(callback);
+  GetNetworkBinderCreationCallbackForTesting() = std::move(callback);
 }
 
 void RegisterIOThreadServices(mojo::ServiceFactory& services) {
@@ -431,7 +432,7 @@ void RegisterMainThreadServices(mojo::ServiceFactory& services) {
     services.Add(RunOnDeviceModel);
   }
 
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && (BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX))
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && BUILDFLAG(IS_CHROMEOS)
   services.Add(RunShapeDetectionService);
 #endif
 

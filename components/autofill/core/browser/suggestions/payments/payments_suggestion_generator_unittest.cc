@@ -1627,8 +1627,7 @@ TEST_F(PaymentsSuggestionGeneratorBnplTest, MaybeUpdateSuggestionsWithBnpl) {
       updated_suggestions[current_suggestion_index++],
       EqualsSuggestion(
           SuggestionType::kBnplEntry,
-          l10n_util::GetStringUTF16(
-              IDS_AUTOFILL_BNPL_CREDIT_CARD_SUGGESTION_MAIN_TEXT),
+          l10n_util::GetStringUTF16(IDS_AUTOFILL_BNPL_PAY_LATER_OPTIONS_TEXT),
           Suggestion::Icon::kBnpl,
           {{Suggestion::Text(l10n_util::GetStringFUTF16(
               IDS_AUTOFILL_BNPL_CREDIT_CARD_SUGGESTION_LABEL, u"$34"))}}));
@@ -1830,8 +1829,7 @@ TEST_F(PaymentsSuggestionGeneratorBnplTest,
   scoped_feature_list.InitWithFeatures(
       /*enabled_features=*/{},
       /*disabled_features=*/
-      {features::kAutofillEnableBuyNowPayLaterForKlarna,
-       features::kAutofillEnableBuyNowPayLaterSyncingForKlarna});
+      {features::kAutofillEnableBuyNowPayLaterForKlarna});
 
   // Add a server card.
   payments_data().AddServerCreditCard(test::GetMaskedServerCardAmex());
@@ -1867,11 +1865,8 @@ TEST_F(PaymentsSuggestionGeneratorBnplTest,
        MaybeUpdateSuggestionsWithBnpl_IphBubble_KlarnaEnabled) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitWithFeatures(
-      /*enabled_features=*/{features::kAutofillEnableBuyNowPayLaterForKlarna,
-                            features::
-                                kAutofillEnableBuyNowPayLaterSyncingForKlarna},
-      /*disabled_features=*/
-      {});
+      /*enabled_features=*/{features::kAutofillEnableBuyNowPayLaterForKlarna},
+      /*disabled_features=*/{});
 
   // Add a server card.
   payments_data().AddServerCreditCard(test::GetMaskedServerCardAmex());
@@ -1908,11 +1903,8 @@ TEST_F(PaymentsSuggestionGeneratorBnplTest,
        MaybeUpdateSuggestionsWithBnpl_IphBubble_KlarnaEnabled_KlarnaMissing) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitWithFeatures(
-      /*enabled_features=*/{features::kAutofillEnableBuyNowPayLaterForKlarna,
-                            features::
-                                kAutofillEnableBuyNowPayLaterSyncingForKlarna},
-      /*disabled_features=*/
-      {});
+      /*enabled_features=*/{features::kAutofillEnableBuyNowPayLaterForKlarna},
+      /*disabled_features=*/{});
 
   // Add a server card.
   payments_data().AddServerCreditCard(test::GetMaskedServerCardAmex());

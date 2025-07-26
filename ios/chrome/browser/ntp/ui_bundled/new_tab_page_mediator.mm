@@ -61,6 +61,7 @@
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/chrome/browser/shared/model/utils/first_run_util.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/util/custom_ui_trait_accessor.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service.h"
@@ -394,22 +395,26 @@ void LogLensButtonNewBadgeShownHistogram(IOSNTPNewBadgeShownResult result) {
   if (colorTheme && colorTheme->color()) {
     // Sets the New Tab Page trait to a color palette generated from the current
     // theme.
-    [self.consumer.traitOverrides
-        setObject:CreateColorPaletteFromSeedColor(
-                      skia::UIColorFromSkColor(colorTheme->color()),
-                      ProtoEnumToSchemeVariant(
-                          colorTheme->browser_color_variant()))
-         forTrait:NewTabPageTrait.class];
+    NewTabPageColorPalette* colorPalette = CreateColorPaletteFromSeedColor(
+        skia::UIColorFromSkColor(colorTheme->color()),
+        ProtoEnumToSchemeVariant(colorTheme->browser_color_variant()));
+
+    [[[CustomUITraitAccessor alloc]
+        initWithMutableTraits:self.consumer.traitOverrides]
+        setObjectForNewTabPageTrait:colorPalette];
     [self.consumer setBackgroundImage:nil];
+    [self.headerConsumer updateLogoColor:colorPalette.tintColor];
     return;
   }
 
   // Clears the color palette associated with the New Tab Page trait,
   // reverting to the default colors defined by the trait.
-  [self.consumer.traitOverrides setObject:[NewTabPageTrait defaultValue]
-                                 forTrait:NewTabPageTrait.class];
+  [[[CustomUITraitAccessor alloc]
+      initWithMutableTraits:self.consumer.traitOverrides]
+      setObjectForNewTabPageTrait:[NewTabPageTrait defaultValue]];
   if (!background) {
     [self.consumer setBackgroundImage:nil];
+    [self.headerConsumer updateLogoColor:nil];
     return;
   }
 
@@ -605,6 +610,7 @@ void LogLensButtonNewBadgeShownHistogram(IOSNTPNewBadgeShownResult result) {
 // image for the new tab page.
 - (void)handleBackgroundImageFetch:(const gfx::Image&)image {
   [self.consumer setBackgroundImage:image.ToUIImage()];
+  [self.headerConsumer updateLogoColor:UIColor.whiteColor];
 }
 
 @end

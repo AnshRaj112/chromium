@@ -246,9 +246,7 @@ BASE_FEATURE(kMlUrlPiecewiseMappedSearchBlending,
 
 // If enabled, the ML scoring service will make use of an in-memory ML score
 // cache in order to speed up the overall scoring process.
-BASE_FEATURE(kMlUrlScoreCaching,
-             "MlUrlScoreCaching",
-             enable_if(!IS_ANDROID && !IS_IOS));
+BASE_FEATURE(kMlUrlScoreCaching, "MlUrlScoreCaching", enable_if(!IS_ANDROID));
 
 // If enabled, runs the ML scoring model to assign new relevance scores to the
 // URL suggestions and reranks them.
@@ -280,6 +278,9 @@ BASE_FEATURE(kCategoricalSuggestions, "CategoricalSuggestions", ENABLED);
 BASE_FEATURE(kOmniboxTouchDownTriggerForPrefetch,
              "OmniboxTouchDownTriggerForPrefetch",
              enable_if(IS_ANDROID));
+
+// Enables keyword-based site search functionality on Android devices.
+BASE_FEATURE(kOmniboxSiteSearch, "OmniboxSiteSearch", DISABLED);
 
 // Enables additional site search providers for the Site search Starter Pack.
 BASE_FEATURE(kStarterPackExpansion,
@@ -440,6 +441,7 @@ static jlong JNI_OmniboxFeatureMap_GetNativeMap(JNIEnv* env) {
       &kPostDelayedTaskFocusTab,
       &kOmniboxMobileParityUpdate,
       &kOmniboxMobileParityUpdateV2,
+      &kOmniboxSiteSearch,
       &kOmniboxAimShortcutTypedState,
       &kMultilineEditField};
   static base::NoDestructor<base::android::FeatureMap> kFeatureMap(

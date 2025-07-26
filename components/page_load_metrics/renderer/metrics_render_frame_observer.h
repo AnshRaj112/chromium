@@ -26,38 +26,7 @@ namespace base {
 class OneShotTimer;
 }  // namespace base
 
-namespace blink {
-struct JavaScriptFrameworkDetectionResult;
-struct SoftNavigationMetrics;
-}  // namespace blink
-
 namespace page_load_metrics {
-
-namespace internal {
-const char kPageLoadInternalSoftNavigationFromStartInvalidTiming[] =
-    "PageLoad.Internal.SoftNavigationFromStartInvalidTiming";
-
-// These values are recorded into a UMA histogram as scenarios where the start
-// time of soft navigation ends up being 0. These entries
-// should not be renumbered and the numeric values should not be reused. These
-// entries should be kept in sync with the definition in
-// tools/metrics/histograms/enums.xml
-// TODO(crbug.com/40074158): Remove the code here and related code once the bug
-// is resolved.
-enum class SoftNavigationFromStartInvalidTimingReasons {
-  kSoftNavStartTimeIsZeroAndLtNavStart = 0,
-  kSoftNavStartTimeIsZeroAndEqNavStart = 1,
-  kSoftNavStartTimeIsNonZeroAndEqNavStart = 2,
-  kSoftNavStartTimeIsNonZeroAndLtNavStart = 3,
-  kMaxValue = kSoftNavStartTimeIsNonZeroAndLtNavStart,
-};
-
-void RecordUmaForkPageLoadInternalSoftNavigationFromStartInvalidTiming(
-    base::TimeDelta start_time_relative_to_reference,
-    double nav_start_to_reference);
-
-}  // namespace internal
-
 class PageTimingMetricsSender;
 class PageTimingSender;
 
@@ -92,7 +61,8 @@ class MetricsRenderFrameObserver : public content::RenderFrameObserver,
       const blink::SubresourceLoadMetrics& subresource_load_metrics) override;
   void DidObserveNewFeatureUsage(
       const blink::UseCounterFeature& feature) override;
-  void DidObserveSoftNavigation(blink::SoftNavigationMetrics metrics) override;
+  void DidObserveSoftNavigation(
+      blink::SoftNavigationMetricsForReporting metrics) override;
   void DidObserveLayoutShift(double score, bool after_input_or_scroll) override;
   void DidStartResponse(const url::SchemeHostPort& final_response_url,
                         int request_id,

@@ -23,6 +23,7 @@ class WebContents;
 }  // namespace content
 
 namespace glic {
+class FocusedTabData;
 class GlicKeyedService;
 }  // namespace glic
 
@@ -73,7 +74,6 @@ class TabAlertController : public tabs::ContentsObservingTabFeature,
       bool used) override;
   void MediaPictureInPictureChanged(bool is_picture_in_picture) override;
   void DidUpdateAudioMutingState(bool muted) override;
-  void OnAudioStateChanged(bool audible) override;
 
   // MediaStreamCaptureIndicator::Observer:
   void OnIsCapturingVideoChanged(content::WebContents* contents,
@@ -91,9 +91,15 @@ class TabAlertController : public tabs::ContentsObservingTabFeature,
   void OnIsContentDisplayedInHeadsetChanged(bool state) override;
 
  private:
+#if BUILDFLAG(ENABLE_GLIC)
+  void OnGlicContextAccessIndicatorStatusChanged(bool is_accessing);
+  void OnGlicSharingFocusedTabChanged(
+      const glic::FocusedTabData& focused_tab_data);
   void OnGlicTabPinningChanged(tabs::TabInterface* tab_interface,
                                bool is_sharing);
-  void ObserveAlerts();
+#endif  // BUILDFLAG(ENABLE_GLIC)
+
+  void OnRecentlyAudibleStateChanged(bool was_audible);
 
   // Adds `alert` to the set of already active alerts for this tab if it isn't
   // currently active. Otherwise, removes `alert` from the set and is considered
@@ -119,8 +125,9 @@ class TabAlertController : public tabs::ContentsObservingTabFeature,
   base::ScopedObservation<vr::VrTabHelper, vr::VrTabHelper::Observer>
       vr_tab_helper_observation_{this};
 
-  // Subscription to be notified when glic sharing status has changed.
-  base::CallbackListSubscription glic_sharing_status_changed_subscription_;
+  // Subscriptions to be notified when an alert status has changed.
+  base::CallbackListSubscription recently_audible_subscription_;
+  std::vector<base::CallbackListSubscription> callback_subscriptions_;
 };
 }  // namespace tabs
 

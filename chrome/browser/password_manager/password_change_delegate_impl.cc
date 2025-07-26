@@ -15,9 +15,9 @@
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
 #include "chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.h"
 #include "chrome/browser/password_manager/password_change/change_password_form_finder.h"
-#include "chrome/browser/password_manager/password_change/change_password_form_waiter.h"
 #include "chrome/browser/password_manager/password_change/cross_origin_navigation_observer.h"
 #include "chrome/browser/password_manager/password_change/model_quality_logs_uploader.h"
+#include "chrome/browser/password_manager/password_change/otp_detection_helper.h"
 #include "chrome/browser/password_manager/password_change/password_change_hats.h"
 #include "chrome/browser/password_manager/profile_password_store_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -174,25 +174,37 @@ PasswordChangeDelegateImpl::PasswordChangeDelegateImpl(
       username_(std::move(username)),
       original_password_(std::move(password)),
       originator_(tab_interface->GetContents()),
-      profile_(Profile::FromBrowserContext(originator_->GetBrowserContext())),
-      ui_controller_(
-          std::make_unique<PasswordChangeUIController>(this, tab_interface)),
-      password_change_hats_(std::make_unique<PasswordChangeHats>(
-          HatsServiceFactory::GetForProfile(profile_,
-                                            /*create_if_necessary=*/true),
-          ProfilePasswordStoreFactory::GetForProfile(
-              profile_,
-              ServiceAccessType::EXPLICIT_ACCESS)
-              .get(),
-          AccountPasswordStoreFactory::GetForProfile(
-              profile_,
-              ServiceAccessType::EXPLICIT_ACCESS)
-              .get())),
-      last_committed_url_(originator_->GetLastCommittedURL()) {
+      profile_(Profile::FromBrowserContext(originator_->GetBrowserContext())) {
   tab_will_detach_subscription_ = tab_interface->RegisterWillDetach(
       base::BindRepeating(&PasswordChangeDelegateImpl::OnTabWillDetach,
                           weak_ptr_factory_.GetWeakPtr()));
+  ui_controller_ =
+      std::make_unique<PasswordChangeUIController>(this, tab_interface);
 
+  auto* client = ChromePasswordManagerClient::FromWebContents(originator_);
+  if (!OtpDetectionHelper::IsOtpPresent(originator_, client)) {
+    // Proceed with password change immediately if there is no OTP on a page.
+    OnOtpNotFound();
+    return;
+  }
+  otp_detection_ = std::make_unique<OtpDetectionHelper>(
+      originator_, client,
+      base::BindOnce(&PasswordChangeDelegateImpl::OnOtpNotFound,
+                     weak_ptr_factory_.GetWeakPtr()));
+}
+
+void PasswordChangeDelegateImpl::OnOtpNotFound() {
+  otp_detection_.reset();
+
+  password_change_hats_ = std::make_unique<PasswordChangeHats>(
+      HatsServiceFactory::GetForProfile(profile_,
+                                        /*create_if_necessary=*/true),
+      ProfilePasswordStoreFactory::GetForProfile(
+          profile_, ServiceAccessType::EXPLICIT_ACCESS)
+          .get(),
+      AccountPasswordStoreFactory::GetForProfile(
+          profile_, ServiceAccessType::EXPLICIT_ACCESS)
+          .get());
   if (auto logger = GetLoggerIfAvailable(originator_)) {
     logger->LogMessage(
         BrowserSavePasswordProgressLogger::STRING_PASSWORD_CHANGE_STARTED);
@@ -240,6 +252,10 @@ void PasswordChangeDelegateImpl::StartPasswordChangeFlow() {
 }
 
 void PasswordChangeDelegateImpl::CancelPasswordChangeFlow() {
+  if (logs_uploader_) {
+    logs_uploader_->SetFlowInterrupted();
+  }
+  navigation_observer_.reset();
   submission_verifier_.reset();
   form_finder_.reset();
   executor_.reset();
@@ -287,8 +303,12 @@ void PasswordChangeDelegateImpl::OnTabWillDetach(
     tabs::TabInterface* tab_interface,
     tabs::TabInterface::DetachReason reason) {
   if (reason == tabs::TabInterface::DetachReason::kDelete) {
+    if (logs_uploader_) {
+      logs_uploader_->SetFlowInterrupted();
+    }
     // Reset pointers immediately to avoid keeping dangling pointer to the tab.
     originator_ = nullptr;
+    navigation_observer_.reset();
     submission_verifier_.reset();
     ui_controller_.reset();
     form_finder_.reset();
@@ -333,6 +353,10 @@ void PasswordChangeDelegateImpl::OnOtpFieldDetected(
     return;
   }
 
+  if (logs_uploader_) {
+    logs_uploader_->SetOtpDetected();
+  }
+
   form_finder_.reset();
   submission_verifier_.reset();
 
@@ -363,7 +387,8 @@ void PasswordChangeDelegateImpl::OpenPasswordDetails() {
     return;
   }
 
-  if (last_committed_url_ == originator_->GetLastCommittedURL()) {
+  if (navigation_observer_->IsSameOrAffiliatedDomain(
+          originator_->GetLastCommittedURL())) {
     ManagePasswordsUIController::FromWebContents(originator_)
         ->ShowChangePasswordBubble(username_, generated_password_);
   } else {

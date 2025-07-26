@@ -30,16 +30,6 @@
       Customize Keyboard Shortcut...
     </message>
   </if>
-  <if expr="is_macosx">
-    <message name="IDS_GLIC_STATUS_ICON_MENU_REMOVE_ICON" translateable="false" desc="This is the menu item for removing the Gemini status icon from the menu bar.">
-      Don't show Gemini in menu bar
-    </message>
-  </if>
-  <if expr="is_win or is_linux">
-    <message name="IDS_GLIC_STATUS_ICON_MENU_REMOVE_ICON" translateable="false" desc="This is the menu item for removing the Gemini status icon from the notifications area.">
-      Don't show Gemini in notifications area
-    </message>
-  </if>
   <if expr="is_win or is_linux">
     <message name="IDS_GLIC_STATUS_ICON_MENU_EXIT" translateable="false" desc="This is the menu item for exiting Chrome.">
       Exit
@@ -198,6 +188,12 @@
   </message>
   <message name="IDS_SETTINGS_GLIC_PERMISSIONS_ACTIVITY_BUTTON_URL" translateable="false" desc="URL to navigate when clicking the 'manage your activity' button.">
     https://myactivity.google.com/product/gemini?utm_source=gemini
+  </message>
+  <message name="IDS_SETTINGS_GLIC_EXTENSIONS_BUTTON" translateable="false" desc="Name of the Gemini Extensions link out.">
+    Manage connected apps
+  </message>
+  <message name="IDS_SETTINGS_GLIC_EXTENSIONS_BUTTON_SUBLABEL" translateable="false" desc="Sublabel describing that this link allows the user to manage Gemini connected apps.">
+    Manage which apps Gemini connects to
   </message>
   <message name="IDS_SETTINGS_GLIC_PERMISSIONS_TAB_ACCESS_WHEN_ON_1" translateable="false" desc="First point in the 'when on' column of the 'tab access' expando">
     You’ll get more relevant answers related to the page content you’re sharing

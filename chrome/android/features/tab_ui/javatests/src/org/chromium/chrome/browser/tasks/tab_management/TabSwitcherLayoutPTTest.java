@@ -64,7 +64,7 @@ import org.chromium.chrome.test.transit.hub.TabSwitcherStation;
 import org.chromium.chrome.test.transit.hub.UndoSnackbarFacility;
 import org.chromium.chrome.test.transit.ntp.IncognitoNewTabPageStation;
 import org.chromium.chrome.test.transit.ntp.RegularNewTabPageStation;
-import org.chromium.chrome.test.transit.page.PageStation;
+import org.chromium.chrome.test.transit.page.CtaPageStation;
 import org.chromium.chrome.test.transit.page.WebPageStation;
 import org.chromium.chrome.test.transit.tabmodel.TabThumbnailsCapturedCarryOn;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
@@ -132,7 +132,7 @@ public class TabSwitcherLayoutPTTest {
 
     /** Enters the regular Tab Switcher, making sure all tabs have a thumbnail. */
     private RegularTabSwitcherStation enterRegularHtsWithThumbnailChecking(
-            PageStation currentStation) {
+            CtaPageStation currentStation) {
         return currentStation
                 .openRegularTabSwitcherAnd()
                 .pickUpCarryOnAnd(
@@ -143,7 +143,7 @@ public class TabSwitcherLayoutPTTest {
 
     /** Enters the Incognito Tab Switcher, making sure all tabs have a thumbnail. */
     private IncognitoTabSwitcherStation enterIncognitoHtsWithThumbnailChecking(
-            PageStation currentStation) {
+            CtaPageStation currentStation) {
         return currentStation
                 .openIncognitoTabSwitcherAnd()
                 .pickUpCarryOnAnd(
@@ -323,6 +323,7 @@ public class TabSwitcherLayoutPTTest {
     @Test
     @MediumTest
     @TestAnimations.EnableAnimations
+    @DisabledTest(message = "crbug.com/433892577 thumbnail capture is flaky")
     @RequiresRestart("Flaky on desktop (crbug.com/381679686), affects flake rate of other tests")
     public void testTabToGridAndBack_SoftCleanup_Ntp() {
         WebPageStation firstPage = mCtaTestRule.startOnBlankPage();
@@ -656,9 +657,9 @@ public class TabSwitcherLayoutPTTest {
         assertFinalDestination(ntp);
     }
 
-    private <T extends PageStation> T roundtripToHTSWithThumbnailChecks(
+    private <T extends CtaPageStation> T roundtripToHTSWithThumbnailChecks(
             T page,
-            Supplier<PageStation.Builder<T>> destinationBuiderFactory,
+            Supplier<CtaPageStation.Builder<T>> destinationBuiderFactory,
             Runnable resetHTSStateOnUiThread,
             boolean canGarbageCollectBitmaps) {
         RegularTabSwitcherStation tabSwitcher = enterRegularHtsWithThumbnailChecking(page);

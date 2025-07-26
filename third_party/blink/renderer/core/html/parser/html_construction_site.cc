@@ -33,6 +33,7 @@
 #include "third_party/blink/renderer/core/dom/attribute_part.h"
 #include "third_party/blink/renderer/core/dom/child_node_part.h"
 #include "third_party/blink/renderer/core/dom/comment.h"
+#include "third_party/blink/renderer/core/dom/container_node.h"
 #include "third_party/blink/renderer/core/dom/document_fragment.h"
 #include "third_party/blink/renderer/core/dom/document_part_root.h"
 #include "third_party/blink/renderer/core/dom/document_type.h"
@@ -534,6 +535,10 @@ HTMLConstructionSite::~HTMLConstructionSite() {
   DCHECK(pending_text_.IsEmpty());
 }
 
+void HTMLConstructionSite::SetPatchScope(ContainerNode* scope) {
+  patch_scope_ = scope;
+}
+
 void HTMLConstructionSite::Trace(Visitor* visitor) const {
   visitor->Trace(reentry_permit_);
   visitor->Trace(document_);
@@ -545,6 +550,7 @@ void HTMLConstructionSite::Trace(Visitor* visitor) const {
   visitor->Trace(task_queue_);
   visitor->Trace(pending_text_);
   visitor->Trace(pending_dom_parts_);
+  visitor->Trace(patch_scope_);
 }
 
 void HTMLConstructionSite::Detach() {
@@ -565,8 +571,9 @@ void HTMLConstructionSite::InsertHTMLHtmlStartTagBeforeHTML(
   DCHECK(document_);
   HTMLHtmlElement* element;
   if (const auto* is_attribute = token->GetAttributeItem(html_names::kIsAttr)) {
-    element = To<HTMLHtmlElement>(document_->CreateElement(
-        html_names::kHTMLTag, GetCreateElementFlags(), is_attribute->Value()));
+    element = To<HTMLHtmlElement>(
+        document_->CreateElement(html_names::kHTMLTag, GetCreateElementFlags(),
+                                 is_attribute->Value(), /*registry*/ nullptr));
   } else {
     element = MakeGarbageCollected<HTMLHtmlElement>(*document_);
   }
@@ -906,26 +913,40 @@ void HTMLConstructionSite::InsertHTMLTemplateElement(
   if (RuntimeEnabledFeatures::DocumentPatchingEnabled()) {
     if (Attribute* patchfor_attribute =
             token->GetAttributeItem(html_names::kPatchforAttr)) {
-      TreeScope* scope = &CurrentNode()->GetTreeScope();
-      if (HTMLTemplateElement* template_parent =
-              DynamicTo<HTMLTemplateElement>(CurrentNode())) {
-        if (ShadowRoot* shadow_root =
-                DynamicTo<ShadowRoot>(template_parent->InsertionTarget())) {
-          scope = shadow_root;
+      const AtomicString& id = patchfor_attribute->Value();
+      Element* patch_target = nullptr;
+      // If we have a patch scope, it is used as a scope to resolve patch
+      // target IDs.
+      if (patch_scope_) {
+        patch_target = patch_scope_->getElementById(id);
+      } else {
+        TreeScope* scope = &CurrentNode()->GetTreeScope();
+        if (HTMLTemplateElement* template_parent =
+                DynamicTo<HTMLTemplateElement>(CurrentNode())) {
+          if (ShadowRoot* shadow_root =
+                  DynamicTo<ShadowRoot>(template_parent->InsertionTarget())) {
+            scope = shadow_root;
+          }
         }
-      }
 
-      if (Element* patch_target =
-              scope->getElementById(patchfor_attribute->Value())) {
+        patch_target = scope->getElementById(id);
+      }
+      if (patch_target) {
         // For now, a template is either targeting a shadow root or a patch.
         declarative_shadow_root_mode = String();
 
         // Like with shadowrootmode, the template is discarded.
         should_attach_template = false;
 
+        String patch_src;
+        if (Attribute* patchsrc_attribute =
+                token->GetAttributeItem(html_names::kPatchsrcAttr)) {
+          patch_src = patchsrc_attribute->Value();
+        }
+
         // From now on, parsed children of the template are inserted directly to
-        // the patch target.
-        template_element->BeginPatch(*patch_target);
+        // the patch target, and patch_src will be fetched.
+        template_element->BeginPatch(*patch_target, patch_src);
       }
     }
   }
@@ -1026,7 +1047,8 @@ void HTMLConstructionSite::InsertScriptElement(AtomicHTMLToken* token) {
   HTMLScriptElement* element = nullptr;
   if (const auto* is_attribute = token->GetAttributeItem(html_names::kIsAttr)) {
     element = To<HTMLScriptElement>(OwnerDocumentForCurrentNode().CreateElement(
-        html_names::kScriptTag, flags, is_attribute->Value()));
+        html_names::kScriptTag, flags, is_attribute->Value(),
+        /*registry*/ nullptr));
   } else {
     element = MakeGarbageCollected<HTMLScriptElement>(
         OwnerDocumentForCurrentNode(), flags);
@@ -1247,7 +1269,8 @@ Element* HTMLConstructionSite::CreateElement(
                                           GetCreateElementFlags());
     } else {
       element = CustomElement::CreateUncustomizedOrUndefinedElement(
-          document, tag_name, GetCreateElementFlags(), is);
+          document, tag_name, GetCreateElementFlags(), is,
+          /*registry*/ nullptr);
     }
     // Definition for the created element does not exist here and it cannot be
     // custom, precustomized, or failed.

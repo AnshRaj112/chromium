@@ -273,7 +273,6 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasRenderingContext,
   void TryRestoreContextEvent(TimerBase*);
   void RestoreFromInvalidSizeIfNeeded() override;
 
-  virtual CanvasResourceProvider* GetOrCreateCanvas2DResourceProvider() = 0;
   virtual std::unique_ptr<CanvasResourceProvider>
       ReplaceResourceProviderForCanvas2D(
           std::unique_ptr<CanvasResourceProvider>) = 0;
@@ -306,7 +305,6 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasRenderingContext,
   void PutByteArray(const SkPixmap& source,
                     const gfx::Rect& source_rect,
                     const gfx::Vector2d& dest_offset);
-  virtual bool IsCanvas2DBufferValid() { NOTREACHED(); }
 
   void WillUseCurrentFont() const;
 

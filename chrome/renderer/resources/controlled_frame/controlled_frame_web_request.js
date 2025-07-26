@@ -10,26 +10,16 @@
 
 const $Headers = require('safeMethods').SafeMethods.$Headers;
 
-let WebUrlPatternNatives = requireNative('WebUrlPatternNatives');
-
-function convertURLPatternsToExtension(urlPatternsStrs) {
-  let matchPatterns = [];
-  for (const urlPatternStr of urlPatternsStrs) {
-    matchPatterns = $Array.concat(
-      matchPatterns,
-      WebUrlPatternNatives.URLPatternToMatchPatterns(
-        new URLPattern(urlPatternStr))
-    );
-  };
-  return matchPatterns;
-}
+const convertURLPatternsToMatchPatterns =
+    require('controlledFrameURLPatternsHelper')
+        .convertURLPatternsToMatchPatterns;
 
 function convertExtensionHeadersToWeb(httpHeaders) {
   const headers = new $Headers.self();
   for (const header of httpHeaders) {
-    const value = (header.value !== undefined)
-        ? header.value
-        : $String.fromCharCode(...header.binaryValue);
+    const value = (header.value !== undefined) ?
+        header.value :
+        $String.fromCharCode(...header.binaryValue);
     $Headers.append(headers, header.name, value);
   }
   return headers;
@@ -60,7 +50,7 @@ function mapString(mapping, value) {
 }
 
 function extractAndMapValues(obj, mapping) {
-  const mapped = { __proto__: null };
+  const mapped = {__proto__: null};
   for (const [key, value] of $Object.entries(obj)) {
     if (key in mapping) {
       $Object.defineProperty(mapped, key, {
@@ -189,13 +179,6 @@ class ControlledFrameWebRequest {
     }
     return new WebRequestInterceptor(this.#webRequest, options);
   }
-
-  interceptorBehaviorChanged() {
-    return new $Promise.self((resolve) => {
-      // TODO(crbug.com/421986167): handlerBehaviorChanged is undefined.
-      this.#webRequest.handlerBehaviorChanged(resolve);
-    });
-  }
 }
 
 function createEventInfo(webRequestEventName) {
@@ -228,7 +211,7 @@ class WebRequestInterceptor extends EventTarget {
 
     this.#filter = {
       __proto__: null,
-      urls: convertURLPatternsToExtension(options.urlPatterns),
+      urls: convertURLPatternsToMatchPatterns(options.urlPatterns),
     };
     if (options.resourceTypes !== undefined) {
       this.#filter.types =
@@ -375,8 +358,8 @@ class WebRequestInterceptor extends EventTarget {
       return;
     }
 
-    const resultPromises = $Array.self(
-        $Promise.resolve(result.authCredentials));
+    const resultPromises =
+        $Array.self($Promise.resolve(result.authCredentials));
     if (options.signal) {
       $Array.push(resultPromises, new $Promise.self((resolve) => {
         options.signal.addEventListener('abort', resolve);

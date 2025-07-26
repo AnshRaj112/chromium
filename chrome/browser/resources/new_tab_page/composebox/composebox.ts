@@ -11,6 +11,7 @@ import type {PropertyValues} from '//resources/lit/v3_0/lit.rollup.js';
 import {CrLitElement} from '//resources/lit/v3_0/lit.rollup.js';
 import type {BigBuffer} from '//resources/mojo/mojo/public/mojom/base/big_buffer.mojom-webui.js';
 import type {UnguessableToken} from '//resources/mojo/mojo/public/mojom/base/unguessable_token.mojom-webui.js';
+import {getInstance as getAnnouncerInstance} from 'chrome://resources/cr_elements/cr_a11y_announcer/cr_a11y_announcer.js';
 import {I18nMixinLit} from 'chrome://resources/cr_elements/i18n_mixin_lit.js';
 import {EventTracker} from 'chrome://resources/js/event_tracker.js';
 
@@ -49,6 +50,17 @@ const FILE_VALIDATION_ERRORS_MAP = new Map<FileUploadErrorType, string>([
     'composeboxFileUploadValidationFailed',
   ],
 ]);
+
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+const enum ComposeboxFileValidationError {
+  NONE = 0,
+  TOO_MANY_FILES = 1,
+  FILE_EMPTY = 2,
+  FILE_SIZE_TOO_LARGE = 3,
+  MAX_VALUE = FILE_SIZE_TOO_LARGE,
+}
+
 
 export class ComposeboxElement extends I18nMixinLit
 (CrLitElement) {
@@ -89,6 +101,10 @@ export class ComposeboxElement extends I18nMixinLit
       errorMessage_: {
         type: String,
       },
+      inputPlaceholder_: {
+        type: String,
+        reflect: true,
+      },
     };
   }
 
@@ -103,6 +119,8 @@ export class ComposeboxElement extends I18nMixinLit
   protected accessor submitting_: boolean = false;
   protected accessor showErrorScrim_: boolean = false;
   protected accessor errorMessage_: string = '';
+  protected accessor inputPlaceholder_: string =
+      loadTimeData.getString('searchboxComposePlaceholder');
   private maxFileCount_: number =
       loadTimeData.getInteger('composeboxFileMaxCount');
   private maxFileSize_: number =
@@ -160,6 +178,12 @@ export class ComposeboxElement extends I18nMixinLit
                 } else {
                   file = {...file, status: status};
                   this.files_.set(token, file);
+
+                  if (status === FileUploadStatus.kUploadSuccessful) {
+                    const announcer = getAnnouncerInstance();
+                    announcer.announce(
+                        this.i18n('composeboxFileUploadCompleteText'));
+                  }
                 }
                 this.files_ = new Map([...this.files_]);
               }
@@ -186,6 +210,20 @@ export class ComposeboxElement extends I18nMixinLit
     if (changedPrivateProperties.has('files_')) {
       this.inputsDisabled_ = this.files_.size >= this.maxFileCount_;
       this.submitEnabled_ = this.submitEnabled_ || this.files_.size > 0;
+    }
+  }
+
+  override updated(changedProperties: PropertyValues<this>) {
+    if ((changedProperties as Map<PropertyKey, unknown>)
+            .has('showErrorScrim_') &&
+        this.showErrorScrim_) {
+      const announcer = getAnnouncerInstance();
+      announcer.announce(this.errorMessage_);
+      const dismissErrorButton =
+          this.shadowRoot.querySelector<HTMLElement>('#dismissErrorButton');
+      if (dismissErrorButton) {
+        dismissErrorButton.focus();
+      }
     }
   }
 
@@ -224,15 +262,23 @@ export class ComposeboxElement extends I18nMixinLit
     const files = input.files;
     if (!files || files.length === 0 ||
         this.files_.size >= this.maxFileCount_) {
+      this.recordFileValidationMetric_(
+          ComposeboxFileValidationError.TOO_MANY_FILES);
       return;
     }
 
     for (const file of files) {
       if (file.size === 0 || file.size > this.maxFileSize_) {
         this.showErrorScrim_ = true;
-        this.errorMessage_ = file.size === 0 ?
+        const fileIsEmpty = file.size === 0;
+        this.errorMessage_ = fileIsEmpty ?
             this.i18n('composeboxFileUploadInvalidEmptySize') :
             this.i18n('composeboxFileUploadInvalidTooLarge');
+        input.value = '';
+        fileIsEmpty ? this.recordFileValidationMetric_(
+                          ComposeboxFileValidationError.FILE_EMPTY) :
+                      this.recordFileValidationMetric_(
+                          ComposeboxFileValidationError.FILE_SIZE_TOO_LARGE);
         return;
       } else {
         const fileBuffer = await file.arrayBuffer();
@@ -259,6 +305,10 @@ export class ComposeboxElement extends I18nMixinLit
           status: FileUploadStatus.kNotUploaded,
         };
         this.files_ = new Map([...this.files_.entries(), [token, attachment]]);
+
+        const announcer = getAnnouncerInstance();
+        announcer.announce(this.i18n('composeboxFileUploadStartedText'));
+        this.recordFileValidationMetric_(ComposeboxFileValidationError.NONE);
       }
     }
     // Clear the file input.
@@ -277,6 +327,7 @@ export class ComposeboxElement extends I18nMixinLit
   protected onCancelClick_() {
     if (this.$.input.value.trim().length > 0 || this.files_.size > 0) {
       this.$.input.value = '';
+      this.input_ = '';
       this.files_ = new Map();
       this.submitEnabled_ = false;
       this.pageHandler_.clearFiles();
@@ -315,6 +366,13 @@ export class ComposeboxElement extends I18nMixinLit
         this.$.input.value.trim(), (e as MouseEvent).button || 0, e.altKey,
         e.ctrlKey, e.metaKey, e.shiftKey);
     this.submitting_ = true;
+  }
+
+  private recordFileValidationMetric_(
+      enumValue: ComposeboxFileValidationError) {
+    chrome.metricsPrivate.recordEnumerationValue(
+        'NewTabPage.Composebox.File.WebUI.UploadAttemptFailure', enumValue,
+        ComposeboxFileValidationError.MAX_VALUE + 1);
   }
 }
 

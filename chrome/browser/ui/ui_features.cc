@@ -128,12 +128,12 @@ BASE_FEATURE_PARAM(base::TimeDelta,
                    kSideBySideShowDropTargetDelay,
                    &kSideBySide,
                    "drop_target_show_delay",
-                   base::Milliseconds(700));
+                   base::Milliseconds(500));
 BASE_FEATURE_PARAM(int,
                    kSideBySideDropTargetMinWidth,
                    &kSideBySide,
                    "drop_target_min_width",
-                   88);
+                   120);
 BASE_FEATURE_PARAM(int,
                    kSideBySideDropTargetMaxWidth,
                    &kSideBySide,
@@ -143,7 +143,7 @@ BASE_FEATURE_PARAM(int,
                    kSideBySideDropTargetTargetWidthPercentage,
                    &kSideBySide,
                    "drop_target_width_percentage",
-                   20);
+                   30);
 
 constexpr base::FeatureParam<MiniToolbarActiveConfiguration>::Option
     kMiniToolbarActiveConfigurationOptions[] = {
@@ -409,7 +409,7 @@ BASE_FEATURE(kEnableManagementPromotionBanner,
 #if BUILDFLAG(IS_CHROMEOS)
 BASE_FEATURE(kEnablePolicyPromotionBanner,
              "EnablePolicyPromotionBanner",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #else
 BASE_FEATURE(kEnablePolicyPromotionBanner,
              "EnablePolicyPromotionBanner",
@@ -588,5 +588,9 @@ bool HasTabSearchToolbarButton() {
 
   return is_tab_search_moving;
 }
+
+BASE_FEATURE(kNonMilestoneUpdateToast,
+             "NonMilestoneUpdateToast",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

@@ -50,6 +50,7 @@ import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.HistogramWatcher;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.loading_modal.LoadingModalDialogCoordinator;
 import org.chromium.chrome.browser.password_manager.CredentialManagerLauncher.CredentialManagerError;
 import org.chromium.chrome.browser.password_manager.PasswordCheckupClientHelper.PasswordCheckBackendException;
@@ -272,9 +273,6 @@ public class PasswordManagerCheckupHelperTest {
 
     @Test
     public void testRetrievesIntentForLocalCheckup() {
-        when(mPasswordManagerUtilBridgeJniMock.shouldUseUpmWiring(mSyncServiceMock, mPrefService))
-                .thenReturn(true);
-
         mPasswordManagerHelper.showPasswordCheckup(
                 ContextUtils.getApplicationContext(),
                 PasswordCheckReferrer.SAFETY_CHECK,
@@ -305,9 +303,6 @@ public class PasswordManagerCheckupHelperTest {
 
     @Test
     public void testPasswordCheckupIntentForLocalCalledIfSuccess() throws CanceledException {
-        when(mPasswordManagerUtilBridgeJniMock.shouldUseUpmWiring(mSyncServiceMock, mPrefService))
-                .thenReturn(true);
-
         setUpSuccessfulCheckupIntentFetching(mPendingIntentMock, TEST_NO_EMAIL_ADDRESS);
         mPasswordManagerHelper.showPasswordCheckup(
                 ContextUtils.getApplicationContext(),
@@ -354,8 +349,6 @@ public class PasswordManagerCheckupHelperTest {
                                         .PASSWORD_CHECKUP_LAUNCH_CREDENTIAL_MANAGER_SUCCESS_HISTOGRAM,
                                 1)
                         .build();
-        when(mPasswordManagerUtilBridgeJniMock.shouldUseUpmWiring(mSyncServiceMock, mPrefService))
-                .thenReturn(true);
         setUpSuccessfulCheckupIntentFetching(mPendingIntentMock, TEST_NO_EMAIL_ADDRESS);
 
         mPasswordManagerHelper.showPasswordCheckup(
@@ -409,8 +402,6 @@ public class PasswordManagerCheckupHelperTest {
                                         .PASSWORD_CHECKUP_LAUNCH_CREDENTIAL_MANAGER_SUCCESS_HISTOGRAM)
                         .build();
 
-        when(mPasswordManagerUtilBridgeJniMock.shouldUseUpmWiring(mSyncServiceMock, mPrefService))
-                .thenReturn(true);
         returnErrorWhenFetchingIntentForPasswordCheckup(
                 new PasswordCheckBackendException("", CredentialManagerError.UNCATEGORIZED),
                 TEST_NO_EMAIL_ADDRESS);
@@ -465,8 +456,6 @@ public class PasswordManagerCheckupHelperTest {
                                 PasswordMetricsUtil
                                         .PASSWORD_CHECKUP_LAUNCH_CREDENTIAL_MANAGER_SUCCESS_HISTOGRAM)
                         .build();
-        when(mPasswordManagerUtilBridgeJniMock.shouldUseUpmWiring(mSyncServiceMock, mPrefService))
-                .thenReturn(true);
         returnErrorWhenFetchingIntentForPasswordCheckup(
                 new ApiException(new Status(CommonStatusCodes.DEVELOPER_ERROR)),
                 TEST_NO_EMAIL_ADDRESS);
@@ -1195,11 +1184,7 @@ public class PasswordManagerCheckupHelperTest {
         PropertyModel dialogModel = mModalDialogManager.getCurrentDialogForTest();
         assertNotNull(dialogModel);
         assertEquals(
-                testActivity
-                        .getResources()
-                        .getString(
-                                org.chromium.chrome.browser.access_loss.R.string
-                                        .pwm_disabled_no_gms_dialog_title),
+                testActivity.getResources().getString(R.string.pwm_disabled_no_gms_dialog_title),
                 dialogModel.get(ModalDialogProperties.TITLE));
     }
 
@@ -1224,11 +1209,7 @@ public class PasswordManagerCheckupHelperTest {
         PropertyModel dialogModel = mModalDialogManager.getCurrentDialogForTest();
         assertNotNull(dialogModel);
         assertEquals(
-                testActivity
-                        .getResources()
-                        .getString(
-                                org.chromium.chrome.browser.access_loss.R.string
-                                        .access_loss_update_gms_title),
+                testActivity.getResources().getString(R.string.access_loss_update_gms_title),
                 dialogModel.get(ModalDialogProperties.TITLE));
     }
 
@@ -1239,10 +1220,6 @@ public class PasswordManagerCheckupHelperTest {
                 .thenReturn(
                         CoreAccountInfo.createFromEmailAndGaiaId(
                                 TEST_EMAIL_ADDRESS, new GaiaId("0")));
-        // Set the adequate PasswordManagerUtilBridge response for shouldUseUpmWiring for a syncing
-        // user.
-        when(mPasswordManagerUtilBridgeJniMock.shouldUseUpmWiring(mSyncServiceMock, mPrefService))
-                .thenReturn(true);
     }
 
     private void setUpSuccessfulCheckupIntentFetching(PendingIntent intent, String accountEmail) {

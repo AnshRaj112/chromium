@@ -2057,21 +2057,6 @@
             ]
         }
     ],
-    "AutofillEnableCardBenefitsForAmericanExpress": [
-        {
-            "platforms": [
-                "android"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "AutofillEnableCardBenefitsForAmericanExpress"
-                    ]
-                }
-            ]
-        }
-    ],
     "AutofillEnableCardBenefitsForBmo": [
         {
             "platforms": [
@@ -2079,7 +2064,8 @@
                 "chromeos_lacros",
                 "linux",
                 "mac",
-                "windows"
+                "windows",
+                "android"
             ],
             "experiments": [
                 {
@@ -2273,21 +2259,6 @@
             ]
         }
     ],
-    "AutofillEnableShowSaveCardSecurelyMessage": [
-        {
-            "platforms": [
-                "android"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "AutofillEnableShowSaveCardSecurelyMessage"
-                    ]
-                }
-            ]
-        }
-    ],
     "AutofillEnableSupportForParsingWithSharedLabels": [
         {
             "platforms": [
@@ -2324,26 +2295,6 @@
                     "name": "Enabled",
                     "enable_features": [
                         "AutofillEnableSyntheticSelectMetricsLogging"
-                    ]
-                }
-            ]
-        }
-    ],
-    "AutofillFixSplitCreditCardImport": [
-        {
-            "platforms": [
-                "android",
-                "chromeos",
-                "ios",
-                "linux",
-                "mac",
-                "windows"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "AutofillFixSplitCreditCardImport"
                     ]
                 }
             ]
@@ -6440,6 +6391,21 @@
             ]
         }
     ],
+    "Conch": [
+        {
+            "platforms": [
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "Conch"
+                    ]
+                }
+            ]
+        }
+    ],
     "ConditionalImageResize": [
         {
             "platforms": [
@@ -7185,7 +7151,7 @@
             ]
         }
     ],
-    "CrOSLocalImageSearchIca": [
+    "CrOSLocalImageSearchOcr": [
         {
             "platforms": [
                 "chromeos"
@@ -7194,8 +7160,7 @@
                 {
                     "name": "Enabled",
                     "enable_features": [
-                        "LauncherImageSearch",
-                        "LauncherImageSearchIca"
+                        "LauncherImageSearchOcr"
                     ]
                 }
             ]
@@ -8610,33 +8575,6 @@
             ]
         }
     ],
-    "DiskCacheBackendExperiment": [
-        {
-            "platforms": [
-                "windows"
-            ],
-            "experiments": [
-                {
-                    "name": "Simple",
-                    "params": {
-                        "backend": "simple"
-                    },
-                    "enable_features": [
-                        "DiskCacheBackendExperiment"
-                    ]
-                },
-                {
-                    "name": "Blockfile",
-                    "params": {
-                        "backend": "blockfile"
-                    },
-                    "enable_features": [
-                        "DiskCacheBackendExperiment"
-                    ]
-                }
-            ]
-        }
-    ],
     "DisplayEdgeToEdgeFullscreen": [
         {
             "platforms": [
@@ -8879,6 +8817,26 @@
                     "name": "Enabled",
                     "enable_features": [
                         "DwaFeature"
+                    ]
+                }
+            ]
+        }
+    ],
+    "DynamicProfileCountry": [
+        {
+            "platforms": [
+                "android",
+                "chromeos",
+                "ios",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "DynamicProfileCountry"
                     ]
                 }
             ]
@@ -9192,23 +9150,6 @@
             ]
         }
     ],
-    "EnableEwalletPayFlow": [
-        {
-            "platforms": [
-                "android"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "AutofillSyncEwalletAccounts",
-                        "EwalletPayments",
-                        "PaymentLinkDetection"
-                    ]
-                }
-            ]
-        }
-    ],
     "EnableExtensionsExplicitBrowserSignin": [
         {
             "platforms": [
@@ -9345,21 +9286,6 @@
                     "name": "Enabled",
                     "enable_features": [
                         "ShoppingPDPMetrics"
-                    ]
-                }
-            ]
-        }
-    ],
-    "EnablePkcs12ToChapsDualWrite": [
-        {
-            "platforms": [
-                "chromeos"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "EnablePkcs12ToChapsDualWrite"
                     ]
                 }
             ]
@@ -9612,6 +9538,24 @@
                     "name": "Enabled",
                     "enable_features": [
                         "EnterpriseFileSystemAccessDeepScan"
+                    ]
+                }
+            ]
+        }
+    ],
+    "EnterpriseIframeDlpRulesSupport": [
+        {
+            "platforms": [
+                "chromeos",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "EnterpriseIframeDlpRulesSupport"
                     ]
                 }
             ]
@@ -10519,7 +10463,8 @@
     "ForceOffTextAutosizing": [
         {
             "platforms": [
-                "android"
+                "android",
+                "android_webview"
             ],
             "experiments": [
                 {
@@ -15144,26 +15089,6 @@
             ]
         }
     ],
-    "MultiBufferNeverDefer": [
-        {
-            "platforms": [
-                "android",
-                "android_webview",
-                "chromeos",
-                "linux",
-                "mac",
-                "windows"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "MultiBufferNeverDefer"
-                    ]
-                }
-            ]
-        }
-    ],
     "MultiCalendarSupport": [
         {
             "platforms": [
@@ -15225,25 +15150,6 @@
                     "name": "Enabled",
                     "enable_features": [
                         "MvcUpdateViewWhenModelChanged"
-                    ]
-                }
-            ]
-        }
-    ],
-    "NavBarColorAnimationEnabled": [
-        {
-            "platforms": [
-                "android"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "params": {
-                        "disable_bottom_chin_color_animation": "false",
-                        "disable_edge_to_edge_layout_color_animation": "false"
-                    },
-                    "enable_features": [
-                        "NavBarColorAnimation"
                     ]
                 }
             ]
@@ -16248,6 +16154,21 @@
             ]
         }
     ],
+    "OmniboxSiteSearchAndroid": [
+        {
+            "platforms": [
+                "android"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "OmniboxSiteSearch"
+                    ]
+                }
+            ]
+        }
+    ],
     "OmniboxStarterPackIPH": [
         {
             "platforms": [
@@ -16642,6 +16563,7 @@
                         "offer_notification": "true",
                         "price_insights": "true",
                         "product_specifications": "true",
+                        "pwa_install": "true",
                         "translate": "true",
                         "zoom": "true"
                     },
@@ -17976,18 +17898,18 @@
             ],
             "experiments": [
                 {
-                    "name": "EnabledWithOTRtrue_20250319",
+                    "name": "EnabledWithOTRfalse_20250319",
                     "params": {
-                        "run_on_otr": "true"
+                        "run_on_otPreconnectFromKeyedServicer": "false"
                     },
                     "enable_features": [
                         "PreconnectFromKeyedService"
                     ]
                 },
                 {
-                    "name": "EnabledWithOTRfalse_20250319",
+                    "name": "EnabledWithOTRtrue_20250319",
                     "params": {
-                        "run_on_otr": "false"
+                        "run_on_otr": "true"
                     },
                     "enable_features": [
                         "PreconnectFromKeyedService"
@@ -19485,6 +19407,26 @@
                     },
                     "enable_features": [
                         "PushMessagingGcmEndpointEnvironment"
+                    ]
+                }
+            ]
+        }
+    ],
+    "PushMessagingGcmEndpointWebpushPath": [
+        {
+            "platforms": [
+                "android",
+                "chromeos",
+                "fuchsia",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled_Dogfood",
+                    "enable_features": [
+                        "PushMessagingGcmEndpointWebpushPath"
                     ]
                 }
             ]
@@ -22831,25 +22773,8 @@
                 {
                     "name": "Enabled",
                     "enable_features": [
+                        "DataSharing",
                         "DataSharingJoinOnly"
-                    ]
-                }
-            ]
-        }
-    ],
-    "SharedTabGroupsTeamfoodIPhone": [
-        {
-            "platforms": [
-                "ios"
-            ],
-            "form_factors": [
-                "phone"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "DataSharing"
                     ]
                 }
             ]
@@ -22996,6 +22921,32 @@
                     "name": "Enabled",
                     "enable_features": [
                         "ShowSuggestionsOnAutofocus"
+                    ]
+                }
+            ]
+        }
+    ],
+    "SideBySideDogfood": [
+        {
+            "platforms": [
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "SideBySide_Dogfood",
+                    "params": {
+                        "drop_target_max_width": "360",
+                        "drop_target_min_width": "88",
+                        "drop_target_show_delay": "700ms",
+                        "drop_target_width_percentage": "20",
+                        "mini_toolbar_active_config": "hide"
+                    },
+                    "enable_features": [
+                        "SideBySide",
+                        "SideBySideLinkMenuNewBadge",
+                        "SideBySideSessionRestore"
                     ]
                 }
             ]
@@ -24150,7 +24101,6 @@
                         "tab_search_toolbar_button": "true"
                     },
                     "enable_features": [
-                        "IPH_TabSearchToolbarButton",
                         "TabstripComboButton"
                     ]
                 }
@@ -25410,8 +25360,11 @@
             "experiments": [
                 {
                     "name": "Enabled",
+                    "params": {
+                        "external_memory_max_growing_factor": "1.3"
+                    },
                     "enable_features": [
-                        "V8ExternalMemoryAccountedInGlobalLimit"
+                        "V8Flag_external_memory_accounted_in_global_limit"
                     ]
                 }
             ]

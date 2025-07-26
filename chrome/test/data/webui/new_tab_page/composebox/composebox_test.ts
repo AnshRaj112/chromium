@@ -9,6 +9,8 @@ import {ComposeboxElement, ComposeboxProxyImpl} from 'chrome://new-tab-page/lazy
 import {$$} from 'chrome://new-tab-page/new_tab_page.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import type {MetricsTracker} from 'chrome://webui-test/metrics_test_support.js';
+import {fakeMetricsPrivate} from 'chrome://webui-test/metrics_test_support.js';
 import type {TestMock} from 'chrome://webui-test/test_mock.js';
 import {eventToPromise, microtasksFinished} from 'chrome://webui-test/test_util.js';
 
@@ -25,6 +27,7 @@ suite('NewTabPageComposeboxTest', () => {
   let composeboxElement: ComposeboxElement;
   let handler: TestMock<PageHandlerRemote>;
   let callbackRouterRemote: PageRemote;
+  let metrics: MetricsTracker;
 
   setup(() => {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
@@ -34,6 +37,7 @@ suite('NewTabPageComposeboxTest', () => {
             new ComposeboxProxyImpl(mock, new PageCallbackRouter())));
     callbackRouterRemote = ComposeboxProxyImpl.getInstance()
                                .callbackRouter.$.bindNewPipeAndPassRemote();
+    metrics = fakeMetricsPrivate();
   });
 
   function createComposeboxElement() {
@@ -170,6 +174,53 @@ suite('NewTabPageComposeboxTest', () => {
     assertStyle(composeboxElement.$.submitIcon, 'cursor', 'pointer');
   });
 
+  [new File(['foo'], 'foo.jpg', {type: 'image/jpeg'}),
+   new File(['foo'], 'foo.pdf', {type: 'application/pdf'})]
+      .forEach((file) => {
+        test(
+            `announce file upload started and completed: ${file.type}`,
+            async () => {
+              createComposeboxElement();
+
+              let announcementCount = 0;
+              const updateAnnouncementCount = () => {
+                announcementCount += 1;
+              };
+              document.body.addEventListener(
+                  'cr-a11y-announcer-messages-sent', updateAnnouncementCount);
+              let announcementPromise = eventToPromise(
+                  'cr-a11y-announcer-messages-sent', document.body);
+
+              const id = generateZeroId();
+              await uploadFileAndVerify(id, file);
+
+              let announcement = await announcementPromise;
+              assertEquals(announcementCount, 1);
+              assertTrue(!!announcement);
+              assertEquals(announcement.detail.messages.length, 1);
+
+              callbackRouterRemote.onFileUploadStatusChanged(
+                  id, FileUploadStatus.kUploadSuccessful, null);
+              await callbackRouterRemote.$.flushForTesting();
+
+              announcementPromise = eventToPromise(
+                  'cr-a11y-announcer-messages-sent', document.body);
+              announcement = await announcementPromise;
+              assertEquals(announcementCount, 2);
+              assertTrue(!!announcement);
+              assertEquals(announcement.detail.messages.length, 1);
+
+              // Cleanup event listener.
+              document.body.removeEventListener(
+                  'cr-a11y-announcer-messages-sent', updateAnnouncementCount);
+              assertEquals(
+                  1,
+                  metrics.count(
+                      'NewTabPage.Composebox.File.WebUI.UploadAttemptFailure',
+                      0));
+            });
+      });
+
   test('upload empty file fails', async () => {
     createComposeboxElement();
     const file = new File([''], 'foo.jpg', {type: 'image/jpeg'});
@@ -186,6 +237,10 @@ suite('NewTabPageComposeboxTest', () => {
     assertEquals(handler.getCallCount('addFile'), 0);
     const files = composeboxElement.$.carousel.files;
     assertEquals(files.length, 0);
+    assertEquals(
+        1,
+        metrics.count(
+            'NewTabPage.Composebox.File.WebUI.UploadAttemptFailure', 2));
   });
 
   test('upload large file fails', async () => {
@@ -209,6 +264,10 @@ suite('NewTabPageComposeboxTest', () => {
     assertEquals(handler.getCallCount('addFile'), 0);
     const files = composeboxElement.$.carousel.files;
     assertEquals(files.length, 0);
+    assertEquals(
+        1,
+        metrics.count(
+            'NewTabPage.Composebox.File.WebUI.UploadAttemptFailure', 3));
   });
 
   [[
@@ -232,7 +291,6 @@ suite('NewTabPageComposeboxTest', () => {
           const file = new File(['foo'], 'foo.jpg', {type: 'image/jpeg'});
           await uploadFileAndVerify(id, file);
 
-          // These statuses
           callbackRouterRemote.onFileUploadStatusChanged(
               id, fileUploadStatus as FileUploadStatus,
               fileUploadErrorType as FileUploadErrorType | null);

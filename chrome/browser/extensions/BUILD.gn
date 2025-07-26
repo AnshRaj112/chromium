@@ -874,6 +874,7 @@ source_set("extensions") {
       "//chrome/browser/media/webrtc",
       "//chrome/browser/task_manager",
       "//chrome/browser/ui:browser_list",
+      "//chrome/browser/ui:browser_tab_strip",
       "//chrome/browser/ui/bookmarks",
       "//chrome/browser/ui/global_error",
       "//chrome/browser/ui/tab_contents",
@@ -1653,7 +1654,10 @@ static_library("test_support") {
         "api/document_scan/document_scan_test_utils.h",
       ]
 
-      deps += [ "//components/user_manager:test_support" ]
+      deps += [
+        "//chromeos/ash/components/dbus/lorgnette_manager:lorgnette_proto",
+        "//components/user_manager:test_support",
+      ]
     }
   }
 }
@@ -1727,6 +1731,7 @@ source_set("chrome_extensions_browser_client") {
       "//chrome/browser/extensions",
       "//chrome/browser/extensions/api/runtime",
       "//chrome/browser/web_applications",
+      "//components/webapps/isolated_web_apps",
     ]
 
     if (is_chromeos) {

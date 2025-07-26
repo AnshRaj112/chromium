@@ -297,6 +297,8 @@ class Backend {
   ErrorAndEvictionRequested DeleteDoomedEntry(
       const CacheEntryKey& key,
       const base::UnguessableToken& token);
+  Error DeleteDoomedEntries(
+      base::flat_set<base::UnguessableToken> excluded_tokens);
   ErrorAndEvictionRequested DeleteLiveEntry(const CacheEntryKey& key);
 
   ErrorAndEvictionRequested DeleteAllEntries();
@@ -355,6 +357,10 @@ class Backend {
   Error DeleteDoomedEntryInternal(const CacheEntryKey& key,
                                   const base::UnguessableToken& token,
                                   bool& corruption_detected);
+  Error DeleteDoomedEntriesInternal(
+      const base::flat_set<base::UnguessableToken>& excluded_tokens,
+      size_t& deleted_count,
+      bool& corruption_detected);
   Error DeleteLiveEntryInternal(const CacheEntryKey& key,
                                 bool& corruption_detected);
   Error DeleteAllEntriesInternal(bool& corruption_detected);
@@ -436,6 +442,11 @@ class Backend {
                        bool& corruption_detected);
   // Deletes all blobs associated with a given token.
   Error DeleteBlobsByToken(const base::UnguessableToken& token);
+  // Deletes all blobs associated with a list of entry tokens.
+  Error DeleteBlobsByTokens(const std::vector<base::UnguessableToken>& tokens);
+  // Deletes multiple resource entries from the `resources` table by their
+  // `res_id`s.
+  Error DeleteResourcesByResIds(const std::vector<int64_t>& res_ids);
 
   // Updates the in-memory `store_status_` by `entry_count_delta` and
   // `total_size_delta`. If the update results in an overflow or a negative
@@ -653,9 +664,8 @@ OptionalEntryInfoOrError Backend::OpenEntryInternal(const CacheEntryKey& key,
   CheckDatabaseInitStatus();
 
   sql::Statement statement(db_.GetCachedStatement(
-      SQL_FROM_HERE, GetQuery(Query::kOpenEntry_SelectResources)));
+      SQL_FROM_HERE, GetQuery(Query::kOpenEntry_SelectLiveResources)));
   statement.BindString(0, key.string());
-  statement.BindBool(1, false);
   if (!statement.Step()) {
     // `Step()` returned false, which means either the query completed with no
     // results, or an error occurred.
@@ -753,8 +763,7 @@ EntryInfoOrError Backend::CreateEntryInternal(const CacheEntryKey& key,
     statement.BindTime(2, entry_info.last_used);
     statement.BindInt64(3, entry_info.body_end);
     statement.BindInt64(4, bytes_usage);
-    statement.BindBool(5, false);  // doomed
-    statement.BindString(6, key.string());
+    statement.BindString(5, key.string());
     if (!statement.Run()) {
       return base::unexpected(Error::kFailedToExecute);
     }
@@ -815,13 +824,9 @@ Error Backend::DoomEntryInternal(const CacheEntryKey& key,
   {
     sql::Statement statement(db_.GetCachedStatement(
         SQL_FROM_HERE, GetQuery(Query::kDoomEntry_MarkDoomedResources)));
-    // Set the new value: doomed = true.
-    statement.BindBool(0, true);
-    statement.BindString(1, key.string());
-    statement.BindInt64(2, TokenHigh(token));
-    statement.BindInt64(3, TokenLow(token));
-    // Set the current value to match: doomed = false.
-    statement.BindBool(4, false);
+    statement.BindString(0, key.string());
+    statement.BindInt64(1, TokenHigh(token));
+    statement.BindInt64(2, TokenLow(token));
     // Iterate through the rows returned by the RETURNING clause.
     while (statement.Step()) {
       // Since we're dooming an entry, its size is subtracted from the total.
@@ -902,8 +907,6 @@ Error Backend::DeleteDoomedEntryInternal(const CacheEntryKey& key,
     statement.BindString(0, key.string());
     statement.BindInt64(1, TokenHigh(token));
     statement.BindInt64(2, TokenLow(token));
-    // Target rows where doomed = true.
-    statement.BindBool(3, true);
     if (!statement.Run()) {
       return Error::kFailedToExecute;
     }
@@ -929,7 +932,85 @@ Error Backend::DeleteDoomedEntryInternal(const CacheEntryKey& key,
     return error;
   }
 
-  return transaction.Commit() ? Error::kOk : Error::kFailedToExecute;
+  return transaction.Commit() ? Error::kOk : Error::kFailedToCommitTransaction;
+}
+
+Error Backend::DeleteDoomedEntries(
+    base::flat_set<base::UnguessableToken> excluded_tokens) {
+  TRACE_EVENT_BEGIN0("disk_cache", "SqlBackend.DeleteDoomedEntries");
+  base::ElapsedTimer timer;
+  bool corruption_detected = false;
+  size_t deleted_count = 0;
+  auto result = DeleteDoomedEntriesInternal(excluded_tokens, deleted_count,
+                                            corruption_detected);
+  RecordTimeAndErrorResultHistogram("DeleteDoomedEntries", timer.Elapsed(),
+                                    result, corruption_detected);
+  base::UmaHistogramCounts100("Net.SqlDiskCache.DeleteDoomedEntriesCount",
+                              deleted_count);
+  TRACE_EVENT_END1("disk_cache", "SqlBackend.DeleteDoomedEntries", "result",
+                   [&](perfetto::TracedValue trace_context) {
+                     auto dict = std::move(trace_context).WriteDictionary();
+                     PopulateTraceDetails(result, store_status_, dict);
+                     dict.Add("deleted_count", deleted_count);
+                   });
+  MaybeCrashIfCorrupted(corruption_detected);
+  return result;
+}
+
+Error Backend::DeleteDoomedEntriesInternal(
+    const base::flat_set<base::UnguessableToken>& excluded_tokens,
+    size_t& deleted_count,
+    bool& corruption_detected) {
+  CheckDatabaseInitStatus();
+  sql::Transaction transaction(&db_);
+  if (!transaction.Begin()) {
+    return Error::kFailedToStartTransaction;
+  }
+
+  std::vector<int64_t> res_ids_to_delete;
+  std::vector<base::UnguessableToken> tokens_for_blob_deletion;
+
+  // 1. Select all doomed entries.
+  {
+    sql::Statement statement(db_.GetCachedStatement(
+        SQL_FROM_HERE,
+        GetQuery(Query::kDeleteDoomedEntries_SelectDoomedResources)));
+    // 2. Collect entries to be deleted, skipping excluded ones.
+    while (statement.Step()) {
+      auto maybe_token = ToUnguessableToken(statement.ColumnInt64(1),
+                                            statement.ColumnInt64(2));
+      if (!maybe_token) {
+        corruption_detected = true;
+        continue;
+      }
+      if (excluded_tokens.contains(*maybe_token)) {
+        continue;
+      }
+      res_ids_to_delete.push_back(statement.ColumnInt64(0));
+      tokens_for_blob_deletion.push_back(*maybe_token);
+    }
+  }
+
+  deleted_count = res_ids_to_delete.size();
+  if (deleted_count == 0) {
+    // Nothing to delete, abort the transaction and return kOk;
+    return Error::kOk;
+  }
+
+  // 3. Delete from `resources` table by `res_id`.
+  if (auto error = DeleteResourcesByResIds(res_ids_to_delete);
+      error != Error::kOk) {
+    return error;
+  }
+
+  // 4. Delete corresponding blobs by token.
+  if (auto error = DeleteBlobsByTokens(tokens_for_blob_deletion);
+      error != Error::kOk) {
+    return error;
+  }
+
+  // 5. Commit the transaction.
+  return transaction.Commit() ? Error::kOk : Error::kFailedToCommitTransaction;
 }
 
 ErrorAndEvictionRequested Backend::DeleteLiveEntry(const CacheEntryKey& key) {
@@ -972,8 +1053,6 @@ Error Backend::DeleteLiveEntryInternal(const CacheEntryKey& key,
     sql::Statement statement(db_.GetCachedStatement(
         SQL_FROM_HERE, GetQuery(Query::kDeleteLiveEntry_DeleteFromResources)));
     statement.BindString(0, key.string());
-    // Target rows where doomed = false.
-    statement.BindBool(1, false);
     while (statement.Step()) {
       ++deleted_count;
       auto maybe_token = ToUnguessableToken(statement.ColumnInt64(0),
@@ -996,11 +1075,9 @@ Error Backend::DeleteLiveEntryInternal(const CacheEntryKey& key,
   }
 
   // Delete the blobs associated with the deleted entries.
-  for (const auto& token_to_be_deleted : tokens_to_be_deleted) {
-    if (Error delete_result = DeleteBlobsByToken(token_to_be_deleted);
-        delete_result != Error::kOk) {
-      return delete_result;
-    }
+  if (Error delete_result = DeleteBlobsByTokens(tokens_to_be_deleted);
+      delete_result != Error::kOk) {
+    return delete_result;
   }
 
   // If we detected corruption, or if the size update calculation overflowed,
@@ -1119,10 +1196,9 @@ Error Backend::DeleteLiveEntriesBetweenInternal(
   {
     sql::Statement statement(db_.GetCachedStatement(
         SQL_FROM_HERE,
-        GetQuery(Query::kDeleteLiveEntriesBetween_SelectResourcesForEviction)));
+        GetQuery(Query::kDeleteLiveEntriesBetween_SelectLiveResources)));
     statement.BindTime(0, initial_time);
     statement.BindTime(1, end_time);
-    statement.BindBool(2, false);
     while (statement.Step()) {
       if (excluded_keys.contains(CacheEntryKey(statement.ColumnString(4)))) {
         continue;
@@ -1141,22 +1217,15 @@ Error Backend::DeleteLiveEntriesBetweenInternal(
   }
 
   // Delete the blobs associated with the entries to be deleted.
-  for (const auto& token_to_be_deleted : tokens_to_be_deleted) {
-    Error delete_result = DeleteBlobsByToken(token_to_be_deleted);
-    if (delete_result != Error::kOk) {
-      return delete_result;
-    }
+  if (auto error = DeleteBlobsByTokens(tokens_to_be_deleted);
+      error != Error::kOk) {
+    return error;
   }
 
   // Delete the selected entries from the `resources` table.
-  for (const auto& res_id : res_ids_to_be_deleted) {
-    sql::Statement statement(db_.GetCachedStatement(
-        SQL_FROM_HERE,
-        GetQuery(Query::kDeleteLiveEntriesBetween_DeleteFromResources)));
-    statement.BindInt64(0, res_id);
-    if (!statement.Run()) {
-      return Error::kFailedToExecute;
-    }
+  if (auto error = DeleteResourcesByResIds(res_ids_to_be_deleted);
+      error != Error::kOk) {
+    return error;
   }
 
   // If we detected corruption, or if the size update calculation overflowed,
@@ -1208,7 +1277,6 @@ Error Backend::UpdateEntryLastUsedInternal(const CacheEntryKey& key,
         GetQuery(Query::kUpdateEntryLastUsed_UpdateResourceLastUsed)));
     statement.BindTime(0, last_used);
     statement.BindString(1, key.string());
-    statement.BindBool(2, false);  // doomed
     if (!statement.Run()) {
       return Error::kFailedToExecute;
     }
@@ -1276,7 +1344,6 @@ Error Backend::UpdateEntryHeaderAndLastUsedInternal(
     statement.BindString(3, key.string());
     statement.BindInt64(4, TokenHigh(token));
     statement.BindInt64(5, TokenLow(token));
-    statement.BindBool(6, false);  // doomed
     if (statement.Step()) {
       const int64_t bytes_usage = statement.ColumnInt64(0);
       if (bytes_usage < static_cast<int64_t>(buffer->size()) +
@@ -1692,6 +1759,31 @@ Error Backend::DeleteBlobsByToken(const base::UnguessableToken& token) {
   return Error::kOk;
 }
 
+Error Backend::DeleteBlobsByTokens(
+    const std::vector<base::UnguessableToken>& tokens) {
+  TRACE_EVENT0("disk_cache", "SqlBackend.DeleteBlobsByTokens");
+  for (const auto& token : tokens) {
+    if (auto error = DeleteBlobsByToken(token); error != Error::kOk) {
+      return error;
+    }
+  }
+  return Error::kOk;
+}
+
+Error Backend::DeleteResourcesByResIds(const std::vector<int64_t>& res_ids) {
+  TRACE_EVENT0("disk_cache", "SqlBackend.DeleteResourcesByResIds");
+  for (int64_t res_id : res_ids) {
+    sql::Statement delete_resource_stmt(db_.GetCachedStatement(
+        SQL_FROM_HERE,
+        GetQuery(Query::kDeleteResourcesByResIds_DeleteFromResources)));
+    delete_resource_stmt.BindInt64(0, res_id);
+    if (!delete_resource_stmt.Run()) {
+      return Error::kFailedToExecute;
+    }
+  }
+  return Error::kOk;
+}
+
 IntOrError Backend::ReadEntryData(const base::UnguessableToken& token,
                                   int64_t offset,
                                   scoped_refptr<net::IOBuffer> buffer,
@@ -1910,10 +2002,9 @@ int64_t Backend::CalculateSizeOfEntriesBetweenInternal(base::Time initial_time,
   // from the `resources` table and adds a static overhead for each entry.
   sql::Statement statement(db_.GetCachedStatement(
       SQL_FROM_HERE,
-      GetQuery(Query::kCalculateSizeOfEntriesBetween_SelectFromResources)));
+      GetQuery(Query::kCalculateSizeOfEntriesBetween_SelectLiveResources)));
   statement.BindTime(0, initial_time);
   statement.BindTime(1, end_time);
-  statement.BindBool(2, false);
   base::ClampedNumeric<int64_t> total_size = 0;
   while (statement.Step()) {
     // `bytes_usage` includes the size of the key, header, and body data.
@@ -1954,9 +2045,8 @@ OptionalEntryInfoWithIdAndKey Backend::OpenLatestEntryBeforeResIdInternal(
 
   sql::Statement statement(db_.GetCachedStatement(
       SQL_FROM_HERE,
-      GetQuery(Query::kOpenLatestEntryBeforeResId_SelectResources)));
+      GetQuery(Query::kOpenLatestEntryBeforeResId_SelectLiveResources)));
   statement.BindInt64(0, res_id_cursor);
-  statement.BindBool(1, false);
   while (statement.Step()) {
     auto maybe_token =
         ToUnguessableToken(statement.ColumnInt64(1), statement.ColumnInt64(2));
@@ -2019,9 +2109,7 @@ Error Backend::RunEvictionInternal(
   base::CheckedNumeric<int64_t> checked_removed_total_size = 0;
   {
     sql::Statement statement(db_.GetCachedStatement(
-        SQL_FROM_HERE,
-        GetQuery(Query::kRunEviction_SelectResourcesForEviction)));
-    statement.BindBool(0, false);
+        SQL_FROM_HERE, GetQuery(Query::kRunEviction_SelectLiveResources)));
     while (size_to_be_removed > checked_removed_total_size.ValueOrDie() &&
            statement.Step()) {
       if (excluded_keys.contains(CacheEntryKey(statement.ColumnString(2)))) {
@@ -2131,8 +2219,8 @@ Error Backend::RecalculateStoreStatusAndCommitTransaction(
 int64_t Backend::CalculateResourceEntryCount() {
   sql::Statement statement(db_.GetCachedStatement(
       SQL_FROM_HERE,
-      GetQuery(Query::kCalculateResourceEntryCount_SelectCountFromResources)));
-  statement.BindBool(0, false);
+      GetQuery(
+          Query::kCalculateResourceEntryCount_SelectCountFromLiveResources)));
   int64_t result = 0;
   if (statement.Step()) {
     result = statement.ColumnInt64(0);
@@ -2144,8 +2232,7 @@ int64_t Backend::CalculateResourceEntryCount() {
 int64_t Backend::CalculateTotalSize() {
   sql::Statement statement(db_.GetCachedStatement(
       SQL_FROM_HERE,
-      GetQuery(Query::kCalculateTotalSize_SelectTotalSizeFromResources)));
-  statement.BindBool(0, false);
+      GetQuery(Query::kCalculateTotalSize_SelectTotalSizeFromLiveResources)));
   int64_t result = 0;
   if (statement.Step()) {
     result = statement.ColumnInt64(0);
@@ -2215,6 +2302,13 @@ class SqlPersistentStoreImpl : public SqlPersistentStore {
     backend_.AsyncCall(&Backend::DeleteDoomedEntry)
         .WithArgs(key, token)
         .Then(WrapCallbackWithEvictionRequested(std::move(callback)));
+  }
+  void DeleteDoomedEntries(
+      base::flat_set<base::UnguessableToken> excluded_tokens,
+      ErrorCallback callback) override {
+    backend_.AsyncCall(&Backend::DeleteDoomedEntries)
+        .WithArgs(std::move(excluded_tokens))
+        .Then(WrapCallback(std::move(callback)));
   }
   void DeleteLiveEntry(const CacheEntryKey& key,
                        ErrorCallback callback) override {

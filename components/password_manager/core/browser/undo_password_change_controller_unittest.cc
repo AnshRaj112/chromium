@@ -25,6 +25,8 @@
 #include "components/password_manager/core/browser/stub_form_saver.h"
 #include "components/password_manager/core/browser/stub_password_manager_client.h"
 #include "components/password_manager/core/browser/stub_password_manager_driver.h"
+#include "components/ukm/test_ukm_recorder.h"
+#include "services/metrics/public/cpp/ukm_source_id.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #if BUILDFLAG(IS_ANDROID)
@@ -35,6 +37,7 @@
 using base::test::RunOnceClosure;
 using testing::NiceMock;
 using testing::Return;
+using ChangeRecoveryUkmEntry = ukm::builders::PasswordManager_ChangeRecovery;
 namespace password_manager {
 namespace {
 const std::u16string kUsername = u"username";
@@ -57,6 +60,14 @@ autofill::Suggestion::PasswordSuggestionDetails GetSuggestionDetails(
   password_details.username = credential.username_value;
   password_details.signon_realm = credential.realm;
   return password_details;
+}
+
+const ukm::mojom::UkmEntry* GetUkmEntry(
+    const ukm::TestAutoSetUkmRecorder& test_ukm_recorder) {
+  auto ukm_entries =
+      test_ukm_recorder.GetEntriesByName(ChangeRecoveryUkmEntry::kEntryName);
+  CHECK_EQ(ukm_entries.size(), 1u);
+  return ukm_entries[0];
 }
 
 class MockPasswordManagerDriver : public StubPasswordManagerDriver {
@@ -126,6 +137,8 @@ class UndoPasswordChangeControllerTest : public testing::Test {
 
     best_match_form_.username_value = failed_login_form_.username_value;
     best_match_form_.match_type = PasswordForm::MatchType::kExact;
+    controller_.OnNavigation(url::Origin::Create(GURL("https://example.com")),
+                             ukm::UkmRecorder::GetNewSourceID());
   }
 
   void TearDown() override { OSCryptMocker::TearDown(); }
@@ -216,6 +229,9 @@ TEST_F(UndoPasswordChangeControllerTest, OnTroubleSigningIn) {
   const auto credential = GetPasswordAndMetadata();
   const auto password_details = GetSuggestionDetails(credential);
   base::HistogramTester histogram_tester;
+  ukm::TestAutoSetUkmRecorder test_ukm_recorder;
+  const auto expected_metric_state = password_manager::
+      PasswordChangeRecoveryFlowState::kTroubleSigningInClicked;
 
   controller_.OnSuggestionSelected(credential);
   controller_.OnTroubleSigningInClicked(password_details);
@@ -223,8 +239,11 @@ TEST_F(UndoPasswordChangeControllerTest, OnTroubleSigningIn) {
   EXPECT_EQ(controller_.GetState(credential.username_value),
             PasswordRecoveryState::kIncludeBackup);
   histogram_tester.ExpectUniqueSample(
-      "PasswordManager.PasswordChangeRecoveryFlow",
-      PasswordChangeRecoveryFlowState::kTroubleSigningInClicked, 1);
+      "PasswordManager.PasswordChangeRecoveryFlow", expected_metric_state, 1);
+  ukm::TestUkmRecorder::ExpectEntryMetric(
+      GetUkmEntry(test_ukm_recorder),
+      ChangeRecoveryUkmEntry::kPasswordChangeRecoveryFlowName,
+      static_cast<int>(expected_metric_state));
 }
 
 TEST_F(UndoPasswordChangeControllerTest, DifferentUsernameResetsFlow) {
@@ -241,6 +260,19 @@ TEST_F(UndoPasswordChangeControllerTest, DifferentUsernameResetsFlow) {
             PasswordRecoveryState::kRegularFlow);
   EXPECT_EQ(controller_.GetState(credential_2.username_value),
             PasswordRecoveryState::kTroubleSigningIn);
+}
+
+TEST_F(UndoPasswordChangeControllerTest, DifferentUrlResetsFlow) {
+  const auto credential = GetPasswordAndMetadata();
+  const auto password_details = GetSuggestionDetails(credential);
+
+  controller_.OnSuggestionSelected(credential);
+  controller_.OnTroubleSigningInClicked(password_details);
+  controller_.OnNavigation(url::Origin::Create(GURL("https://example2.com")),
+                           ukm::UkmRecorder::GetNewSourceID());
+
+  EXPECT_EQ(controller_.GetState(credential.username_value),
+            PasswordRecoveryState::kRegularFlow);
 }
 
 TEST_F(UndoPasswordChangeControllerTest,
@@ -373,6 +405,9 @@ TEST_F(UndoPasswordChangeControllerTest, OnSuggestionsHidden) {
   auto form_manager = CreateFormManager(best_match_form_);
   base::RunLoop run_loop;
   base::HistogramTester histogram_tester;
+  ukm::TestAutoSetUkmRecorder test_ukm_recorder;
+  const auto expected_metric_state = password_manager::
+      PasswordChangeRecoveryFlowState::kProactiveRecoveryPopupShown;
 
   controller_.OnLoginPotentiallyFailed(&driver_, failed_login_form_);
   EXPECT_CALL(driver_, TriggerPasswordRecoverySuggestions(
@@ -386,8 +421,11 @@ TEST_F(UndoPasswordChangeControllerTest, OnSuggestionsHidden) {
   EXPECT_EQ(controller_.GetState(kUsername),
             PasswordRecoveryState::kIncludeBackup);
   histogram_tester.ExpectUniqueSample(
-      "PasswordManager.PasswordChangeRecoveryFlow",
-      PasswordChangeRecoveryFlowState::kProactiveRecoveryPopupShown, 1);
+      "PasswordManager.PasswordChangeRecoveryFlow", expected_metric_state, 1);
+  ukm::TestUkmRecorder::ExpectEntryMetric(
+      GetUkmEntry(test_ukm_recorder),
+      ChangeRecoveryUkmEntry::kPasswordChangeRecoveryFlowName,
+      static_cast<int>(expected_metric_state));
 }
 
 }  // namespace password_manager

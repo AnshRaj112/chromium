@@ -408,7 +408,7 @@ BASE_FEATURE_PARAM(std::string,
 // Enables camera preview in permission bubble and site settings.
 BASE_FEATURE(kCameraMicPreview,
              "CameraMicPreview",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 // Temporarily disabled due to issues:
@@ -1147,7 +1147,7 @@ BASE_FEATURE(kGetDisplayMediaIgnoreAudioPermissionFailures,
 // Defers device selection until after permission is granted.
 BASE_FEATURE(kGetUserMediaDeferredDeviceSettingsSelection,
              "GetUserMediaDeferredDeviceSettingsSelection",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 BASE_FEATURE_PARAM(std::string,
@@ -2110,11 +2110,14 @@ BASE_FEATURE(kPrefetchFontLookupTables,
 );
 #endif
 
-// Prefetch request properties are updated to be privacy-preserving. See
-// crbug.com/988956.
-BASE_FEATURE(kPrefetchPrivacyChanges,
-             "PrefetchPrivacyChanges",
+BASE_FEATURE(kPreloadingEagerHeuristics,
+             "PreloadingEagerHeuristics",
              base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE_PARAM(base::TimeDelta,
+                   kPreloadingEagerHeuristicsHoverDwellTime,
+                   &kPreloadingEagerHeuristics,
+                   "hover_dwell_time",
+                   base::Milliseconds(5));
 
 BASE_FEATURE(kPreloadingHeuristicsMLModel,
              "PreloadingHeuristicsMLModel",
@@ -2359,11 +2362,6 @@ BASE_FEATURE(kSecPurposePrefetchHeaderRelPrefetch,
 BASE_FEATURE(kSelectiveInOrderScript,
              "SelectiveInOrderScript",
              base::FEATURE_DISABLED_BY_DEFAULT);
-BASE_FEATURE(kSelectiveInOrderScriptTarget,
-             "SelectiveInOrderScriptTarget",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-const base::FeatureParam<std::string> kSelectiveInOrderScriptAllowList{
-    &kSelectiveInOrderScriptTarget, "allow_list", ""};
 
 // When enabled, the SubresourceFilter receives calls from the ResourceLoader
 // to perform additional checks against any aliases found from DNS CNAME records

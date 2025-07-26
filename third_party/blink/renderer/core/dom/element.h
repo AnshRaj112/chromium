@@ -1420,6 +1420,7 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
 
   // Scoped Custom Elements
   CustomElementRegistry* customElementRegistry() const;
+  void SetCustomElementRegistry(CustomElementRegistry*);
 
   // https://dom.spec.whatwg.org/#concept-element-is-value
   void SetIsValue(const AtomicString&);
@@ -1894,6 +1895,8 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
       PseudoId,
       const AtomicString& view_transition_name = g_null_atom);
   void ClearTransitionPseudoTreeIfNeeded(const StyleRecalcChange);
+  void DetachTransitionPseudo();
+  void AttachTransitionPseudo();
 
   bool IsElementNode() const =
       delete;  // This will catch anyone doing an unnecessary check.

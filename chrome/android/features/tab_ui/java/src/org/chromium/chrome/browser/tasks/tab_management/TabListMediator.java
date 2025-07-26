@@ -1011,7 +1011,7 @@ class TabListMediator implements TabListNotificationHandler {
         mTabModelObserver =
                 new TabModelObserver() {
                     @Override
-                    public void didSelectTab(Tab tab, int type, int lastId) {
+                    public void didSelectTab(Tab tab, @TabSelectionType int type, int lastId) {
                         assert mShowingTabs;
 
                         mNextTabId = Tab.INVALID_TAB_ID;
@@ -1424,8 +1424,8 @@ class TabListMediator implements TabListNotificationHandler {
         mOriginalProfile = originalProfile;
         mTabListFaviconProvider.initWithNative(originalProfile);
 
-        mOnTabGroupModelFilterChanged.onResult(
-                mCurrentTabGroupModelFilterSupplier.addObserver(mOnTabGroupModelFilterChanged));
+        mCurrentTabGroupModelFilterSupplier.addSyncObserverAndCallIfNonNull(
+                mOnTabGroupModelFilterChanged);
 
         mTabGroupSyncService = TabGroupSyncServiceFactory.getForProfile(originalProfile);
         if (mTabGroupSyncService != null) {
@@ -3157,7 +3157,8 @@ class TabListMediator implements TabListNotificationHandler {
         if (tabId != Tab.INVALID_TAB_ID) {
             TabGroupModelFilter filter = mCurrentTabGroupModelFilterSupplier.get();
             Tab tab = filter.getTabModel().getTabById(tabId);
-            assumeNonNull(tab);
+            if (tab == null) return;
+
             boolean isInTabGroup = filter.tabGroupExists(tab.getTabGroupId());
             final @Nullable @TabGroupColorId Integer tabGroupColor =
                     isInTabGroup ? filter.getTabGroupColorWithFallback(tab.getTabGroupId()) : null;

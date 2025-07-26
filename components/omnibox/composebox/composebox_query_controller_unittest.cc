@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 
+#include "base/base64url.h"
 #include "base/test/bind.h"
 #include "base/test/repeating_test_future.h"
 #include "base/test/task_environment.h"
@@ -45,7 +46,7 @@
 #endif  // !BUILDFLAG(IS_IOS)
 
 constexpr char kQuerySubmissionTimeQueryParameter[] = "qsubts";
-constexpr char kUserPerceivedQuerySubmissionTimeQueryParameter[] = "pqsubts";
+constexpr char kClientUploadDurationQueryParameter[] = "cud";
 constexpr char kSessionIdQueryParameterKey[] = "gsessionid";
 constexpr char kVariationsHeaderKey[] = "X-Client-Data";
 constexpr char kTestUser[] = "test_user@gmail.com";
@@ -63,6 +64,7 @@ base::Time kTestQueryStartTime =
     base::Time::FromMillisecondsSinceUnixEpoch(1000);
 
 using FileUploadStatusTuple = std::tuple<base::UnguessableToken,
+                                         lens::MimeType,
                                          FileUploadStatus,
                                          std::optional<FileUploadErrorType>>;
 
@@ -163,14 +165,16 @@ class ComposeboxQueryControllerTest
 
   void WaitForFileUpload(
       const base::UnguessableToken& file_token,
+      lens::MimeType mime_type,
       FileUploadStatus expected_status = FileUploadStatus::kUploadSuccessful,
       std::optional<FileUploadErrorType> expected_error_type = std::nullopt) {
     FileUploadStatusTuple processing_file_upload_status =
         file_upload_status_future_.Take();
     EXPECT_EQ(file_token, std::get<0>(processing_file_upload_status));
+    EXPECT_EQ(mime_type, std::get<1>(processing_file_upload_status));
     EXPECT_EQ(FileUploadStatus::kProcessing,
-              std::get<1>(processing_file_upload_status));
-    EXPECT_EQ(std::nullopt, std::get<2>(processing_file_upload_status));
+              std::get<2>(processing_file_upload_status));
+    EXPECT_EQ(std::nullopt, std::get<3>(processing_file_upload_status));
 
     if (expected_status != FileUploadStatus::kValidationFailed) {
       // For client-side validation failures, the state will never change to
@@ -178,16 +182,18 @@ class ComposeboxQueryControllerTest
       FileUploadStatusTuple upload_started_file_upload_status =
           file_upload_status_future_.Take();
       EXPECT_EQ(file_token, std::get<0>(upload_started_file_upload_status));
+      EXPECT_EQ(mime_type, std::get<1>(upload_started_file_upload_status));
       EXPECT_EQ(FileUploadStatus::kUploadStarted,
-                std::get<1>(upload_started_file_upload_status));
-      EXPECT_EQ(std::nullopt, std::get<2>(upload_started_file_upload_status));
+                std::get<2>(upload_started_file_upload_status));
+      EXPECT_EQ(std::nullopt, std::get<3>(upload_started_file_upload_status));
     }
 
     FileUploadStatusTuple final_file_upload_status =
         file_upload_status_future_.Take();
     EXPECT_EQ(file_token, std::get<0>(final_file_upload_status));
-    EXPECT_EQ(expected_status, std::get<1>(final_file_upload_status));
-    EXPECT_EQ(expected_error_type, std::get<2>(final_file_upload_status));
+    EXPECT_EQ(mime_type, std::get<1>(final_file_upload_status));
+    EXPECT_EQ(expected_status, std::get<2>(final_file_upload_status));
+    EXPECT_EQ(expected_error_type, std::get<3>(final_file_upload_status));
 
     if (expected_status == FileUploadStatus::kValidationFailed) {
       // For client-side validation failures, the file upload request will not
@@ -212,10 +218,11 @@ class ComposeboxQueryControllerTest
   // ComposeboxQueryController::FileUploadStatusObserver:
   void OnFileUploadStatusChanged(
       const base::UnguessableToken& file_token,
+      lens::MimeType mime_type,
       FileUploadStatus file_upload_status,
       const std::optional<FileUploadErrorType>& error_type) override {
-    file_upload_status_future_.AddValue(file_token, file_upload_status,
-                                        error_type);
+    file_upload_status_future_.AddValue(file_token, mime_type,
+                                        file_upload_status, error_type);
   }
 
 #if !BUILDFLAG(IS_IOS)
@@ -227,6 +234,24 @@ class ComposeboxQueryControllerTest
     return image_bytes.value();
   }
 #endif  // !BUILDFLAG(IS_IOS)
+
+  lens::LensOverlayRequestId DecodeRequestIdFromVsrid(std::string vsrid_param) {
+    std::string serialized_proto;
+    EXPECT_TRUE(base::Base64UrlDecode(
+        vsrid_param, base::Base64UrlDecodePolicy::DISALLOW_PADDING,
+        &serialized_proto));
+    lens::LensOverlayRequestId proto;
+    EXPECT_TRUE(proto.ParseFromString(serialized_proto));
+    return proto;
+  }
+
+  lens::LensOverlayRequestId GetRequestIdFromUrl(std::string url_string) {
+    GURL url = GURL(url_string);
+    std::string vsrid_param;
+    EXPECT_TRUE(
+        net::GetValueForKeyInQuery(url, kRequestIdParameterKey, &vsrid_param));
+    return DecodeRequestIdFromVsrid(vsrid_param);
+  }
 
  protected:
   signin::IdentityTestEnvironment* identity_test_env() {
@@ -264,6 +289,7 @@ class ComposeboxQueryControllerTest
   base::test::RepeatingTestFuture<QueryControllerState>
       controller_state_future_;
   base::test::RepeatingTestFuture<base::UnguessableToken,
+                                  lens::MimeType,
                                   FileUploadStatus,
                                   std::optional<FileUploadErrorType>>
       file_upload_status_future_;
@@ -335,7 +361,7 @@ TEST_F(ComposeboxQueryControllerTest, NotifySessionAbandoned) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Check that file is in cache.
   EXPECT_TRUE(controller().GetFileInfo(file_token));
@@ -365,7 +391,7 @@ TEST_F(ComposeboxQueryControllerTest, UploadFileRequestFailure) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token,
+  WaitForFileUpload(file_token, lens::MimeType::kPdf,
                     /*expected_status=*/FileUploadStatus::kUploadFailed,
                     /*expected_error_type=*/FileUploadErrorType::kServerError);
 }
@@ -391,7 +417,7 @@ TEST_F(ComposeboxQueryControllerTest, UploadImageFileRequestSuccess) {
       image_options);
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kImage);
   // Validate the file upload request payload.
   EXPECT_EQ(controller()
                 .last_sent_file_upload_request()
@@ -421,6 +447,13 @@ TEST_F(ComposeboxQueryControllerTest, UploadImageFileRequestSuccess) {
                 .image_encode_data()
                 .encoded_image_size_bytes(),
             360);
+  EXPECT_EQ(controller()
+                .last_sent_file_upload_request()
+                ->objects_request()
+                .request_context()
+                .request_id()
+                .media_type(),
+            lens::LensOverlayRequestId::MEDIA_TYPE_DEFAULT_IMAGE);
   // Check that the vsrid matches that for an image upload.
   EXPECT_EQ(controller()
                 .GetFileInfo(file_token)
@@ -472,7 +505,8 @@ TEST_F(ComposeboxQueryControllerTest, UploadEmptyImageFileRequestFailure) {
       image_options);
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token, FileUploadStatus::kValidationFailed,
+  WaitForFileUpload(file_token, lens::MimeType::kImage,
+                    FileUploadStatus::kValidationFailed,
                     FileUploadErrorType::kImageProcessingError);
 }
 #endif  // !BUILDFLAG(IS_IOS)
@@ -491,7 +525,7 @@ TEST_F(ComposeboxQueryControllerTest, UploadPdfFileRequestSuccess) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
   // Validate the file upload request payload.
   EXPECT_EQ(controller()
                 .last_sent_file_upload_request()
@@ -546,6 +580,13 @@ TEST_F(ComposeboxQueryControllerTest, UploadPdfFileRequestSuccess) {
                 .request_id()
                 .long_context_id(),
             1);
+  EXPECT_EQ(controller()
+                .last_sent_file_upload_request()
+                ->objects_request()
+                .request_context()
+                .request_id()
+                .media_type(),
+            lens::LensOverlayRequestId::MEDIA_TYPE_PDF);
   // Check that the routing info is in the vsrid.
   EXPECT_EQ(controller()
                 .GetFileInfo(file_token)
@@ -574,13 +615,14 @@ TEST_F(ComposeboxQueryControllerTest, UploadInvalidMimeTypeFileRequestFailure) {
   std::unique_ptr<ComposeboxQueryController::FileInfo> file_info =
       std::make_unique<ComposeboxQueryController::FileInfo>();
   file_info->file_token_ = file_token;
-  file_info->mime_type_ = lens::MimeType::kUnknown;
+  lens::MimeType mime_type = lens::MimeType::kUnknown;
+  file_info->mime_type_ = mime_type;
   controller().StartFileUploadFlow(
       std::move(file_info), base::MakeRefCounted<base::RefCountedBytes>(),
       /*image_options=*/std::nullopt);
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token, FileUploadStatus::kValidationFailed,
+  WaitForFileUpload(file_token, mime_type, FileUploadStatus::kValidationFailed,
                     FileUploadErrorType::kBrowserProcessingError);
 }
 
@@ -608,7 +650,7 @@ TEST_F(ComposeboxQueryControllerTest, UploadFileRequestSuccessWithOAuth) {
       access_token_info().id_token);
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 }
 
 TEST_F(ComposeboxQueryControllerTest, UploadFileAndWaitForClusterInfoExpire) {
@@ -628,7 +670,7 @@ TEST_F(ComposeboxQueryControllerTest, UploadFileAndWaitForClusterInfoExpire) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Wait 1 hour.
   task_environment().FastForwardBy(base::Hours(1));
@@ -638,9 +680,10 @@ TEST_F(ComposeboxQueryControllerTest, UploadFileAndWaitForClusterInfoExpire) {
   FileUploadStatusTuple expired_file_upload_status =
       file_upload_status_future_.Take();
   EXPECT_EQ(file_token, std::get<0>(expired_file_upload_status));
+  EXPECT_EQ(lens::MimeType::kPdf, std::get<1>(expired_file_upload_status));
   EXPECT_EQ(FileUploadStatus::kUploadExpired,
-            std::get<1>(expired_file_upload_status));
-  EXPECT_EQ(std::nullopt, std::get<2>(expired_file_upload_status));
+            std::get<2>(expired_file_upload_status));
+  EXPECT_EQ(std::nullopt, std::get<3>(expired_file_upload_status));
 }
 
 TEST_F(ComposeboxQueryControllerTest,
@@ -667,9 +710,10 @@ TEST_F(ComposeboxQueryControllerTest,
   FileUploadStatusTuple processing_file_upload_status =
       file_upload_status_future_.Take();
   EXPECT_EQ(file_token, std::get<0>(processing_file_upload_status));
+  EXPECT_EQ(lens::MimeType::kPdf, std::get<1>(processing_file_upload_status));
   EXPECT_EQ(FileUploadStatus::kProcessing,
-            std::get<1>(processing_file_upload_status));
-  EXPECT_EQ(std::nullopt, std::get<2>(processing_file_upload_status));
+            std::get<2>(processing_file_upload_status));
+  EXPECT_EQ(std::nullopt, std::get<3>(processing_file_upload_status));
 
   // Act: Send the oauth token for the cluster info or file upload request.
   identity_test_env()->WaitForAccessTokenRequestIfNecessaryAndRespondWithToken(
@@ -698,16 +742,20 @@ TEST_F(ComposeboxQueryControllerTest,
   FileUploadStatusTuple upload_started_file_upload_status =
       file_upload_status_future_.Take();
   EXPECT_EQ(file_token, std::get<0>(upload_started_file_upload_status));
-  EXPECT_EQ(FileUploadStatus::kUploadStarted,
+  EXPECT_EQ(lens::MimeType::kPdf,
             std::get<1>(upload_started_file_upload_status));
-  EXPECT_EQ(std::nullopt, std::get<2>(upload_started_file_upload_status));
+  EXPECT_EQ(FileUploadStatus::kUploadStarted,
+            std::get<2>(upload_started_file_upload_status));
+  EXPECT_EQ(std::nullopt, std::get<3>(upload_started_file_upload_status));
 
   FileUploadStatusTuple upload_successful_file_upload_status =
       file_upload_status_future_.Take();
   EXPECT_EQ(file_token, std::get<0>(upload_successful_file_upload_status));
-  EXPECT_EQ(FileUploadStatus::kUploadSuccessful,
+  EXPECT_EQ(lens::MimeType::kPdf,
             std::get<1>(upload_successful_file_upload_status));
-  EXPECT_EQ(std::nullopt, std::get<2>(upload_successful_file_upload_status));
+  EXPECT_EQ(FileUploadStatus::kUploadSuccessful,
+            std::get<2>(upload_successful_file_upload_status));
+  EXPECT_EQ(std::nullopt, std::get<3>(upload_successful_file_upload_status));
 
   EXPECT_EQ(controller().num_file_upload_requests_sent(), 1);
   EXPECT_THAT(GetGsessionIdFromUrl(controller().last_sent_fetch_url()),
@@ -740,7 +788,7 @@ TEST_F(ComposeboxQueryControllerTest, AbandonSessionClearsFiles) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Act: Abandon the session.
   controller().NotifySessionAbandoned();
@@ -782,11 +830,9 @@ TEST_F(ComposeboxQueryControllerTest, AbandonSessionClearsFiles) {
   EXPECT_TRUE(net::GetValueForKeyInQuery(
       aim_url, kQuerySubmissionTimeQueryParameter, &qsubts_value));
 
-  std::string pqsubts_value;
+  std::string cud_value;
   EXPECT_TRUE(net::GetValueForKeyInQuery(
-      aim_url, kUserPerceivedQuerySubmissionTimeQueryParameter,
-      &pqsubts_value));
-  EXPECT_EQ(pqsubts_value, "1000");
+      aim_url, kClientUploadDurationQueryParameter, &cud_value));
 }
 
 TEST_F(ComposeboxQueryControllerTest,
@@ -865,11 +911,9 @@ TEST_F(ComposeboxQueryControllerTest,
   EXPECT_TRUE(net::GetValueForKeyInQuery(
       aim_url, kQuerySubmissionTimeQueryParameter, &qsubts_value));
 
-  std::string pqsubts_value;
+  std::string cud_value;
   EXPECT_TRUE(net::GetValueForKeyInQuery(
-      aim_url, kUserPerceivedQuerySubmissionTimeQueryParameter,
-      &pqsubts_value));
-  EXPECT_EQ(pqsubts_value, "1000");
+      aim_url, kClientUploadDurationQueryParameter, &cud_value));
 }
 
 TEST_F(ComposeboxQueryControllerTest, QuerySubmitted) {
@@ -902,11 +946,9 @@ TEST_F(ComposeboxQueryControllerTest, QuerySubmitted) {
   EXPECT_TRUE(net::GetValueForKeyInQuery(
       aim_url, kQuerySubmissionTimeQueryParameter, &qsubts_value));
 
-  std::string pqsubts_value;
+  std::string cud_value;
   EXPECT_TRUE(net::GetValueForKeyInQuery(
-      aim_url, kUserPerceivedQuerySubmissionTimeQueryParameter,
-      &pqsubts_value));
-  EXPECT_EQ(pqsubts_value, "1000");
+      aim_url, kClientUploadDurationQueryParameter, &cud_value));
 }
 
 TEST_F(ComposeboxQueryControllerTest, QuerySubmittedWithUploadedPdf) {
@@ -923,7 +965,7 @@ TEST_F(ComposeboxQueryControllerTest, QuerySubmittedWithUploadedPdf) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Act: Create the destination URL for the query. The destination URL can
   // only be created after the cluster info is received.
@@ -934,6 +976,8 @@ TEST_F(ComposeboxQueryControllerTest, QuerySubmittedWithUploadedPdf) {
   EXPECT_TRUE(net::GetValueForKeyInQuery(aim_url, kRequestIdParameterKey,
                                          &vsrid_value));
   EXPECT_FALSE(vsrid_value.empty());
+  EXPECT_EQ(lens::LensOverlayRequestId::MEDIA_TYPE_PDF,
+            DecodeRequestIdFromVsrid(vsrid_value).media_type());
 
   // Assert: Visual input type is set to pdf for multimodal pdf queries.
   std::string vit_value;
@@ -952,12 +996,69 @@ TEST_F(ComposeboxQueryControllerTest, QuerySubmittedWithUploadedPdf) {
   EXPECT_TRUE(net::GetValueForKeyInQuery(
       aim_url, kQuerySubmissionTimeQueryParameter, &qsubts_value));
 
-  std::string pqsubts_value;
+  std::string cud_value;
   EXPECT_TRUE(net::GetValueForKeyInQuery(
-      aim_url, kUserPerceivedQuerySubmissionTimeQueryParameter,
-      &pqsubts_value));
-  EXPECT_EQ(pqsubts_value, "1000");
+      aim_url, kClientUploadDurationQueryParameter, &cud_value));
 }
+
+#if !BUILDFLAG(IS_IOS)
+TEST_F(ComposeboxQueryControllerTest, QuerySubmittedWithUploadedImage) {
+  // Act: Start the session.
+  controller().NotifySessionStarted();
+
+  // Assert: Validate cluster info request and state changes.
+  WaitForClusterInfo();
+
+  // Act: Start the file upload flow.
+  const base::UnguessableToken file_token = base::UnguessableToken::Create();
+  std::vector<uint8_t> image_bytes = CreateJPGBytes(100, 100);
+  composebox::ImageEncodingOptions image_options{.max_size = 1000000,
+                                                 .max_height = 1000,
+                                                 .max_width = 1000,
+                                                 .compression_quality = 30};
+  StartImageFileUploadFlow(
+      file_token,
+      /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>(image_bytes),
+      image_options);
+
+  // Assert: Validate file upload request and status changes.
+  WaitForFileUpload(file_token, lens::MimeType::kImage);
+
+  // Act: Create the destination URL for the query. The destination URL can
+  // only be created after the cluster info is received.
+  GURL aim_url = controller().CreateAimUrl("hello", kTestQueryStartTime);
+
+  // Assert: Lens request id is NOT added to multimodal pdf queries.
+  std::string vsrid_value;
+  EXPECT_TRUE(net::GetValueForKeyInQuery(aim_url, kRequestIdParameterKey,
+                                         &vsrid_value));
+  EXPECT_FALSE(vsrid_value.empty());
+  EXPECT_EQ(lens::LensOverlayRequestId::MEDIA_TYPE_DEFAULT_IMAGE,
+            DecodeRequestIdFromVsrid(vsrid_value).media_type());
+
+  // Assert: Visual input type is set to img for multimodal image queries.
+  std::string vit_value;
+  EXPECT_TRUE(net::GetValueForKeyInQuery(aim_url, kVisualInputTypeParameterKey,
+                                         &vit_value));
+  EXPECT_EQ(vit_value, "img");
+
+  // Assert: Gsession id is added to multimodal pdf queries.
+  std::string gsession_id_value;
+  EXPECT_TRUE(net::GetValueForKeyInQuery(aim_url, kSessionIdQueryParameterKey,
+                                         &gsession_id_value));
+  EXPECT_EQ(kTestSearchSessionId, gsession_id_value);
+
+  // Check that the timestamps are attached to the url.
+  std::string qsubts_value;
+  EXPECT_TRUE(net::GetValueForKeyInQuery(
+      aim_url, kQuerySubmissionTimeQueryParameter, &qsubts_value));
+
+  std::string cud_value;
+  EXPECT_TRUE(net::GetValueForKeyInQuery(
+      aim_url, kClientUploadDurationQueryParameter,
+      &cud_value));
+}
+#endif  // !BUILDFLAG(IS_IOS)
 
 TEST_F(ComposeboxQueryControllerTest,
        QuerySubmittedWithUploadedPdfButInvalidClusterInfoIsUnimodal) {
@@ -980,7 +1081,7 @@ TEST_F(ComposeboxQueryControllerTest,
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Wait 1 hour.
   task_environment().FastForwardBy(base::Hours(1));
@@ -1022,7 +1123,7 @@ TEST_F(ComposeboxQueryControllerTest, DeleteFile_Success) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Check that file is in cache.
   EXPECT_TRUE(controller().GetFileInfo(file_token));
@@ -1072,7 +1173,7 @@ TEST_F(ComposeboxQueryControllerTest, ClearFiles) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Check that file is in cache.
   EXPECT_TRUE(controller().GetFileInfo(file_token));
@@ -1100,7 +1201,7 @@ TEST_F(ComposeboxQueryControllerTest, QuerySubmittedWithLnsSurface) {
       /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
 
   // Assert: Validate file upload request and status changes.
-  WaitForFileUpload(file_token);
+  WaitForFileUpload(file_token, lens::MimeType::kPdf);
 
   // Act: Create the destination URL for the query. The destination URL can
   // only be created after the cluster info is received.

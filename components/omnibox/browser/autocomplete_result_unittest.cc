@@ -2,21 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <array>
-
 #ifdef UNSAFE_BUFFERS_BUILD
 // TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
 #pragma allow_unsafe_buffers
 #endif
 
+#include "components/omnibox/browser/autocomplete_result.h"
+
 #include <stddef.h>
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "base/containers/span.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/field_trial_params.h"
@@ -34,7 +36,6 @@
 #include "components/omnibox/browser/autocomplete_match_type.h"
 #include "components/omnibox/browser/autocomplete_provider.h"
 #include "components/omnibox/browser/autocomplete_provider_client.h"
-#include "components/omnibox/browser/autocomplete_result.h"
 #include "components/omnibox/browser/fake_autocomplete_provider.h"
 #include "components/omnibox/browser/fake_autocomplete_provider_client.h"
 #include "components/omnibox/browser/fake_tab_matcher.h"
@@ -55,8 +56,8 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
-#include "third_party/omnibox_proto/entity_info.pb.h"
 #include "third_party/omnibox_proto/groups.pb.h"
+#include "third_party/omnibox_proto/suggest_template_info.pb.h"
 #include "third_party/omnibox_proto/types.pb.h"
 #include "ui/base/device_form_factor.h"
 
@@ -187,8 +188,7 @@ class AutocompleteResultTest : public testing::Test {
   AutocompleteMatch PopulateAutocompleteMatch(const TestData& data);
 
   // Adds |count| AutocompleteMatches to |matches|.
-  void PopulateAutocompleteMatches(const TestData* data,
-                                   size_t count,
+  void PopulateAutocompleteMatches(base::span<const TestData> data,
                                    ACMatches* matches);
   ACMatches PopulateAutocompleteMatches(const std::vector<TestData>& data);
 
@@ -202,16 +202,12 @@ class AutocompleteResultTest : public testing::Test {
 
   // Creates an AutocompleteResult from |last| and |current|. The two are
   // merged by |TransferOldMatches| and compared by |AssertResultMatches|.
-  void RunTransferOldMatchesTest(const TestData* last,
-                                 size_t last_size,
-                                 const TestData* current,
-                                 size_t current_size,
+  void RunTransferOldMatchesTest(base::span<const TestData> last,
+                                 base::span<const TestData> current,
                                  const TestData* expected,
                                  size_t expected_size);
-  void RunTransferOldMatchesTest(const TestData* last,
-                                 size_t last_size,
-                                 const TestData* current,
-                                 size_t current_size,
+  void RunTransferOldMatchesTest(base::span<const TestData> last,
+                                 base::span<const TestData> current,
                                  const TestData* expected,
                                  size_t expected_size,
                                  AutocompleteInput input);
@@ -267,11 +263,12 @@ AutocompleteMatch AutocompleteResultTest::PopulateAutocompleteMatch(
   return match;
 }
 
-void AutocompleteResultTest::PopulateAutocompleteMatches(const TestData* data,
-                                                         size_t count,
-                                                         ACMatches* matches) {
-  for (size_t i = 0; i < count; ++i)
+void AutocompleteResultTest::PopulateAutocompleteMatches(
+    base::span<const TestData> data,
+    ACMatches* matches) {
+  for (size_t i = 0; i < data.size(); ++i) {
     matches->push_back(PopulateAutocompleteMatch(data[i]));
+  }
 }
 
 ACMatches AutocompleteResultTest::PopulateAutocompleteMatches(
@@ -313,28 +310,24 @@ void AutocompleteResultTest::AssertMatch(AutocompleteMatch match,
       << i;
 }
 
-void AutocompleteResultTest::RunTransferOldMatchesTest(const TestData* last,
-                                                       size_t last_size,
-                                                       const TestData* current,
-                                                       size_t current_size,
-                                                       const TestData* expected,
-                                                       size_t expected_size) {
+void AutocompleteResultTest::RunTransferOldMatchesTest(
+    base::span<const TestData> last,
+    base::span<const TestData> current,
+    const TestData* expected,
+    size_t expected_size) {
   AutocompleteInput input(u"a", metrics::OmniboxEventProto::OTHER,
                           TestSchemeClassifier());
-  RunTransferOldMatchesTest(last, last_size, current, current_size, expected,
-                            expected_size, input);
+  RunTransferOldMatchesTest(last, current, expected, expected_size, input);
 }
 
 void AutocompleteResultTest::RunTransferOldMatchesTest(
-    const TestData* last,
-    size_t last_size,
-    const TestData* current,
-    size_t current_size,
+    base::span<const TestData> last,
+    base::span<const TestData> current,
     const TestData* expected,
     size_t expected_size,
     AutocompleteInput input) {
   ACMatches last_matches;
-  PopulateAutocompleteMatches(last, last_size, &last_matches);
+  PopulateAutocompleteMatches(last, &last_matches);
   AutocompleteResult last_result;
   last_result.AppendMatches(last_matches);
   last_result.SortAndCull(
@@ -343,7 +336,7 @@ void AutocompleteResultTest::RunTransferOldMatchesTest(
       /*mia_enabled*/ false);
 
   ACMatches current_matches;
-  PopulateAutocompleteMatches(current, current_size, &current_matches);
+  PopulateAutocompleteMatches(current, &current_matches);
   AutocompleteResult current_result;
   current_result.AppendMatches(current_matches);
   current_result.SortAndCull(
@@ -505,9 +498,8 @@ TEST_F(AutocompleteResultTest, TransferOldMatches) {
       {1, 1, 399, false},  // transferred matches aren't allowed to be default.
   };
 
-  ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(last, std::size(last),
-                                                    current, std::size(current),
-                                                    result, std::size(result)));
+  ASSERT_NO_FATAL_FAILURE(
+      RunTransferOldMatchesTest(last, current, result, std::size(result)));
 }
 
 // Tests that if the new results have a lower max relevance score than last,
@@ -531,9 +523,8 @@ TEST_F(AutocompleteResultTest, TransferOldMatchesAllowedToBeDefault) {
       {2, 1, 899, false},  // transferred matches aren't allowed to be default.
   };
 
-  ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(last, std::size(last),
-                                                    current, std::size(current),
-                                                    result, std::size(result)));
+  ASSERT_NO_FATAL_FAILURE(
+      RunTransferOldMatchesTest(last, current, result, std::size(result)));
 }
 
 // Tests |TransferOldMatches()| with an |AutocompleteInput| with
@@ -577,8 +568,7 @@ TEST_F(AutocompleteResultTest,
     // clang-format on
 
     ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(
-        last, std::size(last), current, std::size(current), result,
-        std::size(result), input));
+        last, current, result, std::size(result), input));
   }
 
   {
@@ -607,8 +597,7 @@ TEST_F(AutocompleteResultTest,
     // clang-format on
 
     ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(
-        last, std::size(last), current, std::size(current), result,
-        std::size(result), input));
+        last, current, result, std::size(result), input));
   }
 
   {
@@ -634,8 +623,7 @@ TEST_F(AutocompleteResultTest,
     // clang-format on
 
     ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(
-        last, std::size(last), current, std::size(current), result,
-        std::size(result), input));
+        last, current, result, std::size(result), input));
   }
 
   {
@@ -665,8 +653,7 @@ TEST_F(AutocompleteResultTest,
     // clang-format on
 
     ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(
-        last, std::size(last), current, std::size(current), result,
-        std::size(result), input));
+        last, current, result, std::size(result), input));
   }
 }
 
@@ -688,9 +675,8 @@ TEST_F(AutocompleteResultTest, TransferOldMatchesMultipleProviders) {
       {7, 1, 500, true}, {4, 1, 499, false},
   };
 
-  ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(last, std::size(last),
-                                                    current, std::size(current),
-                                                    result, std::size(result)));
+  ASSERT_NO_FATAL_FAILURE(
+      RunTransferOldMatchesTest(last, current, result, std::size(result)));
 }
 
 // Tests that matches are copied correctly from two distinct providers when
@@ -711,9 +697,8 @@ TEST_F(AutocompleteResultTest,
       {4, 1, 700, false}, {7, 1, 500, true},
   };
 
-  ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(last, std::size(last),
-                                                    current, std::size(current),
-                                                    result, std::size(result)));
+  ASSERT_NO_FATAL_FAILURE(
+      RunTransferOldMatchesTest(last, current, result, std::size(result)));
 }
 
 // Tests that transferred matches do not include the specialized match types.
@@ -731,9 +716,8 @@ TEST_F(AutocompleteResultTest, TransferOldMatchesSkipsSpecializedSuggestions) {
       {2, 2, 500, false},
   };
 
-  ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(last, std::size(last),
-                                                    current, std::size(current),
-                                                    result, std::size(result)));
+  ASSERT_NO_FATAL_FAILURE(
+      RunTransferOldMatchesTest(last, current, result, std::size(result)));
 }
 
 // Tests that transferred matches do not include the specialized match types.
@@ -756,9 +740,8 @@ TEST_F(AutocompleteResultTest, TransferOldMatchesSkipDoneProviders) {
   GetProvider(1)->done_ = true;
   GetProvider(3)->done_ = true;
 
-  ASSERT_NO_FATAL_FAILURE(RunTransferOldMatchesTest(last, std::size(last),
-                                                    current, std::size(current),
-                                                    result, std::size(result)));
+  ASSERT_NO_FATAL_FAILURE(
+      RunTransferOldMatchesTest(last, current, result, std::size(result)));
 }
 
 // Tests that matches with empty destination URLs aren't treated as duplicates
@@ -770,7 +753,7 @@ TEST_F(AutocompleteResultTest, SortAndCullEmptyDestinationURLs) {
   };
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   matches[1].destination_url = GURL();
   matches[3].destination_url = GURL();
   matches[4].destination_url = GURL();
@@ -813,7 +796,7 @@ TEST_F(AutocompleteResultTest, SortAndCullTailSuggestions) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   // These will get sorted up, but still removed.
   matches[3].type = AutocompleteMatchType::SEARCH_SUGGEST_TAIL;
   matches[4].type = AutocompleteMatchType::SEARCH_SUGGEST_TAIL;
@@ -848,7 +831,7 @@ TEST_F(AutocompleteResultTest, SortAndCullKeepDefaultTailSuggestions) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   // Make sure that even bad tail suggestions, if the only default match,
   // are kept.
   matches[0].type = AutocompleteMatchType::SEARCH_SUGGEST_TAIL;
@@ -885,7 +868,7 @@ TEST_F(AutocompleteResultTest, SortAndCullKeepMoreDefaultTailSuggestions) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   // Make sure that even a bad non-tail default suggestion is kept.
   for (size_t i = 1; i < 5; ++i)
     matches[i].type = AutocompleteMatchType::SEARCH_SUGGEST_TAIL;
@@ -923,7 +906,7 @@ TEST_F(AutocompleteResultTest, SortAndCullZeroRelevanceSuggestions) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   for (size_t i = 2; i < std::size(data); ++i)
     matches[i].type = AutocompleteMatchType::SEARCH_SUGGEST_TAIL;
 
@@ -959,7 +942,7 @@ TEST_F(AutocompleteResultTest, SortAndCullZeroRelevanceDefaultMatches) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   for (size_t i = 1; i < std::size(data); ++i)
     matches[i].type = AutocompleteMatchType::SEARCH_SUGGEST_TAIL;
 
@@ -998,7 +981,7 @@ TEST_F(AutocompleteResultTest, SortAndCullOnlyTailSuggestions) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   // These will not be removed.
   for (size_t i = 1; i < 5; ++i)
     matches[i].type = AutocompleteMatchType::SEARCH_SUGGEST_TAIL;
@@ -1030,7 +1013,7 @@ TEST_F(AutocompleteResultTest, SortAndCullNoMatchesAllowedToBeDefault) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
 
   AutocompleteInput input(std::u16string(), metrics::OmniboxEventProto::OTHER,
                           TestSchemeClassifier());
@@ -1063,7 +1046,7 @@ TEST_F(AutocompleteResultTest, SortAndCullDuplicateSearchURLs) {
   };
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   matches[0].destination_url = GURL("http://www.foo.com/s?q=foo");
   matches[1].destination_url = GURL("http://www.foo.com/s?q=foo2");
   matches[2].destination_url = GURL("http://www.foo.com/s?q=foo&oq=f");
@@ -1110,7 +1093,7 @@ TEST_F(AutocompleteResultTest, SortAndCullWithMatchDups) {
   };
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   matches[0].destination_url = GURL("http://www.foo.com/s?q=foo");
   matches[1].destination_url = GURL("http://www.foo.com/s?q=foo2");
   matches[2].destination_url = GURL("http://www.foo.com/s?q=foo&oq=f");
@@ -1259,7 +1242,7 @@ TEST_F(AutocompleteResultTest, DemoteOnDeviceSearchSuggestions) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   matches[0].type = AutocompleteMatchType::SEARCH_SUGGEST;
   matches[1].type = AutocompleteMatchType::SEARCH_SUGGEST;
   matches[2].type = AutocompleteMatchType::SEARCH_SUGGEST;
@@ -1385,7 +1368,7 @@ TEST_F(AutocompleteResultTest, SortAndCullReorderForDefaultMatch) {
     // is already a legal default match (which is the default from
     // PopulateAutocompleteMatches()).
     ACMatches matches;
-    PopulateAutocompleteMatches(data, std::size(data), &matches);
+    PopulateAutocompleteMatches(data, &matches);
     AutocompleteInput input(u"a", metrics::OmniboxEventProto::HOME_PAGE,
                             test_scheme_classifier);
     AutocompleteResult result;
@@ -1400,7 +1383,7 @@ TEST_F(AutocompleteResultTest, SortAndCullReorderForDefaultMatch) {
   {
     // Check that reorder swaps up a result appropriately.
     ACMatches matches;
-    PopulateAutocompleteMatches(data, std::size(data), &matches);
+    PopulateAutocompleteMatches(data, &matches);
     matches[0].allowed_to_be_default_match = false;
     matches[1].allowed_to_be_default_match = false;
     AutocompleteInput input(u"a", metrics::OmniboxEventProto::HOME_PAGE,
@@ -1497,7 +1480,7 @@ TEST_F(AutocompleteResultTest, SortAndCullPromoteDefaultMatch) {
   // Check that reorder swaps up a result, and promotes relevance,
   // appropriately.
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   AutocompleteInput input(u"a", metrics::OmniboxEventProto::HOME_PAGE,
                           test_scheme_classifier);
   AutocompleteResult result;
@@ -1528,7 +1511,7 @@ TEST_F(AutocompleteResultTest, SortAndCullPromoteUnconsecutiveMatches) {
   // Check that reorder swaps up a result, and promotes relevance,
   // even for a default match that isn't the best.
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   AutocompleteInput input(u"a", metrics::OmniboxEventProto::HOME_PAGE,
                           test_scheme_classifier);
   AutocompleteResult result;
@@ -1903,7 +1886,7 @@ TEST_F(AutocompleteResultTest, SortAndCullPromoteDuplicateSearchURLs) {
   };
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   // Note that 0, 2 and 3 will compare equal after stripping.
   matches[0].destination_url = GURL("http://www.foo.com/s?q=foo");
   matches[1].destination_url = GURL("http://www.foo.com/s?q=foo2");
@@ -1946,7 +1929,7 @@ TEST_F(AutocompleteResultTest, SortAndCullFeaturedSearchBeforeStarterPack) {
       {5, 2, 900, true, {}, AutocompleteMatchType::SEARCH_WHAT_YOU_TYPED},
   };
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
 
   AutocompleteInput input(u"@", metrics::OmniboxEventProto::OTHER,
                           TestSchemeClassifier());
@@ -1989,7 +1972,7 @@ TEST_F(AutocompleteResultTest,
   };
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
 
   AutocompleteInput input(u"a", metrics::OmniboxEventProto::OTHER,
                           TestSchemeClassifier());
@@ -2034,7 +2017,7 @@ TEST_F(AutocompleteResultTest, GroupSuggestionsByExtension) {
       omnibox::SECTION_UNSCOPED_EXTENSION_2);
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   AutocompleteInput input(u"a", metrics::OmniboxEventProto::OTHER,
                           TestSchemeClassifier());
   AutocompleteResultForTesting result;
@@ -2320,7 +2303,7 @@ TEST_F(AutocompleteResultTest, DocumentSuggestionsCanMergeButNotToDefault) {
       {3, 1, 400, false},   // HISTORY result for url [3].
   };
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   matches[0].type = AutocompleteMatchType::DOCUMENT_SUGGESTION;
   static_cast<FakeAutocompleteProvider*>(matches[0].provider)->type_ =
       AutocompleteProvider::Type::TYPE_DOCUMENT;
@@ -2483,7 +2466,7 @@ TEST_F(AutocompleteResultTest, ClipboardSuggestionOnTopOfSearchSuggestionTest) {
   // clang-format on
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   matches[0].type = AutocompleteMatchType::SEARCH_SUGGEST;
   static_cast<FakeAutocompleteProvider*>(matches[0].provider)->type_ =
       AutocompleteProvider::Type::TYPE_ZERO_SUGGEST_LOCAL_HISTORY;
@@ -2642,7 +2625,7 @@ TEST_F(AutocompleteResultTest, Desktop_MostVisitedSitesGrouping) {
         {9, 1, 410, false, {}, AutocompleteMatchType::HISTORY_URL, group2},
     };
     ACMatches matches;
-    PopulateAutocompleteMatches(data, std::size(data), &matches);
+    PopulateAutocompleteMatches(data, &matches);
 
     AutocompleteResult result;
     result.MergeSuggestionGroupsMap(suggestion_groups_map);
@@ -2694,7 +2677,7 @@ TEST_F(AutocompleteResultTest, Desktop_MostVisitedSitesGrouping) {
         {9, 1, 410, false, {}, AutocompleteMatchType::SEARCH_HISTORY, group1},
     };
     ACMatches matches;
-    PopulateAutocompleteMatches(data, std::size(data), &matches);
+    PopulateAutocompleteMatches(data, &matches);
 
     AutocompleteResult result;
     result.MergeSuggestionGroupsMap(suggestion_groups_map);
@@ -2751,7 +2734,7 @@ TEST_F(AutocompleteResultTest, Desktop_TwoColumnRealbox) {
       {7, 1, 430, false, {}, AutocompleteMatchType::SEARCH_SUGGEST, group3},
   };
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
 
   // Suggestion groups have the omnibox::SECTION_DEFAULT and
   // omnibox::GroupConfig_SideType_DEFAULT_PRIMARY by default.
@@ -2924,7 +2907,7 @@ TEST_F(AutocompleteResultTest, Desktop_ZpsGroupingIPH) {
        IphType::kFeaturedEnterpriseSiteSearch},
   };
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
 
   // Suggestion groups have the omnibox::SECTION_DEFAULT by default.
   omnibox::GroupConfigMap suggestion_groups_map;
@@ -3007,7 +2990,7 @@ TEST_F(AutocompleteResultTest, Desktop_ZpsGroupingIPH) {
     SCOPED_TRACE("Query from omnibox - without IPH");
     // Remove the IPH suggestion from the list of matches.
     matches.clear();
-    PopulateAutocompleteMatches(data, std::size(data) - 1, &matches);
+    PopulateAutocompleteMatches({data, std::size(data) - 1}, &matches);
 
     AutocompleteResult result;
     result.MergeSuggestionGroupsMap(suggestion_groups_map);
@@ -3156,7 +3139,7 @@ TEST_F(AutocompleteResultTest, Android_InspireMe) {
       {6, 1, 440, false, {}, AutocompleteMatchType::SEARCH_SUGGEST, group3},
   };
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
 
   // Suggestion groups have the omnibox::SECTION_DEFAULT and
   // omnibox::GroupConfig_SideType_DEFAULT_PRIMARY by default.
@@ -3287,7 +3270,7 @@ TEST_F(AutocompleteResultTest, IOS_InspireMe) {
       {4, 1, 460, false, {}, AutocompleteMatchType::SEARCH_SUGGEST, group2},
   };
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
 
   // Suggestion groups have the omnibox::SECTION_DEFAULT and
   // omnibox::GroupConfig_SideType_DEFAULT_PRIMARY by default.
@@ -3414,10 +3397,12 @@ TEST_F(AutocompleteResultTest, Mobile_TrimOmniboxActions) {
                            : AutocompleteMatchType::SEARCH_SUGGEST_ENTITY);
       for (auto& action_id : actions) {
         if (action_id == OmniboxActionId::ACTION_IN_SUGGEST) {
-          omnibox::ActionInfo info;
-          info.set_action_type(omnibox::ActionInfo_ActionType_DIRECTIONS);
+          omnibox::SuggestTemplateInfo::TemplateAction action;
+          action.set_action_type(
+              omnibox::
+                  SuggestTemplateInfo_TemplateAction_ActionType_DIRECTIONS);
           match.actions.push_back(base::MakeRefCounted<OmniboxActionInSuggest>(
-              std::move(info), std::nullopt));
+              std::move(action), std::nullopt));
         } else {
           match.actions.push_back(
               base::MakeRefCounted<FakeOmniboxAction>(action_id));
@@ -3503,7 +3488,7 @@ TEST_F(AutocompleteResultTest, ContextualSearchAblateOthers) {
   suggestion_groups_map[group3];
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   for (AutocompleteMatch& m : matches) {
     if (m.suggestion_group_id && m.suggestion_group_id.value() == group3) {
       m.subtypes.insert(omnibox::SuggestSubtype::SUBTYPE_CONTEXTUAL_SEARCH);
@@ -3570,7 +3555,7 @@ TEST_F(AutocompleteResultTest, ContextualSearchAblateOthers_AblateSearchOnly) {
   suggestion_groups_map[group3];
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   for (AutocompleteMatch& m : matches) {
     if (m.suggestion_group_id && m.suggestion_group_id.value() == group3) {
       m.subtypes.insert(omnibox::SuggestSubtype::SUBTYPE_CONTEXTUAL_SEARCH);
@@ -3638,7 +3623,7 @@ TEST_F(AutocompleteResultTest, ContextualSearchAblateOthers_AblateUrlOnly) {
   suggestion_groups_map[group3];
 
   ACMatches matches;
-  PopulateAutocompleteMatches(data, std::size(data), &matches);
+  PopulateAutocompleteMatches(data, &matches);
   for (AutocompleteMatch& m : matches) {
     if (m.suggestion_group_id && m.suggestion_group_id.value() == group3) {
       m.subtypes.insert(omnibox::SuggestSubtype::SUBTYPE_CONTEXTUAL_SEARCH);

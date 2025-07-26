@@ -220,8 +220,7 @@ std::string RealtimeReportingClient::GetProfileIdentifier() {
 
 std::string RealtimeReportingClient::GetContentAreaAccountEmail(
     const GURL& url) {
-  return enterprise_connectors::GetActiveContentAreaUser(identity_manager_,
-                                                         url);
+  return GetActiveContentAreaUser(identity_manager_, url);
 }
 
 std::string RealtimeReportingClient::GetBrowserClientId() {
@@ -263,6 +262,8 @@ void RealtimeReportingClient::MaybeCollectDeviceSignalsAndReportEvent(
   if (signals_aggregator) {
     device_signals::SignalsAggregationRequest request;
     request.signal_names.emplace(device_signals::SignalName::kAgent);
+    request.agent_signal_parameters.emplace(
+        device_signals::AgentSignalCollectionType::kCrowdstrikeIdentifiers);
     signals_aggregator->GetSignals(
         request,
         base::BindOnce(&RealtimeReportingClient::PopulateSignalsAndReportEvent,

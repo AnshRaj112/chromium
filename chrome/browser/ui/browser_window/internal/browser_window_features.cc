@@ -14,9 +14,6 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/collaboration/collaboration_service_factory.h"
 #include "chrome/browser/commerce/shopping_service_factory.h"
-#include "chrome/browser/download/bubble/download_bubble_prefs.h"
-#include "chrome/browser/download/bubble/download_bubble_ui_controller.h"
-#include "chrome/browser/download/bubble/download_display_controller.h"
 #include "chrome/browser/extensions/browser_extension_window_controller.h"
 #include "chrome/browser/extensions/manifest_v2_experiment_manager.h"
 #include "chrome/browser/extensions/mv2_experiment_stage.h"
@@ -46,6 +43,8 @@
 #include "chrome/browser/ui/performance_controls/memory_saver_opt_in_iph_controller.h"
 #include "chrome/browser/ui/signin/signin_view_controller.h"
 #include "chrome/browser/ui/sync/browser_synced_window_delegate.h"
+#include "chrome/browser/ui/tabs/features.h"
+#include "chrome/browser/ui/tabs/glic_actor_task_icon_controller.h"
 #include "chrome/browser/ui/tabs/glic_nudge_controller.h"
 #include "chrome/browser/ui/tabs/organization/tab_declutter_controller.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/most_recent_shared_tab_update_store.h"
@@ -56,6 +55,7 @@
 #include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
 #include "chrome/browser/ui/tabs/tab_list_bridge.h"
 #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_service_impl.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/toasts/toast_controller.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
 #include "chrome/browser/ui/toasts/toast_service.h"
@@ -64,7 +64,6 @@
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/color_provider_browser_helper.h"
 #include "chrome/browser/ui/views/data_sharing/data_sharing_bubble_controller.h"
-#include "chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/immersive_mode_controller.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
@@ -115,6 +114,12 @@
 #if BUILDFLAG(IS_WIN)
 #include "chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.h"
 #include "chrome/browser/ui/views/frame/windows_taskbar_icon_updater.h"
+#endif
+
+#if !BUILDFLAG(IS_CHROMEOS)
+#include "chrome/browser/download/bubble/download_bubble_ui_controller.h"
+#include "chrome/browser/download/bubble/download_display_controller.h"
+#include "chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.h"
 #endif
 
 #if BUILDFLAG(ENABLE_GLIC)
@@ -202,6 +207,12 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
       }
     }
 #endif  // BUILDFLAG(ENABLE_GLIC)
+
+    if (tabs::AreVerticalTabsEnabled()) {
+      vertical_tab_strip_state_controller_ =
+          std::make_unique<tabs::VerticalTabStripStateController>(
+              browser->GetProfile()->GetPrefs());
+    }
   }
 
   // The LensOverlayEntryPointController is constructed for all browser types
@@ -307,10 +318,12 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
       browser->window()->GetExclusiveAccessContext());
 
   // This code needs exclusive access manager to be initialized.
+#if !BUILDFLAG(IS_CHROMEOS)
   if (download_toolbar_ui_controller_) {
     download_toolbar_ui_controller_->display_controller()
         ->ListenToFullScreenChanges();
   }
+#endif
 
   // Features that are only enabled for normal browser windows (e.g. a window
   // with an omnibox and a tab strip). By default most features should be
@@ -448,7 +461,7 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
 
   if (CommentsSidePanelCoordinator::IsSupported()) {
     comments_side_panel_coordinator_ =
-        std::make_unique<CommentsSidePanelCoordinator>();
+        std::make_unique<CommentsSidePanelCoordinator>(browser_view);
   }
 
   side_panel_coordinator_->Init(browser_view->browser());
@@ -494,10 +507,10 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
     }
   }
 
-  if (download::IsDownloadBubbleEnabled()) {
-    download_toolbar_ui_controller_ =
-        std::make_unique<DownloadToolbarUIController>(browser_view);
-  }
+#if !BUILDFLAG(IS_CHROMEOS)
+  download_toolbar_ui_controller_ =
+      std::make_unique<DownloadToolbarUIController>(browser_view);
+#endif
 
   if (base::FeatureList::IsEnabled(ntp_features::kNtpFooter)) {
     new_tab_footer_controller_ =
@@ -529,9 +542,11 @@ void BrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
   glic_button_controller_.reset();
 #endif
 
+#if !BUILDFLAG(IS_CHROMEOS)
   if (download_toolbar_ui_controller_) {
     download_toolbar_ui_controller_->TearDownPreBrowserWindowDestruction();
   }
+#endif
 
   history_clusters_side_panel_coordinator_.reset();
 

@@ -369,6 +369,10 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
        IDS_PASSWORD_MANAGER_UI_PASSWORD_DETAILS_CARD_DELETE_BUTTON_ARIA_LABEL},
       {"passwordDetailsCardDeleteButtonNoUsernameAriaLabel",
        IDS_PASSWORD_MANAGER_UI_PASSWORD_DETAILS_CARD_DELETE_BUTTON_NO_USERNAME_ARIA_LABEL},
+      {"passwordDetailsCardBackupPasswordNote",
+       IDS_PASSWORD_MANAGER_UI_BACKUP_PASSWORD_SETTINGS_DESCRIPTION},
+      {"passwordDetailsCardBackupPasswordNoteDetails",
+       IDS_PASSWORD_MANAGER_UI_BACKUP_PASSWORD_SETTINGS_DESCRIPTION_DETAILS},
       {"passwordLabel", IDS_PASSWORD_MANAGER_UI_PASSWORD_LABEL},
       {"passwordManager",
        IDS_PASSWORD_BUBBLES_PASSWORD_MANAGER_LINK_TEXT_SYNCED_TO_ACCOUNT},
@@ -633,7 +637,7 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
 
   source->AddBoolean("passwordChangeAvailable",
                      PasswordChangeServiceFactory::GetForProfile(profile)
-                         ->IsPasswordChangeAvailable());
+                         ->ShouldShowEntryInSettings());
 
   source->AddBoolean(
       "enablePasswordManagerMojoApi",
@@ -777,4 +781,20 @@ void PasswordManagerUI::CreateHelpBubbleHandler(
           PasswordManagerUI::kSharePasswordElementId,
           PasswordManagerUI::kAccountStoreToggleElementId,
           PasswordManagerUI::kOverflowMenuElementId});
+}
+
+void PasswordManagerUI::BindInterface(
+    mojo::PendingReceiver<password_manager::mojom::PageHandlerFactory>
+        receiver) {
+  password_manager_page_factory_receiver_.reset();
+  password_manager_page_factory_receiver_.Bind(std::move(receiver));
+}
+
+void PasswordManagerUI::CreatePageHandler(
+    mojo::PendingRemote<password_manager::mojom::Page> page,
+    mojo::PendingReceiver<password_manager::mojom::PageHandler> receiver) {
+  DCHECK(page);
+  password_manager_ui_handler_ = std::make_unique<PasswordManagerUIHandler>(
+      std::move(receiver), std::move(page), passwords_private_delegate_,
+      web_ui()->GetWebContents());
 }

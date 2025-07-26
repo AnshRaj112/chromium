@@ -146,6 +146,9 @@ extern const char kAutofillUseRendererIDsDescription[];
 extern const char kAutofillVcnEnrollStrikeExpiryTimeName[];
 extern const char kAutofillVcnEnrollStrikeExpiryTimeDescription[];
 
+extern const char kBeginCursorAtPointTentativeFixName[];
+extern const char kBeginCursorAtPointTentativeFixDescription[];
+
 extern const char kBestFeaturesScreenInFirstRunName[];
 extern const char kBestFeaturesScreenInFirstRunDescription[];
 
@@ -244,6 +247,9 @@ extern const char kDataSharingSharedDataTypesEnabledWithUi[];
 
 extern const char kDefaultBrowserBannerPromoName[];
 extern const char kDefaultBrowserBannerPromoDescription[];
+
+extern const char kDefaultBrowserOffCyclePromoName[];
+extern const char kDefaultBrowserOffCyclePromoDescription[];
 
 extern const char kDefaultBrowserPromoPropensityModelName[];
 extern const char kDefaultBrowserPromoPropensityModelDescription[];
@@ -618,6 +624,9 @@ extern const char kManualLogUploadsInFREDescription[];
 // reports.
 extern const char kMetrickitNonCrashReportName[];
 extern const char kMetrickitNonCrashReportDescription[];
+
+extern const char kMigrateAccountPrefsOnMobileName[];
+extern const char kMigrateAccountPrefsOnMobileDescription[];
 
 extern const char kMostVisitedTilesHorizontalRenderGroupName[];
 extern const char kMostVisitedTilesHorizontalRenderGroupDescription[];

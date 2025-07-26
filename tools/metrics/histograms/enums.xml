@@ -2553,8 +2553,8 @@ Called by update_net_error_codes.py.-->
   <int value="86" label="Notification interactions"/>
   <int value="87" label="Reduce accept language"/>
   <int value="88" label="Notification permission review"/>
-  <int value="89" label="Private network guard"/>
-  <int value="90" label="Private network chooser data"/>
+  <int value="89" label="(Obsolete) Private network guard"/>
+  <int value="90" label="(Obsolete) Private network chooser data"/>
   <int value="91"
       label="Federated identity identity-provider-sign-in-status API"/>
   <int value="92" label="Unused site permissions"/>
@@ -2605,6 +2605,7 @@ Called by update_net_error_codes.py.-->
   <int value="137" label="Translator API languages initialized by site"/>
   <int value="138" label="Suspicious notification ids"/>
   <int value="139" label="Geolocation with options"/>
+  <int value="140" label="Device Attributes"/>
 </enum>
 
 <!-- LINT.ThenChange(//components/content_settings/core/browser/content_settings_uma_util.cc:kHistogramValue) -->
@@ -9339,6 +9340,7 @@ from previous Chrome versions.
   <int value="-1745909884" label="LibAssistantV2:disabled"/>
   <int value="-1745844997" label="AvifGainmapHdrImages:enabled"/>
   <int value="-1744231895" label="CCTEphemeralMode:enabled"/>
+  <int value="-1743234830" label="SubmenusTabContextMenuLffTabStrip:disabled"/>
   <int value="-1743214399" label="TrustSafetySentimentSurveyV2:disabled"/>
   <int value="-1743079191" label="SyncPseudoUSSPriorityPreferences:enabled"/>
   <int value="-1742376665" label="SyncPseudoUSSPasswords:disabled"/>
@@ -9750,6 +9752,7 @@ from previous Chrome versions.
   <int value="-1595021446"
       label="AdaptiveButtonInTopToolbarPageSummary:enabled"/>
   <int value="-1594298767" label="FullscreenToolbarReveal:enabled"/>
+  <int value="-1594078405" label="SubmenusTabContextMenuLffTabStrip:enabled"/>
   <int value="-1594067749" label="TabStripIncognitoMigration:disabled"/>
   <int value="-1593946814"
       label="AccountReauthenticationRecentTimeWindow:enabled"/>
@@ -11799,6 +11802,7 @@ from previous Chrome versions.
   <int value="-847735582" label="NotificationsViaHelperApp:enabled"/>
   <int value="-847216521" label="ChromeDuplex:enabled"/>
   <int value="-846670837" label="QuickAppAccessTestUI:enabled"/>
+  <int value="-846321831" label="OmniboxSiteSearch:enabled"/>
   <int value="-844786349" label="ClipboardHistoryNudgeSessionReset:enabled"/>
   <int value="-844537521" label="HttpFormWarning:disabled"/>
   <int value="-844381918" label="ArcNativeBridgeExperiment:disabled"/>
@@ -12359,6 +12363,7 @@ from previous Chrome versions.
   <int value="-638349846" label="OmniboxWarmRecycledViewPool:disabled"/>
   <int value="-638177392" label="FuseBoxDebug:enabled"/>
   <int value="-638007872" label="OfflineContentOnNetError:enabled"/>
+  <int value="-637647384" label="MigrateAccountPrefs:disabled"/>
   <int value="-637297943" label="WebAuthenticationCableSecondFactor:disabled"/>
   <int value="-637215276" label="QuickAnswersOnEditableText:enabled"/>
   <int value="-636701420"
@@ -12717,6 +12722,7 @@ from previous Chrome versions.
   <int value="-506706655" label="respect-autocomplete-off-autofill"/>
   <int value="-506366023" label="VizHitTest:enabled"/>
   <int value="-506064880" label="EnableIPH:disabled"/>
+  <int value="-505751088" label="OmniboxSiteSearch:disabled"/>
   <int value="-505679399" label="FontCacheScaling:enabled"/>
   <int value="-505264501" label="BackForwardTransitions:enabled"/>
   <int value="-504952236" label="AutocorrectParamsTuning:disabled"/>
@@ -12855,6 +12861,7 @@ from previous Chrome versions.
   <int value="-454362199" label="HelpAppV2:disabled"/>
   <int value="-454359275" label="kQuickAnswersMaterialNextUI:disabled"/>
   <int value="-454246685" label="AndroidAppIntegrationWithFavicon:disabled"/>
+  <int value="-453506590" label="MediaLinkHelpers:disabled"/>
   <int value="-452734575" label="ArcExtendInputAnrTimeout:enabled"/>
   <int value="-451898735" label="private-aggregation-developer-mode"/>
   <int value="-450976085"
@@ -12977,6 +12984,7 @@ from previous Chrome versions.
       label="OmniboxUIExperimentBlueTitlesAndGrayUrlsOnPageSuggestions:enabled"/>
   <int value="-401170566"
       label="OmniboxUIExperimentHideSuggestionUrlPath:disabled"/>
+  <int value="-400947433" label="MigrateAccountPrefs:enabled"/>
   <int value="-400706140" label="MahiSummarizeSelected:disabled"/>
   <int value="-400584764" label="ChromeHomeNtpRedesign:enabled"/>
   <int value="-400572959" label="UseDownloadOfflineContentProvider:enabled"/>
@@ -15887,6 +15895,7 @@ from previous Chrome versions.
   <int value="666871156" label="KaleidoscopeModule:enabled"/>
   <int value="667262414" label="IOSPromoBookmarkBubble:disabled"/>
   <int value="667643314" label="LitePageServerPreviews:enabled"/>
+  <int value="668342684" label="TabModelInitFixes:disabled"/>
   <int value="669097106" label="NtpRealboxMatchOmniboxTheme:disabled"/>
   <int value="669958310" label="EnableSuggestedLocalFiles:disabled"/>
   <int value="670404276" label="ImeUsEnglishModelUpdate:disabled"/>
@@ -16210,6 +16219,7 @@ from previous Chrome versions.
   <int value="773952982" label="ReduceIPAddressChangeNotification:disabled"/>
   <int value="775075949" label="ImeInputLogicHmm:enabled"/>
   <int value="775148009" label="OsSettingsDeepLinking:disabled"/>
+  <int value="775373286" label="TabModelInitFixes:enabled"/>
   <int value="777569794" label="FeedWebUi:enabled"/>
   <int value="777667507" label="DesktopPWAsLinkCapturing:enabled"/>
   <int value="778000757" label="EnableInputEventLogging:disabled"/>
@@ -17122,6 +17132,7 @@ from previous Chrome versions.
   <int value="1122217615" label="PasswordGenerationBottomSheet:enabled"/>
   <int value="1122327201"
       label="MediaFoundationCameraUsageMonitoring:disabled"/>
+  <int value="1122442180" label="MediaLinkHelpers:enabled"/>
   <int value="1122820469" label="ArcImageCopyPasteCompat:enabled"/>
   <int value="1122825280" label="FontationsFontBackend:enabled"/>
   <int value="1123140537" label="tab-link-drag-drop:disabled"/>
@@ -18558,6 +18569,7 @@ from previous Chrome versions.
   <int value="1639681180" label="HelpAppAppsDiscovery:enabled"/>
   <int value="1639728471" label="ThemeRefactorAndroid:disabled"/>
   <int value="1640386037" label="ContextualSuggestionsSlimPeekUI:disabled"/>
+  <int value="1640633395" label="ApproximateGeolocationPermission:disabled"/>
   <int value="1641671651" label="ContextualPageActionShareModel:disabled"/>
   <int value="1642200544" label="ArcExtendServiceAnrTimeout:disabled"/>
   <int value="1642478923" label="ContextualTriggersSelectionSize:enabled"/>
@@ -19639,6 +19651,7 @@ from previous Chrome versions.
       label="IsolatedWebAppManagedGuestSessionInstall:disabled"/>
   <int value="2015547864" label="NetworkServiceInProcess:enabled"/>
   <int value="2017283500" label="DragDropTabTearingEnableOEM:disabled"/>
+  <int value="2017591110" label="ApproximateGeolocationPermission:enabled"/>
   <int value="2018206979" label="FilesLocalImageSearch:disabled"/>
   <int value="2018956925" label="UseAAudioDriver:disabled"/>
   <int value="2019319052" label="EnableVariableRefreshRate:disabled"/>
@@ -21732,32 +21745,6 @@ Called by update_net_error_codes.py.-->
   <int value="1" label="Before Commit"/>
   <int value="2" label="Before First Paint"/>
   <int value="3" label="After First Paint"/>
-</enum>
-
-<enum name="PasswordAccessLossWarningExportStep">
-  <int value="0" label="Password serialization failed"/>
-  <int value="1" label="Export with deletion was rejected"/>
-  <int value="2" label="No screen lock set up"/>
-  <int value="3" label="Saving exported passwords failed"/>
-  <int value="4" label="Export was aborted because authenticaiton expired"/>
-  <int value="5" label="Passwords were exported"/>
-  <int value="6" label="Password import rejected"/>
-  <int value="7" label="The GMS Core UI for password import was opened"/>
-</enum>
-
-<enum name="PasswordAccessLossWarningTriggers">
-  <int value="0" label="Chrome started up"/>
-  <int value="1" label="A password was saved or updated"/>
-  <int value="2" label="A credential was filled via touch to fill sheet"/>
-  <int value="3" label="A credential was filled via keyboard accessory sheet"/>
-  <int value="4" label="A credential was filled via keyboard accessory bar"/>
-  <int value="5" label="A credential was filled via all passwords sheet"/>
-</enum>
-
-<enum name="PasswordAccessLossWarningUserActions">
-  <int value="0" label="The main action was taken"/>
-  <int value="1" label="The help center link was opened"/>
-  <int value="2" label="The sheet was dismissed"/>
 </enum>
 
 <enum name="PasswordBubbleDismissalReason">

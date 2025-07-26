@@ -23,6 +23,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
+#include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -127,8 +128,10 @@ using perfetto::protos::pbzero::ChromeTrackEvent;
 using RenderViewHostID = std::pair<int32_t, int32_t>;
 using RoutingIDViewMap =
     absl::flat_hash_map<RenderViewHostID, RenderViewHostImpl*>;
-base::LazyInstance<RoutingIDViewMap>::Leaky g_routing_id_view_map =
-    LAZY_INSTANCE_INITIALIZER;
+RoutingIDViewMap& GetRoutingIDViewMap() {
+  static base::NoDestructor<RoutingIDViewMap> routing_id_view_map;
+  return *routing_id_view_map;
+}
 
 #if BUILDFLAG(IS_WIN)
 // Fetches the name and font size of a particular Windows system font.
@@ -228,9 +231,9 @@ RenderViewHost* RenderViewHost::From(RenderWidgetHost* rwh) {
 // static
 RenderViewHostImpl* RenderViewHostImpl::FromID(int process_id, int routing_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  RoutingIDViewMap* views = g_routing_id_view_map.Pointer();
-  auto it = views->find(RenderViewHostID(process_id, routing_id));
-  return it == views->end() ? nullptr : it->second;
+  RoutingIDViewMap& views = GetRoutingIDViewMap();
+  auto it = views.find(RenderViewHostID(process_id, routing_id));
+  return it == views.end() ? nullptr : it->second;
 }
 
 // static
@@ -339,7 +342,7 @@ RenderViewHostImpl::RenderViewHostImpl(
       ->Insert(this);
 
   std::pair<RoutingIDViewMap::iterator, bool> result =
-      g_routing_id_view_map.Get().emplace(
+      GetRoutingIDViewMap().emplace(
           RenderViewHostID(GetProcess()->GetDeprecatedID(), routing_id_), this);
   CHECK(result.second) << "Inserting a duplicate item!";
   GetAgentSchedulingGroup().AddRoute(routing_id_, this);
@@ -378,7 +381,7 @@ RenderViewHostImpl::~RenderViewHostImpl() {
 
   // Detach the routing ID as the object is going away.
   GetAgentSchedulingGroup().RemoveRoute(GetRoutingID());
-  g_routing_id_view_map.Get().erase(
+  GetRoutingIDViewMap().erase(
       RenderViewHostID(GetProcess()->GetDeprecatedID(), GetRoutingID()));
 
   delegate_->RenderViewDeleted(this);
@@ -469,10 +472,13 @@ bool RenderViewHostImpl::CreateRenderView(
           prerender_host.should_warm_up_compositor();
       prerender_param->should_prepare_paint_tree =
           prerender_host.should_prepare_paint_tree();
+      prerender_param->should_pause_javascript_execution =
+          prerender_host.should_pause_javascript_execution();
     } else {
       prerender_param->page_metric_suffix = ".Preview";
       prerender_param->should_warm_up_compositor = false;
       prerender_param->should_prepare_paint_tree = false;
+      prerender_param->should_pause_javascript_execution = false;
     }
     params->prerender_param = std::move(prerender_param);
   }

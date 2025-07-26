@@ -37,6 +37,26 @@ ci.defaults.set(
     siso_remote_jobs = siso.remote_jobs.DEFAULT,
 )
 
+_DEFAULT_CONSOLE_ORDERING = consoles.ordering(short_names = ["dbg", "rel"])
+
+_LIBFUZZER_CONSOLE_ORDERING = consoles.ordering(short_names = [
+    "linux",
+    "linux-dbg",
+    "linux high dbg",
+    "linux high end",
+    "linux32",
+    "linux-msan",
+    "linux-ubsan",
+    "chromeos-asan",
+    "mac-asan",
+    "win-asan",
+    "arm",
+    "arm-dbg",
+    "arm64",
+    "arm64-dbg",
+    "ios",
+])
+
 consoles.console_view(
     name = "chromium.fuzz",
     branch_selector = [
@@ -50,26 +70,15 @@ consoles.console_view(
             "mac asan",
             "cros asan",
             "linux asan",
-            "libfuzz",
+            "libfuzzer",
             "linux msan",
             "linux tsan",
         ],
-        "*config*": consoles.ordering(short_names = ["dbg", "rel"]),
-        "win asan": "*config*",
-        "mac asan": "*config*",
-        "linux asan": "*config*",
-        "linux asan|x64 v8-ARM": "*config*",
-        "libfuzz": consoles.ordering(short_names = [
-            "chromeos-asan",
-            "linux32",
-            "linux32-dbg",
-            "linux",
-            "linux-dbg",
-            "linux-msan",
-            "linux-ubsan",
-            "mac-asan",
-            "win-asan",
-        ]),
+        "win asan": _DEFAULT_CONSOLE_ORDERING,
+        "mac asan": _DEFAULT_CONSOLE_ORDERING,
+        "linux asan": _DEFAULT_CONSOLE_ORDERING,
+        "linux asan|x64 v8-ARM": _DEFAULT_CONSOLE_ORDERING,
+        "libfuzzer": _LIBFUZZER_CONSOLE_ORDERING,
     },
 )
 
@@ -78,6 +87,7 @@ def ci_builder(
         chromium_config_name = None,
         build_config = None,
         target_bits = None,
+        target_arch = None,
         target_platform = None,
         chromium_extra_apply_configs = [],
         gclient_apply_configs = None,
@@ -103,7 +113,10 @@ def ci_builder(
     if target_bits == 32:
         gn_configs.append("x86")
     elif target_bits == 64:
-        gn_configs.append("x64")
+        if target_arch == builder_config.target_arch.ARM:
+            gn_configs.append("arm64")
+        else:
+            gn_configs.append("x64")
 
     if target_platform == builder_config.target_platform.CHROMEOS:
         gn_configs.append("chromeos")
@@ -129,6 +142,7 @@ def ci_builder(
                     "mb",
                 ] + chromium_extra_apply_configs),
                 build_config = build_config,
+                target_arch = target_arch,
                 target_bits = target_bits,
                 target_platform = target_platform,
             ),
@@ -202,7 +216,7 @@ def libfuzzer_builder(
         clusterfuzz_archive_subdir = None,
         clusterfuzz_ios_targets_only = None,
         clusterfuzz_v8_targets_only = None,
-        contact_team_email = "chrome-deet-core@google.com",
+        contact_team_email = "chrome-fuzzing-core@google.com",
         **kwargs):
     gn_configs = [
         "libfuzzer",
@@ -232,7 +246,7 @@ def libfuzzer_builder(
         gn_extra_configs = gn_configs,
         use_component_build = use_component_build,
         properties = properties,
-        console_category = "libfuzz",
+        console_category = "libfuzzer",
         contact_team_email = contact_team_email,
         **kwargs
     )
@@ -428,7 +442,7 @@ ci.builder(
         category = "centipede",
         short_name = "cent",
     ),
-    contact_team_email = "chrome-deet-core@google.com",
+    contact_team_email = "chrome-fuzzing-core@google.com",
     execution_timeout = 4 * time.hour,
     properties = {
         "upload_bucket": "chromium-browser-centipede",
@@ -482,7 +496,7 @@ Those fuzzers require more resources to run correctly.\
         category = "centipede",
         short_name = "cent high",
     ),
-    contact_team_email = "chrome-deet-core@google.com",
+    contact_team_email = "chrome-fuzzing-core@google.com",
     properties = {
         "upload_bucket": "chromium-browser-centipede",
         "upload_directory": "asan",
@@ -532,7 +546,7 @@ in release mode with dcheck_always_on.\
         category = "centipede",
         short_name = "cent high dc",
     ),
-    contact_team_email = "chrome-deet-core@google.com",
+    contact_team_email = "chrome-fuzzing-core@google.com",
     properties = {
         "upload_bucket": "chromium-browser-centipede",
         "upload_directory": "asan",
@@ -644,9 +658,10 @@ browser_msan_builder(
 
 def browser_asan_mac_builder(
         gn_extra_configs = [],
+        max_concurrent_invocations = 2,
         **kwargs):
     return browser_asan_builder(
-        max_concurrent_invocations = 2,
+        max_concurrent_invocations = max_concurrent_invocations,
         build_config = builder_config.build_config.RELEASE,
         target_bits = 64,
         target_platform = builder_config.target_platform.MAC,
@@ -680,6 +695,23 @@ browser_asan_mac_builder(
     gn_extra_configs = [
         "chrome_with_codecs",
     ],
+)
+
+browser_asan_mac_builder(
+    name = "Mac ARM64 ASAN Release",
+    description_html = "ASAN build of chrome for Mac ARM64.",
+    builderless = True,
+    cpu = cpu.ARM64,
+    # TODO(https://crbug.com/431089339): Add to gardening rotation once the build
+    # is proven green.
+    gardener_rotations = args.ignore_default(None),
+    target_arch = builder_config.target_arch.ARM,
+    # Full subdir: `mac-release-arm64`
+    clusterfuzz_archive_subdir = "arm64",
+    console_short_name = "arm64-rel",
+    contact_team_email = "chrome-sanitizer-builder-owners@google.com",
+    # We requested a single machine in https://crbug.com/432473774.
+    max_concurrent_invocations = 1,
 )
 
 def browser_tsan_builder(**kwargs):

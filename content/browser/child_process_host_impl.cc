@@ -34,7 +34,6 @@
 #include "ipc/ipc.mojom.h"
 #include "ipc/ipc_channel.h"
 #include "ipc/ipc_channel_mojo.h"
-#include "ipc/message_filter.h"
 #include "services/resource_coordinator/public/mojom/memory_instrumentation/constants.mojom.h"
 #include "services/service_manager/public/cpp/interface_provider.h"
 
@@ -211,14 +210,6 @@ void ChildProcessHostImpl::OnDisconnectedFromChildProcess() {
 
 bool ChildProcessHostImpl::IsChannelOpening() {
   return opening_channel_;
-}
-
-bool ChildProcessHostImpl::Send(IPC::Message* message) {
-  if (!channel_) {
-    delete message;
-    return false;
-  }
-  return channel_->Send(message);
 }
 
 // static

@@ -647,8 +647,8 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-features=EnableBoundSessionCredentialsSoftwareKeysForManualTesting,DeviceBoundSessions",
-      "--disable-features=DeviceBoundSessionsRefreshQuota"
+      "--enable-features=EnableBoundSessionCredentialsSoftwareKeysForManualTesting,DeviceBoundSessions,DeviceBoundSessionsOriginTrialFeedback",
+      "--disable-features=DeviceBoundSessionsRefreshQuota,TrackingProtection3pcd"
     ],
     "expires": "never"
   },
@@ -1645,7 +1645,8 @@
     ],
     "bases": [
       "external/wpt/IndexedDB",
-      "storage/indexeddb"
+      "storage/indexeddb",
+      "wpt_internal/IndexedDB"
     ],
     "args": [
       "--enable-features=IdbSqliteBackingStore"
@@ -2525,6 +2526,7 @@
       "Win"
     ],
     "bases": [
+      "external/wpt/cookies/origin-bound-cookies/port-bound-cookies.html",
       "http/tests/inspector-protocol/issues/port-mismatch-exclusion.js",
       "http/tests/inspector-protocol/network/blocked-cookie-port-mismatch.js"
     ],
@@ -2978,6 +2980,7 @@
       "Win"
     ],
     "bases": [
+      "external/wpt/cookies/origin-bound-cookies/scheme-bound-cookies.https.html",
       "http/tests/inspector-protocol/issues/scheme-mismatch-exclusion.js",
       "http/tests/inspector-protocol/network/blocked-cookie-scheme-mismatch.js"
     ],
@@ -2991,21 +2994,23 @@
     ]
   },
   {
-    "prefix": "scoped-custom-element-registry-disabled",
+    "prefix": "scoped-custom-element-registry",
     "owners": [
       "masonf@chromium.org",
-      "tgivens@microsoft.com"
+      "tgivens@microsoft.com",
+      "jaysonchen@microsoft.com"
     ],
     "platforms": [
       "Linux",
-      "Mac",
       "Win"
     ],
     "bases": [
-      "external/wpt/custom-elements/registries/"
+      "external/wpt/custom-elements/registries/Document-createElement.html",
+      "external/wpt/custom-elements/registries/Document-createElementNS.html",
+      "external/wpt/custom-elements/registries/Document-customElementRegistry.html"
     ],
     "args": [
-      "--disable-blink-features=ScopedCustomElementRegistry"
+      "--enable-blink-features=ScopedCustomElementRegistry"
     ],
     "expires": "Jun 1, 2026"
   },
@@ -4209,6 +4214,9 @@
     "platforms": ["Linux"],
     "bases": [
       "external/wpt/soft-navigation-heuristics/"
+    ],
+    "exclusive_tests": [
+      "external/wpt/soft-navigation-heuristics/smoke/tentative/late-url-change.html"
     ],
     "args": [
       "--enable-features=SoftNavigationDetectionPrePaintBasedAttribution"

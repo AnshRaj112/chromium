@@ -18,21 +18,12 @@ const WebViewContextMenusImpl =
     require('chromeWebView').WebViewContextMenusImpl;
 const ControlledFrameInternal = getInternalApi('controlledFrameInternal');
 const WebUrlPatternNatives = requireNative('WebUrlPatternNatives');
+const convertURLPatternsToMatchPatterns =
+    require('controlledFrameURLPatternsHelper')
+        .convertURLPatternsToMatchPatterns;
 
 function identity(value) {
   return value;
-}
-
-function mapUrlPatternsToMatchPatterns(urlPatternsStrs) {
-  let matchPatterns = [];
-  for (const urlPatternStr of urlPatternsStrs) {
-    matchPatterns = $Array.concat(
-      matchPatterns,
-      WebUrlPatternNatives.URLPatternToMatchPatterns(
-        new URLPattern(urlPatternStr))
-    );
-  };
-  return matchPatterns;
 }
 
 function ensureString(value) {
@@ -102,31 +93,27 @@ ControlledFrameContextMenusImpl.prototype.convertMethodToPromiseBased =
         handler.bind(this), arguments, callbackIndex, verifyEnvironment,
         /*callbackAllowed=*/ true);
   };
-}
+};
 
-    // Controlled Frame has its own internal definition of Context Menus
-    // create().
-    ControlledFrameContextMenusImpl.prototype.createImpl =
-        function() {
+// Controlled Frame has its own internal definition of Context Menus
+// create().
+ControlledFrameContextMenusImpl.prototype.createImpl = function() {
   const args = $Array.concat([this.viewInstanceId_], $Array.slice(arguments));
   return $Function.apply(
       ControlledFrameInternal.contextMenusCreate, null, args);
-}
+};
 
-        // Controlled Frame has its own internal definition of Context Menus
-        // update().
-        ControlledFrameContextMenusImpl.prototype.updateImpl =
-            function() {
+// Controlled Frame has its own internal definition of Context Menus
+// update().
+ControlledFrameContextMenusImpl.prototype.updateImpl = function() {
   let args = $Array.concat([this.viewInstanceId_], $Array.slice(arguments));
   return $Function.apply(
       ControlledFrameInternal.contextMenusUpdate, null, args);
-}
+};
 
-            ControlledFrameContextMenusImpl.prototype.create =
-                ControlledFrameContextMenusImpl.prototype
-                    .convertMethodToPromiseBased(
-                        ControlledFrameContextMenusImpl.prototype.createImpl,
-                        'create');
+ControlledFrameContextMenusImpl.prototype.create =
+    ControlledFrameContextMenusImpl.prototype.convertMethodToPromiseBased(
+        ControlledFrameContextMenusImpl.prototype.createImpl, 'create');
 
 ControlledFrameContextMenusImpl.prototype.remove =
     ControlledFrameContextMenusImpl.prototype.convertMethodToPromiseBased(
@@ -151,10 +138,12 @@ function unwebifyContextMenusProperties(properties) {
   const unwebifiedProperties = extractAndMapValues(properties, {
     checked: identity,
     contexts: identity,
-    documentURLPatterns: $Function.bind(mapUrlPatternsToMatchPatterns, null),
+    documentURLPatterns: $Function.bind(
+      convertURLPatternsToMatchPatterns, null),
     enabled: identity,
     parentId: identity,
-    targetURLPatterns: $Function.bind(mapUrlPatternsToMatchPatterns, null),
+    targetURLPatterns: $Function.bind(
+      convertURLPatternsToMatchPatterns, null),
     title: identity,
     type: identity,
   });
@@ -172,10 +161,12 @@ function unwebifyContextMenusCreateProperties(properties) {
     id: identity,
     checked: identity,
     contexts: identity,
-    documentURLPatterns: $Function.bind(mapUrlPatternsToMatchPatterns, null),
+    documentURLPatterns: $Function.bind(
+      convertURLPatternsToMatchPatterns, null),
     enabled: identity,
     parentId: identity,
-    targetURLPatterns: $Function.bind(mapUrlPatternsToMatchPatterns, null),
+    targetURLPatterns: $Function.bind(
+      convertURLPatternsToMatchPatterns, null),
     title: identity,
     type: identity,
   });
@@ -334,8 +325,7 @@ class MenuItemDetails {
 class ContextMenusShowEvent extends Event {
   constructor(details) {
     super('show');
-    this['preventDefault'] =
-      $Function.bind(details.preventDefault, this);
+    this['preventDefault'] = $Function.bind(details.preventDefault, this);
     $Object.freeze(this);
   }
 }

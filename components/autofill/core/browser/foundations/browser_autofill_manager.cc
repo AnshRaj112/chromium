@@ -492,15 +492,7 @@ bool ShouldOfferSingleFieldFill(const AutofillField* autofill_field,
   // due to an unrecognized autocomplete attribute. Note that in the context
   // of Autofill, the popup for credit card related fields is not getting
   // suppressed due to an unrecognized autocomplete attribute.
-  // TODO(crbug.com/40853053): Revisit here to see whether we should offer
-  // IBAN filling for fields with unrecognized autocomplete attribute
   if (suppress_reason == SuppressReason::kAutocompleteUnrecognized) {
-    return false;
-  }
-
-  // Therefore, we check the attribute explicitly.
-  if (autofill_field &&
-      autofill_field->Type().html_type() == HtmlFieldType::kUnrecognized) {
     return false;
   }
 
@@ -1756,6 +1748,12 @@ void BrowserAutofillManager::FillOrPreviewForm(
                        action_persistence, form, filling_payload,
                        CHECK_DEREF(form_structure), CHECK_DEREF(autofill_field),
                        trigger_source);
+                 },
+                 [&](const OtpFillData*) {
+                   form_filler_->FillOrPreviewForm(
+                       action_persistence, form, filling_payload,
+                       CHECK_DEREF(form_structure), CHECK_DEREF(autofill_field),
+                       trigger_source);
                  }},
              filling_payload);
 }
@@ -2621,6 +2619,10 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
           [&](const VerifiedProfile*) {
             // TODO(crbug.com/380367784): consider moving the
             // notification to the delegate here.
+          },
+          [&](const OtpFillData*) {
+            // TODO(crbug.com/415272525): Notify the OTP manager to track
+            // OTP filling acceptance.
           }},
       filling_payload);
 }
@@ -2855,8 +2857,7 @@ std::vector<Suggestion> BrowserAutofillManager::GetProfileSuggestions(
     if (form.fields().size() == form_structure.field_count()) {
       skip_reasons = form_filler_->GetFieldFillingSkipReasons(
           form.fields(), form_structure, trigger_autofill_field,
-          /*type_groups_originally_filled=*/std::nullopt,
-          FillingProduct::kAddress, /*is_refill=*/false);
+          FormFiller::RefillOptions::NotRefill(), FillingProduct::kAddress);
     }
     FieldTypeSet field_types;
     for (size_t i = 0; i < form_structure.field_count(); ++i) {
@@ -3194,7 +3195,7 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
       }
       break;
     case FillingProduct::kOneTimePassword:
-      suggestions = BuildOtpSuggestions(one_time_passwords);
+      suggestions = BuildOtpSuggestions(one_time_passwords, field.global_id());
       break;
     default:
       // Skip other filling products.

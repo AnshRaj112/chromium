@@ -966,33 +966,6 @@ public class PersonalDataManager implements Destroyable {
     }
 
     /**
-     * Checks whether the Autofill PersonalDataManager has profiles.
-     *
-     * @return True If there are profiles.
-     */
-    public boolean hasProfiles() {
-        return PersonalDataManagerJni.get().hasProfiles(mPersonalDataManagerAndroid);
-    }
-
-    /**
-     * Checks whether the Autofill PersonalDataManager has credit cards.
-     *
-     * @return True If there are credit cards.
-     */
-    public boolean hasCreditCards() {
-        return PersonalDataManagerJni.get().hasCreditCards(mPersonalDataManagerAndroid);
-    }
-
-    /**
-     * @return Whether FIDO authentication is available.
-     */
-    public boolean isFidoAuthenticationAvailable() {
-        return isAutofillPaymentMethodsEnabled()
-                && PersonalDataManagerJni.get()
-                        .isFidoAuthenticationAvailable(mPersonalDataManagerAndroid);
-    }
-
-    /**
      * @return Whether the Autofill feature for Profiles (addresses) is enabled.
      */
     public boolean isAutofillProfileEnabled() {
@@ -1065,6 +1038,16 @@ public class PersonalDataManager implements Destroyable {
     }
 
     /**
+     * @param guid The GUID of the credit card.
+     * @return Whether the card is eligible for benefits, based on its `guid`.
+     */
+    public boolean isCardEligibleForBenefits(String guid) {
+        ThreadUtils.assertOnUiThread();
+        return PersonalDataManagerJni.get()
+                .isCardEligibleForBenefits(mPersonalDataManagerAndroid, guid);
+    }
+
+    /**
      * Enables or disables the card benefit showing feature.
      *
      * @param enable True to enable showing card benefits, false otherwise.
@@ -1106,6 +1089,21 @@ public class PersonalDataManager implements Destroyable {
     /** Returns the preference value for supporting payments using Ewallet. */
     public boolean getFacilitatedPaymentsEwalletPref() {
         return mPrefService.getBoolean(Pref.FACILITATED_PAYMENTS_EWALLET);
+    }
+
+    /** Sets the preference value for supporting payments using A2A. */
+    public void setFacilitatedPaymentsA2AEnabledPref(boolean value) {
+        mPrefService.setBoolean(Pref.FACILITATED_PAYMENTS_A2A_ENABLED, value);
+    }
+
+    /** Returns the preference value for supporting payments using A2A. */
+    public boolean getFacilitatedPaymentsA2AEnabledPref() {
+        return mPrefService.getBoolean(Pref.FACILITATED_PAYMENTS_A2A_ENABLED);
+    }
+
+    /** Returns the preference value for whether A2A has already been triggered once. */
+    public boolean getFacilitatedPaymentsA2ATriggeredOncePref() {
+        return mPrefService.getBoolean(Pref.FACILITATED_PAYMENTS_A2A_TRIGGERED_ONCE);
     }
 
     @NativeMethods
@@ -1186,12 +1184,6 @@ public class PersonalDataManager implements Destroyable {
         void recordAndLogCreditCardUse(
                 long nativePersonalDataManagerAndroid, @JniType("std::string") String guid);
 
-        boolean hasProfiles(long nativePersonalDataManagerAndroid);
-
-        boolean hasCreditCards(long nativePersonalDataManagerAndroid);
-
-        boolean isFidoAuthenticationAvailable(long nativePersonalDataManagerAndroid);
-
         boolean isAutofillProfileManaged(long nativePersonalDataManagerAndroid);
 
         boolean isAutofillCreditCardManaged(long nativePersonalDataManagerAndroid);
@@ -1217,5 +1209,8 @@ public class PersonalDataManager implements Destroyable {
         BankAccount[] getMaskedBankAccounts(long nativePersonalDataManagerAndroid);
 
         Ewallet[] getEwallets(long nativePersonalDataManagerAndroid);
+
+        boolean isCardEligibleForBenefits(
+                long nativePersonalDataManagerAndroid, @JniType("std::string") String guid);
     }
 }

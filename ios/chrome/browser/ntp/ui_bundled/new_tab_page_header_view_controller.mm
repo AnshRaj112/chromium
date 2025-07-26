@@ -649,7 +649,7 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   } else {
     NewTabPageColorPalette* colorPalette =
         IsNTPBackgroundCustomizationEnabled()
-            ? [self.traitCollection objectForTrait:NewTabPageTrait.class]
+            ? [self.traitCollection objectForNewTabPageTrait]
             : nil;
     button.layer.cornerRadius = 0;
     [button setImage:nil forState:UIControlStateNormal];
@@ -883,6 +883,18 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   _logoVendor = logoVendor;
   _logoVendor.doodleObserver = self;
   [self updateLogoAndFakeboxDisplay];
+}
+
+- (void)updateLogoColor:(UIColor*)logoTintColor {
+  CHECK(_logoVendor);
+
+  if (logoTintColor) {
+    _logoVendor.usesMonochromeLogo = YES;
+    _logoVendor.view.tintColor = logoTintColor;
+  } else {
+    _logoVendor.usesMonochromeLogo = NO;
+    _logoVendor.view.tintColor = nil;
+  }
 }
 
 - (void)setVoiceSearchIsEnabled:(BOOL)voiceSearchIsEnabled {

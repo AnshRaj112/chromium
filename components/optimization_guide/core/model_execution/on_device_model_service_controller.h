@@ -26,6 +26,7 @@
 #include "base/types/pass_key.h"
 #include "components/optimization_guide/core/delivery/model_info.h"
 #include "components/optimization_guide/core/model_execution/feature_keys.h"
+#include "components/optimization_guide/core/model_execution/on_device_model_adaptation_loader.h"
 #include "components/optimization_guide/core/model_execution/on_device_model_component.h"
 #include "components/optimization_guide/core/model_execution/on_device_model_metadata.h"
 #include "components/optimization_guide/core/model_execution/on_device_model_validator.h"
@@ -78,7 +79,7 @@ class OnDeviceModelServiceController final : public mojom::ModelBroker {
       std::unique_ptr<OnDeviceModelAccessController> access_controller,
       base::WeakPtr<OnDeviceModelComponentStateManager>
           on_device_component_state_manager,
-      on_device_model::ServiceClient::LaunchFn launch_fn);
+      base::SafeRef<on_device_model::ServiceClient> service_client);
   ~OnDeviceModelServiceController() override;
 
   // Initializes OnDeviceModelServiceController. This should be called once
@@ -111,9 +112,8 @@ class OnDeviceModelServiceController final : public mojom::ModelBroker {
   void UpdateModel(std::unique_ptr<OnDeviceModelMetadata> model_metadata);
 
   // Updates the model adaptation for the feature.
-  void MaybeUpdateModelAdaptation(
-      ModelBasedCapabilityKey feature,
-      std::unique_ptr<OnDeviceModelAdaptationMetadata> adaptation_metadata);
+  void MaybeUpdateModelAdaptation(ModelBasedCapabilityKey feature,
+                                  MaybeAdaptationMetadata adaptation_metadata);
 
   // Add/remove observers for notifying on-device model availability changes.
   void AddOnDeviceModelAvailabilityChangeObserver(
@@ -130,14 +130,8 @@ class OnDeviceModelServiceController final : public mojom::ModelBroker {
     return weak_ptr_factory_.GetWeakPtr();
   }
 
-  OnDeviceModelAdaptationMetadata* GetFeatureMetadata(
-      ModelBasedCapabilityKey feature);
-
-  const base::flat_map<ModelBasedCapabilityKey,
-                       OnDeviceModelAdaptationMetadata>&
-  model_adaptation_metadata() const {
-    return model_adaptation_metadata_;
-  }
+  // Retrieves the object storing the adaptation metadata for 'feature'.
+  MaybeAdaptationMetadata& GetFeatureMetadata(ModelBasedCapabilityKey feature);
 
   void BindBroker(mojo::PendingReceiver<mojom::ModelBroker> receiver) {
     receivers_.Add(this, std::move(receiver));
@@ -372,13 +366,13 @@ class OnDeviceModelServiceController final : public mojom::ModelBroker {
   base::WeakPtr<OnDeviceModelComponentStateManager>
       on_device_component_state_manager_;
 
-  on_device_model::ServiceClient service_client_;
+  base::SafeRef<on_device_model::ServiceClient> service_client_;
   SafetyClient safety_client_;
 
   // Map from feature to its adaptation assets. Present only for features that
   // have valid model adaptation. It could be missing for features that require
   // model adaptation, but they have not been loaded yet.
-  base::flat_map<ModelBasedCapabilityKey, OnDeviceModelAdaptationMetadata>
+  base::flat_map<ModelBasedCapabilityKey, MaybeAdaptationMetadata>
       model_adaptation_metadata_;
 
   std::map<ModelBasedCapabilityKey, SolutionProvider> solution_providers_;

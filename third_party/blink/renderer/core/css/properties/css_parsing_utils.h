@@ -659,8 +659,7 @@ CSSValue* ConsumeBorderWidth(CSSParserTokenStream&,
                              const CSSParserContext&,
                              UnitlessQuirk);
 CSSValue* ConsumeSVGPaint(CSSParserTokenStream&, const CSSParserContext&);
-CSSValue* ParseLetterSpacing(CSSParserTokenStream&, const CSSParserContext&);
-CSSValue* ParseWordSpacing(CSSParserTokenStream&, const CSSParserContext&);
+CSSValue* ParseSpacing(CSSParserTokenStream&, const CSSParserContext&);
 
 CSSValue* ConsumeSingleContainerName(CSSParserTokenStream&,
                                      const CSSParserContext&);
@@ -828,6 +827,8 @@ CORE_EXPORT CSSValue* ConsumePositionTryFallbacks(CSSParserTokenStream&,
                                                   const CSSParserContext&);
 
 CSSValue* ConsumeFitText(CSSParserTokenStream&, const CSSParserContext&);
+
+CSSValue* ConsumeTextOverflow(CSSParserTokenStream&);
 
 // If the stream starts with “!important”, consumes it and returns true.
 // If the stream is at EOF, returns false.

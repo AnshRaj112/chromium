@@ -11,7 +11,6 @@
 
 #include "ash/constants/ash_constants.h"
 #include "ash/public/cpp/notification_utils.h"
-#include "base/barrier_closure.h"
 #include "base/check_deref.h"
 #include "base/containers/contains.h"
 #include "base/containers/extend.h"
@@ -22,6 +21,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/media/webrtc/capture_policy_utils.h"
+#include "chrome/browser/media/webrtc/multi_capture/multi_capture_data_service.h"
 #include "chrome/browser/notifications/notification_display_service.h"
 #include "chrome/browser/notifications/notification_display_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -53,8 +53,10 @@ const char kPrivacyIndicatorsMultiCaptureLoginNotificationId[] =
     "multi-capture-login-privacy-indicators";
 const char kPrivacyIndicatorsMultiCaptureLoginNotifierId[] =
     "multi-capture-login-privacy-indicators";
-const char kPrivacyIndicatorsMultiCaptureActiveNotificationIdBase[] =
+const char kPrivacyIndicatorsMultiCaptureNotificationIdPrefix[] =
     "multi-capture-active-privacy-indicators-";
+
+constexpr auto kNotifierType = message_center::NotifierType::SYSTEM_COMPONENT;
 
 std::vector<std::string> GetAllCaptureWithNotificationApps(
     const MultiCaptureUsageIndicatorService::AllowListedAppNames& apps) {
@@ -87,7 +89,7 @@ std::vector<std::string> GetAllCaptureWithoutNotificationApps(
 }
 
 std::string GenerateActiveNotifcationId(const webapps::AppId& app_id) {
-  return kPrivacyIndicatorsMultiCaptureActiveNotificationIdBase + app_id;
+  return kPrivacyIndicatorsMultiCaptureNotificationIdPrefix + app_id;
 }
 
 std::vector<std::string> GenerateAppNameList(
@@ -161,13 +163,17 @@ MultiCaptureUsageIndicatorService::AllowListedAppNames::~AllowListedAppNames() =
 MultiCaptureUsageIndicatorService::MultiCaptureUsageIndicatorService(
     PrefService* prefs,
     web_app::WebAppProvider* provider,
-    NotificationDisplayService* notification_display_service)
+    NotificationDisplayService* notification_display_service,
+    MultiCaptureDataService* data_service)
     : pref_service_(prefs),
       provider_(provider),
-      notification_display_service_(notification_display_service) {
+      notification_display_service_(notification_display_service),
+      data_service_(data_service) {
   CHECK(pref_service_);
   CHECK(provider_);
   CHECK(notification_display_service_);
+
+  data_service_observer_.Observe(data_service_);
 }
 
 MultiCaptureUsageIndicatorService::~MultiCaptureUsageIndicatorService() =
@@ -177,10 +183,10 @@ std::unique_ptr<MultiCaptureUsageIndicatorService>
 MultiCaptureUsageIndicatorService::Create(
     PrefService* prefs,
     web_app::WebAppProvider* provider,
-    NotificationDisplayService* notification_display_service) {
+    NotificationDisplayService* notification_display_service,
+    MultiCaptureDataService* data_service) {
   auto service = base::WrapUnique(new MultiCaptureUsageIndicatorService(
-      prefs, provider, notification_display_service));
-  service->ShowUsageIndicatorsOnStart();
+      prefs, provider, notification_display_service, data_service));
   return service;
 }
 
@@ -212,6 +218,14 @@ void MultiCaptureUsageIndicatorService::MultiCaptureStopped(
   }
 }
 
+void MultiCaptureUsageIndicatorService::MultiCaptureDataChanged() {
+  RefreshNotifications();
+}
+
+void MultiCaptureUsageIndicatorService::MultiCaptureDataServiceDestroyed() {
+  data_service_observer_.Reset();
+}
+
 message_center::Notification
 MultiCaptureUsageIndicatorService::CreateFutureCaptureNotification(
     const MultiCaptureUsageIndicatorService::AllowListedAppNames& apps) {
@@ -223,8 +237,7 @@ MultiCaptureUsageIndicatorService::CreateFutureCaptureNotification(
   // popup).
   optional_fields.priority = message_center::LOW_PRIORITY;
   optional_fields.pinned = true;
-  // TODO(crbug.com/424102053): Replace with finalized icon.
-  optional_fields.vector_small_image = &vector_icons::kScreenShareIcon;
+  optional_fields.vector_small_image = &vector_icons::kScreenRecordIcon;
 
   optional_fields.buttons.emplace_back(
       l10n_util::GetStringUTF16(IDS_MULTI_CAPTURE_NOTIFICATION_BUTTON_TEXT));
@@ -240,8 +253,7 @@ MultiCaptureUsageIndicatorService::CreateFutureCaptureNotification(
       /*display_source=*/std::u16string(),
       /*origin_url=*/GURL(),
       message_center::NotifierId(
-          message_center::NotifierType::SYSTEM_COMPONENT,
-          kPrivacyIndicatorsMultiCaptureLoginNotifierId,
+          kNotifierType, kPrivacyIndicatorsMultiCaptureLoginNotifierId,
           ash::NotificationCatalogName::kPrivacyIndicators),
       optional_fields,
       /*delegate=*/
@@ -283,8 +295,7 @@ MultiCaptureUsageIndicatorService::CreateActiveCaptureNotification(
     // Using this notifier ID will tie the notification to the privacy
     // indicators group and prevent a separate icon to show up in the system
     // tray.
-    // TODO(crbug.com/432201381): Create multi capture specific notifier id.
-    notifier_id = ash::kPrivacyIndicatorsNotifierId;
+    notifier_id = ash::kPrivacyIndicatorsMultiCaptureNotifierId;
   }
 
   if (notification_shown_for_app_id_.contains(app_id)) {
@@ -293,8 +304,7 @@ MultiCaptureUsageIndicatorService::CreateActiveCaptureNotification(
     optional_fields.priority = message_center::LOW_PRIORITY;
   }
 
-  // TODO(crbug.com/424102053): Replace with finalized icon.
-  optional_fields.vector_small_image = &vector_icons::kScreenShareIcon;
+  optional_fields.vector_small_image = &vector_icons::kScreenRecordIcon;
   optional_fields.pinned = true;
 
   message_center::Notification notification(
@@ -312,7 +322,7 @@ MultiCaptureUsageIndicatorService::CreateActiveCaptureNotification(
       /*display_source=*/std::u16string(),
       /*origin_url=*/GURL(),
       message_center::NotifierId(
-          message_center::NotifierType::SYSTEM_COMPONENT, notifier_id,
+          kNotifierType, notifier_id,
           ash::NotificationCatalogName::kPrivacyIndicators),
       optional_fields,
       // TODO(crbug.com/424104858): Make the notification do nothing on click.
@@ -325,76 +335,22 @@ MultiCaptureUsageIndicatorService::CreateActiveCaptureNotification(
   return notification;
 }
 
-void MultiCaptureUsageIndicatorService::ShowUsageIndicatorsOnStart() {
-  // Fetch the initial value of the multi screen capture allowlist for later
-  // matching to prevent dynamic refresh. We intentionally break dynamic
-  // refresh as it is not possible to add further screen capture apps after
-  // session start due to privacy constraints.
-  multi_screen_capture_allow_list_on_login_ =
-      pref_service_
-          ->GetList(capture_policy::kManagedMultiScreenCaptureAllowedForUrls)
-          .Clone();
-
-  web_app::IwaKeyDistributionInfoProvider& key_distribution_info_provider =
-      web_app::IwaKeyDistributionInfoProvider::GetInstance();
-  if (provider_->is_registry_ready() &&
-      key_distribution_info_provider.OnMaybeDownloadedComponentDataReady()
-          .is_signaled()) {
-    RefreshNotifications();
-    return;
-  }
-
-  auto initialized_components_barrier = base::BarrierClosure(
-      2u,
-      base::BindOnce(&MultiCaptureUsageIndicatorService::RefreshNotifications,
-                     weak_ptr_factory_.GetWeakPtr()));
-  provider_->on_registry_ready().Post(FROM_HERE,
-                                      initialized_components_barrier);
-  key_distribution_info_provider.OnMaybeDownloadedComponentDataReady().Post(
-      FROM_HERE, initialized_components_barrier);
-}
-
 MultiCaptureUsageIndicatorService::AllowListedAppNames
 MultiCaptureUsageIndicatorService::GetInstalledAndAllowlistedAppNames() const {
   CHECK(provider_);
+  CHECK(data_service_);
 
-  const std::vector<std::string>
-      skip_capture_notification_bundle_ids_allowlist =
-          web_app::IwaKeyDistributionInfoProvider::GetInstance()
-              .GetSkipMultiCaptureNotificationBundleIds();
-
+  const std::map<webapps::AppId, std::string>&
+      future_capture_no_notification_apps =
+          data_service_->GetCaptureAppsWithoutNotification();
   std::map<webapps::AppId, std::string> future_capture_notification_apps;
-  std::map<webapps::AppId, std::string> future_capture_no_notification_apps;
   std::map<webapps::AppId, std::string> current_capture_notification_apps;
-  for (const base::Value& allowlisted_app_value :
-       multi_screen_capture_allow_list_on_login_) {
-    if (!allowlisted_app_value.is_string()) {
-      continue;
-    }
-
-    const GURL allowlisted_app_url(allowlisted_app_value.GetString());
-    web_app::WebAppRegistrar& registrar = provider_->registrar_unsafe();
-    const std::optional<webapps::AppId> app_id =
-        registrar.FindBestAppWithUrlInScope(
-            allowlisted_app_url, web_app::WebAppFilter::IsIsolatedApp());
-
-    // App isn't installed yet.
-    if (!app_id) {
-      continue;
-    }
-
-    const bool can_skip_active_notification =
-        base::Contains(skip_capture_notification_bundle_ids_allowlist,
-                       allowlisted_app_url.host());
-    const bool is_currently_capturing =
-        base::Contains(started_captures_, *app_id);
-    const std::string app_name = registrar.GetAppShortName(*app_id);
-    if (can_skip_active_notification) {
-      future_capture_no_notification_apps[*app_id] = app_name;
-    } else if (is_currently_capturing) {
-      current_capture_notification_apps[*app_id] = app_name;
+  for (const auto& [app_id, app_name] :
+       data_service_->GetCaptureAppsWithNotification()) {
+    if (base::Contains(started_captures_, app_id)) {
+      current_capture_notification_apps[app_id] = app_name;
     } else {
-      future_capture_notification_apps[*app_id] = app_name;
+      future_capture_notification_apps[app_id] = app_name;
     }
   }
 
@@ -458,7 +414,6 @@ void MultiCaptureUsageIndicatorService::ShowActiveMultiCaptureNotifications(
     // and only execute this if there is a change.
     notification_display_service_->Close(NotificationHandler::Type::TRANSIENT,
                                          GenerateActiveNotifcationId(app_id));
-
     notification_display_service_->Display(
         NotificationHandler::Type::TRANSIENT,
         CreateActiveCaptureNotification(app_id, app_name,

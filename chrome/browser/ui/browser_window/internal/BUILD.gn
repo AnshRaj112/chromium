@@ -21,6 +21,7 @@ source_set("internal") {
       "android/android_browser_window.cc",
       "android/browser_window_interface_iterator_android.cc",
     ]
+    deps += [ ":jni" ]
   } else {
     sources += [
       "browser_window_features.cc",
@@ -32,17 +33,18 @@ source_set("internal") {
     deps += [
       "//chrome/browser/actor/ui",
       "//chrome/browser/extensions",
-      "//chrome/browser/lens/region_search:region_search",
+      "//chrome/browser/lens/region_search",
       "//chrome/browser/media/router:media_router_feature",
       "//chrome/browser/ui:ui_features",
-      "//chrome/browser/ui/bookmarks:bookmarks",
+      "//chrome/browser/ui/bookmarks",
       "//chrome/browser/ui/commerce",
       "//chrome/browser/ui/exclusive_access",
       "//chrome/browser/ui/extensions",
-      "//chrome/browser/ui/find_bar:find_bar",
+      "//chrome/browser/ui/find_bar",
       "//chrome/browser/ui/lens",
       "//chrome/browser/ui/performance_controls",
       "//chrome/browser/ui/signin",
+      "//chrome/browser/ui/sync",
       "//chrome/browser/ui/tabs:tab_list_bridge",
       "//chrome/browser/ui/tabs/tab_strip_api",
       "//chrome/browser/ui/toasts",
@@ -53,9 +55,9 @@ source_set("internal") {
       "//chrome/browser/ui/views/toolbar",
       "//chrome/browser/ui/web_applications",
       "//components/breadcrumbs/core:status",
-      "//components/collaboration/public:public",
+      "//components/collaboration/public",
       "//components/commerce/core:feature_list",
-      "//components/data_sharing/public:public",
+      "//components/data_sharing/public",
       "//components/lens:features",
       "//components/profile_metrics",
       "//components/saved_tab_groups/public",
@@ -81,16 +83,42 @@ source_set("internal") {
   }
 }
 
+source_set("unit_tests") {
+  testonly = true
+  sources = []
+  deps = [
+    ":internal",
+    "//testing/gtest",
+  ]
+
+  if (is_android) {
+    sources += [
+      "android/android_base_window_unittest.cc",
+      "android/android_browser_window_unittest.cc",
+    ]
+    deps += [
+      "//base",
+      "//chrome/browser/ui/browser_window/test:native_unit_test_support_java",
+      "//chrome/browser/ui/browser_window/test:native_unit_test_support_jni",
+      "//ui/base",
+    ]
+  }
+}
+
 # Android targets need to be guarded by is_android because:
 # (1) Android GNI files may assert is_android, and
 # (2) The rest of this file can be included in non-Android builds.
 if (is_android) {
   import("//build/config/android/rules.gni")
+  import("//third_party/jni_zero/jni_zero.gni")
 
   android_library("java") {
     visibility = [
       ":*",
       "//chrome/android:chrome_all_java",
+      "//chrome/browser/ui/android/extensions/windowing/internal:javatests",
+      "//chrome/browser/ui/browser_window/test:junit_test_support",
+      "//chrome/browser/ui/browser_window/test:native_unit_test_support_java",
     ]
     sources = [
       "android/java/src/org/chromium/chrome/browser/ui/browser_window/AndroidBaseWindow.java",
@@ -102,6 +130,50 @@ if (is_android) {
     deps = [
       "//build/android:build_java",
       "//chrome/browser/ui/browser_window:java",
+      "//third_party/androidx:androidx_annotation_annotation_java",
+      "//third_party/jni_zero:jni_zero_java",
+      "//ui/android:ui_no_recycler_view_java",
+    ]
+    srcjar_deps = [ ":jni" ]
+  }
+
+  generate_jni("jni") {
+    sources = [
+      "android/java/src/org/chromium/chrome/browser/ui/browser_window/AndroidBaseWindow.java",
+      "android/java/src/org/chromium/chrome/browser/ui/browser_window/AndroidBrowserWindow.java",
+    ]
+  }
+
+  robolectric_library("junit") {
+    testonly = true
+    sources = [
+      "android/java/src/org/chromium/chrome/browser/ui/browser_window/ChromeAndroidTaskImplUnitTest.java",
+      "android/java/src/org/chromium/chrome/browser/ui/browser_window/ChromeAndroidTaskTrackerImplUnitTest.java",
+    ]
+    deps = [
+      ":java",
+      "//base:base_junit_test_support",
+      "//build/android:build_java",
+      "//chrome/browser/ui/browser_window:java",
+      "//chrome/browser/ui/browser_window/test:junit_test_support",
+      "//third_party/junit",
+      "//third_party/mockito:mockito_java",
+      "//ui/android:ui_no_recycler_view_java",
+    ]
+  }
+
+  android_library("javatests") {
+    testonly = true
+    sources = [ "android/java/src/org/chromium/chrome/browser/ui/browser_window/ChromeAndroidTaskIntegrationTest.java" ]
+    deps = [
+      ":java",
+      "//base:base_java_test_support",
+      "//chrome/android:chrome_java",
+      "//chrome/browser/flags:java",
+      "//chrome/browser/ui/browser_window:java",
+      "//chrome/test/android:chrome_java_transit",
+      "//third_party/androidx:androidx_test_runner_java",
+      "//third_party/junit",
     ]
   }
 }

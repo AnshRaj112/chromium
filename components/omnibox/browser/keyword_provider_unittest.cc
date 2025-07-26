@@ -13,6 +13,7 @@
 
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/task_environment.h"
@@ -104,9 +105,8 @@ class KeywordProviderTest : public testing::Test {
   void SetUp() override;
 
   template <class ResultType>
-  void RunTest(TestData<ResultType>* keyword_cases,
-               int num_cases,
-               ResultType AutocompleteMatch::*member);
+  void RunTest(base::span<TestData<ResultType>> keyword_cases,
+               ResultType AutocompleteMatch::* member);
 
  protected:
   search_engines::SearchEnginesTestEnvironment search_engines_test_environment_{
@@ -124,25 +124,25 @@ void KeywordProviderTest::SetUp() {
 }
 
 template <class ResultType>
-void KeywordProviderTest::RunTest(TestData<ResultType>* keyword_cases,
-                                  int num_cases,
-                                  ResultType AutocompleteMatch::*member) {
+void KeywordProviderTest::RunTest(
+    base::span<TestData<ResultType>> keyword_cases,
+    ResultType AutocompleteMatch::* member) {
   ACMatches matches;
-  for (int i = 0; i < num_cases; ++i) {
-    UNSAFE_TODO(SCOPED_TRACE(keyword_cases[i].input));
-    AutocompleteInput input(UNSAFE_TODO(keyword_cases[i]).input,
+  for (size_t i = 0; i < keyword_cases.size(); ++i) {
+    SCOPED_TRACE(keyword_cases[i].input);
+    AutocompleteInput input(keyword_cases[i].input,
                             metrics::OmniboxEventProto::OTHER,
                             TestingSchemeClassifier());
     kw_provider_->Start(input, false);
     EXPECT_TRUE(kw_provider_->done());
     matches = kw_provider_->matches();
-    UNSAFE_TODO(ASSERT_EQ(keyword_cases[i].num_results, matches.size()));
+    ASSERT_EQ(keyword_cases[i].num_results, matches.size());
     for (size_t j = 0; j < matches.size(); ++j) {
-      UNSAFE_TODO(
-          EXPECT_EQ(keyword_cases[i].output[j].member, matches[j].*member));
-      UNSAFE_TODO(
-          EXPECT_EQ(keyword_cases[i].output[j].allowed_to_be_default_match,
-                    matches[j].allowed_to_be_default_match));
+      EXPECT_EQ(UNSAFE_TODO(keyword_cases[i].output[j].member),
+                matches[j].*member);
+      EXPECT_EQ(
+          UNSAFE_TODO(keyword_cases[i].output[j].allowed_to_be_default_match),
+          matches[j].allowed_to_be_default_match);
     }
   }
 }
@@ -219,8 +219,7 @@ TEST_F(KeywordProviderTest, Edit) {
       {u"nonsub", 1, {{u"nonsub", true}, kEmptyMatch, kEmptyMatch}},
   };
 
-  RunTest<std::u16string>(edit_cases, std::size(edit_cases),
-                          &AutocompleteMatch::fill_into_edit);
+  RunTest<std::u16string>(edit_cases, &AutocompleteMatch::fill_into_edit);
 }
 
 TEST_F(KeywordProviderTest, URL) {
@@ -256,8 +255,7 @@ TEST_F(KeywordProviderTest, URL) {
         {GURL("http://www.cleantestv2.com/?q=w"), false}}},
   };
 
-  RunTest<GURL>(url_cases, std::size(url_cases),
-                &AutocompleteMatch::destination_url);
+  RunTest<GURL>(url_cases, &AutocompleteMatch::destination_url);
 }
 
 TEST_F(KeywordProviderTest, Contents) {
@@ -296,8 +294,7 @@ TEST_F(KeywordProviderTest, Contents) {
        {{u"1 2+ 3", false}, {u"1 2+ 3", false}, {u"1 2+ 3", false}}},
   };
 
-  RunTest<std::u16string>(contents_cases, std::size(contents_cases),
-                          &AutocompleteMatch::contents);
+  RunTest<std::u16string>(contents_cases, &AutocompleteMatch::contents);
 }
 
 TEST_F(KeywordProviderTest, AddKeyword) {
@@ -450,8 +447,7 @@ TEST_F(KeywordProviderTest, ExtraQueryParams) {
         {GURL("http://aaaa/?aaaa=1&b=1+2+3&c"), false}}},
   };
 
-  RunTest<GURL>(url_cases, std::size(url_cases),
-                &AutocompleteMatch::destination_url);
+  RunTest<GURL>(url_cases, &AutocompleteMatch::destination_url);
 }
 
 TEST_F(KeywordProviderTest, DoesNotProvideMatchesOnFocus) {
@@ -477,5 +473,5 @@ TEST_F(KeywordProviderTest, TemplateSchemeKeyword) {
       {u"я я", 0, {}},
       {u"я://я", 0, {}},
   };
-  RunTest<void*>(url_cases, std::size(url_cases), nullptr);
+  RunTest<void*>(url_cases, nullptr);
 }

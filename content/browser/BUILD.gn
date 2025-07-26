@@ -44,8 +44,8 @@ if (is_android) {
     ]
     deps = [
       "//third_party/rust/font_types/v0_9:lib",
-      "//third_party/rust/read_fonts/v0_30:lib",
-      "//third_party/rust/skrifa/v0_32:lib",
+      "//third_party/rust/read_fonts/v0_31:lib",
+      "//third_party/rust/skrifa/v0_33:lib",
     ]
   }
 }
@@ -100,7 +100,7 @@ source_set("browser") {
     "//components/attribution_reporting:mojom",
     "//components/back_forward_cache:enum",
     "//components/browsing_data/core:cookie_or_cache_deletion_choice",
-    "//components/browsing_topics/common:common",
+    "//components/browsing_topics/common",
     "//components/cbor",
     "//components/discardable_memory/common",
     "//components/discardable_memory/service",
@@ -117,7 +117,7 @@ source_set("browser") {
     "//components/link_header_util",
     "//components/metrics",
     "//components/metrics:single_sample_metrics",
-    "//components/metrics/dwa:dwa",
+    "//components/metrics/dwa",
     "//components/metrics/dwa:dwa_builders",
     "//components/network_session_configurator/browser",
     "//components/offline_pages/buildflags",
@@ -130,7 +130,7 @@ source_set("browser") {
     "//components/performance_manager/scenario_api",
     "//components/power_monitor",
     "//components/services/filesystem:lib",
-    "//components/services/quarantine:quarantine",
+    "//components/services/quarantine",
     "//components/services/storage",
     "//components/services/storage:filesystem_proxy_factory",
     "//components/services/storage/dom_storage:local_storage_proto",
@@ -172,7 +172,7 @@ source_set("browser") {
     "//content/browser/private_aggregation:mojo_bindings",
     "//content/browser/private_aggregation/proto:private_aggregation_budgets_proto",
     "//content/browser/process_internals:mojo_bindings",
-    "//content/browser/resources:resources",
+    "//content/browser/resources",
     "//content/browser/resources/media:resources",
     "//content/browser/tracing/traces_internals:mojo_bindings",
     "//content/browser/webrtc/resources",
@@ -260,7 +260,7 @@ source_set("browser") {
     "//services/video_capture/public/cpp",
     "//services/video_capture/public/mojom:constants",
     "//services/video_effects/buildflags",
-    "//services/video_effects/public/mojom:mojom",
+    "//services/video_effects/public/mojom",
     "//services/viz/privileged/mojom",
     "//services/viz/public/cpp/gpu",
     "//services/viz/public/mojom",
@@ -280,7 +280,7 @@ source_set("browser") {
     "//third_party/blink/public:resources",
     "//third_party/blink/public:scaled_resources",
     "//third_party/blink/public/common",
-    "//third_party/blink/public/common:common",
+    "//third_party/blink/public/common",
     "//third_party/blink/public/common:font_enumeration_table_proto",
     "//third_party/blink/public/common:preloading_headers",
     "//third_party/blink/public/strings",
@@ -1929,6 +1929,8 @@ source_set("browser") {
     "renderer_host/navigation_throttle_registry_impl.h",
     "renderer_host/navigation_throttle_runner.cc",
     "renderer_host/navigation_throttle_runner.h",
+    "renderer_host/navigation_throttle_runner2.cc",
+    "renderer_host/navigation_throttle_runner2.h",
     "renderer_host/navigation_transitions/navigation_entry_screenshot.cc",
     "renderer_host/navigation_transitions/navigation_entry_screenshot.h",
     "renderer_host/navigation_transitions/navigation_entry_screenshot_cache.cc",
@@ -2627,7 +2629,7 @@ source_set("browser") {
   if (is_win) {
     deps += [
       "//components/services/font_data:lib",
-      "//components/stylus_handwriting/win:win",
+      "//components/stylus_handwriting/win",
     ]
   }
 
@@ -2693,7 +2695,7 @@ source_set("browser") {
       "//ui/base/ime/ash",
       "//ui/chromeos/styles:cros_styles_views",
     ]
-    public_deps += [ "//ash/webui/common/resources:resources" ]
+    public_deps += [ "//ash/webui/common/resources" ]
   }
 
   if (is_castos) {
@@ -2897,6 +2899,7 @@ source_set("browser") {
       "renderer_host/web_menu_runner_ios.h",
       "renderer_host/web_menu_runner_ios.mm",
       "speech/tts_ios.mm",
+      "web_contents/web_contents_impl_ios.mm",
       "web_contents/web_contents_view_ios.h",
       "web_contents/web_contents_view_ios.mm",
     ]
@@ -3497,10 +3500,10 @@ source_set("browser") {
     deps += [
       "//components/device_event_log",
       "//components/password_manager/core/common",
+      "//components/soda",
       "//components/soda:constants",
-      "//components/soda:soda",
       "//components/soda:utils",
-      "//components/speech:speech",
+      "//components/speech",
       "//components/vector_icons",
       "//components/webauthn/json",
       "//content/browser/tracing:resources",
@@ -3658,7 +3661,7 @@ source_set("browser") {
 
   # TODO(crbug.com/371609830): Remove dep on experiment end.
   if (is_chromeos) {
-    deps += [ "//ash/constants:constants" ]
+    deps += [ "//ash/constants" ]
   }
 }
 

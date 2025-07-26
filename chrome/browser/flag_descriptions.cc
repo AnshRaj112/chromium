@@ -231,6 +231,14 @@ const char kAnnotatorModeDescription[] =
     "Enables the tool for annotating across the OS.";
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
+#if BUILDFLAG(IS_ANDROID)
+const char kApproximateGeolocationPermissionName[] =
+    "Approximate Geolocation Permission";
+const char kApproximateGeolocationPermissionDescription[] =
+    "Enables the approximate geolocation permission prompt, with options to "
+    "control prompt arm variations.";
+#endif  // BUILDFLAG(IS_ANDROID)
+
 const char kAriaElementReflectionName[] = "Enable ARIA element reflection";
 const char kAriaElementReflectionDescription[] =
     "Enable setting ARIA relationship attributes that reference other elements "
@@ -673,12 +681,6 @@ const char kAutofillEnableBuyNowPayLaterSyncingName[] =
     "Enable syncing buy now pay later user data.";
 const char kAutofillEnableBuyNowPayLaterSyncingDescription[] =
     "When enabled, Chrome will sync user data related to buy now pay later.";
-
-const char kAutofillEnableBuyNowPayLaterSyncingForKlarnaName[] =
-    "Enable syncing buy now pay later user data for Klarna";
-const char kAutofillEnableBuyNowPayLaterSyncingForKlarnaDescription[] =
-    "When enabled, Chrome will sync user data related to buy now pay later for "
-    "Klarna.";
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS)
 
@@ -2952,6 +2954,10 @@ const char kOmniboxSearchAggregatorName[] = "Omnibox search aggregator";
 const char kOmniboxSearchAggregatorDescription[] =
     "Enables omnibox suggestions from the search aggregator provider";
 
+const char kOmniboxSiteSearchName[] = "Omnibox Site Search";
+const char kOmniboxSiteSearchDescription[] =
+    "Enables keyword-based site search functionality on Android devices";
+
 const char kContextualSearchBoxUsesContextualSearchProviderName[] =
     "Contextual search box uses contextual search provider";
 const char kContextualSearchBoxUsesContextualSearchProviderDescription[] =
@@ -3930,6 +3936,22 @@ const char kTabCollectionAndroidDescription[] =
     "data loss, etc. Don't enable this flag unless you know what you are doing "
     "and are working on developing this feature.";
 
+const char kTabGroupEntryPointsAndroidName[] = "Tab Group Entry Points";
+const char kTabGroupEntryPointsAndroidDescription[] =
+    "Enables additional entry points for creating tab groups";
+
+const char kTabGroupParityBottomSheetAndroidName[] =
+    "Tab Group Parity Bottom Sheet";
+const char kTabGroupParityBottomSheetAndroidDescription[] =
+    "Enables adding Tabs to Tab Groups via the Tab Group Parity Bottom Sheet";
+
+const char kTabModelInitFixesName[] = "Tab Model Init Fixes";
+const char kTabModelInitFixesDescription[] =
+    "A grab bag of simple and miscellaneous improvements for tab model "
+    "initialization on Android. Should speed up initialization, as well as "
+    "have better handling for app menu tab model operations during "
+    "initialization.";
+
 const char kTabSwitcherDragDropName[] = "Tab Drag and Drop via Tab Switcher";
 const char kTabSwitcherDragDropDescription[] =
     "Enables long-pressing on tab switcher tab to start drag-and-drop. Users "
@@ -3946,15 +3968,6 @@ const char kTabSwitcherGroupSuggestionsTestModeAndroidName[] =
 const char kTabSwitcherGroupSuggestionsTestModeAndroidDescription[] =
     "Helper flag for testing that shows group suggestions for the last 3 tabs "
     "in the tab switcher (if present).";
-
-const char kTabGroupEntryPointsAndroidName[] = "Tab Group Entry Points";
-const char kTabGroupEntryPointsAndroidDescription[] =
-    "Enables additional entry points for creating tab groups";
-
-const char kTabGroupParityBottomSheetAndroidName[] =
-    "Tab Group Parity Bottom Sheet";
-const char kTabGroupParityBottomSheetAndroidDescription[] =
-    "Enables adding Tabs to Tab Groups via the Tab Group Parity Bottom Sheet";
 
 const char kTabletTabStripAnimationName[] = "Tablet Tab Strip Animation";
 const char kTabletTabStripAnimationDescription[] =
@@ -5057,15 +5070,14 @@ const char kMediaPickerAdoptionStudyDescription[] =
     "Controls how to launch the Android Media Picker (note: This flag is "
     "ignored as of Android U)";
 
+const char kMigrateAccountPrefsOnMobileName[] =
+    "Migrate account prefs on mobile";
+const char kMigrateAccountPrefsOnMobileDescription[] =
+    "Migrate account prefs on Mobile to the single-json implementation.";
+
 const char kNavBarColorAnimationName[] = "NavBarColorAnimation";
 const char kNavBarColorAnimationDescription[] =
     "Enables animations for color changes to the OS navigation bar.";
-
-const char kNavBarColorMatchesTabBackgroundName[] =
-    "Nav bar color matches tab background";
-const char kNavBarColorMatchesTabBackgroundDescription[] =
-    "Matches the OS navigation bar color to the background color of the "
-    "active tab.";
 
 const char kNavigationCaptureRefactorAndroidName[] =
     "Navigation Capture refactoring for Chrome on Android";
@@ -5247,6 +5259,14 @@ const char kStrictSiteIsolationDescription[] =
     "platform, enterprise policy, or field trial. See also "
     "#site-isolation-trial-opt-out for how to disable site isolation for "
     "testing.";
+
+#if BUILDFLAG(IS_ANDROID)
+const char kSubmenusTabContextMenuLffTabStripName[] =
+    "Submenus in LFF Tab Context Menu on LFF Tab Strip";
+const char kSubmenusTabContextMenuLffTabStripDescription[] =
+    "Enables submenus (for moving tabs to groups or windows) in the tab "
+    "context menu on LFF tab strip";
+#endif  // BUILDFLAG(IS_ANDROID)
 
 const char kSupervisedUserInterstitialWithoutApprovalsName[] =
     "Supervisded user interstitial without approvals for content filters";
@@ -5484,6 +5504,10 @@ const char kEnableHeadlessLiveCaptionName[] = "Headless Live Captions";
 const char kEnableHeadlessLiveCaptionDescription[] =
     "Enable features related to headless captions exploration. These are "
     "very likely unstable.";
+
+const char kEnableMediaLinkHelpersName[] = "Media Link Helpers";
+const char kEnableMediaLinkHelpersDescription[] =
+    "Enable customized per-site media link processing.";
 
 const char kEnableCrOSLiveTranslateName[] = "Live Translate CrOS";
 const char kEnableCrOSLiveTranslateDescription[] =

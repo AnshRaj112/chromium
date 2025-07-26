@@ -51,6 +51,18 @@ float MotionEventAndroidSourceNative::GetPressure(size_t pointer_index) const {
   return AMotionEvent_getPressure(event_.a_input_event(), pointer_index);
 }
 
+float MotionEventAndroidSourceNative::GetAxisHscroll(
+    size_t pointer_index) const {
+  return AMotionEvent_getAxisValue(event_.a_input_event(),
+                                   AMOTION_EVENT_AXIS_HSCROLL, pointer_index);
+}
+
+float MotionEventAndroidSourceNative::GetAxisVscroll(
+    size_t pointer_index) const {
+  return AMotionEvent_getAxisValue(event_.a_input_event(),
+                                   AMOTION_EVENT_AXIS_VSCROLL, pointer_index);
+}
+
 float MotionEventAndroidSourceNative::GetRawTilt(size_t pointer_index) const {
   return AMotionEvent_getAxisValue(event_.a_input_event(),
                                    AMOTION_EVENT_AXIS_TILT, pointer_index);
@@ -60,6 +72,15 @@ MotionEvent::ToolType MotionEventAndroidSourceNative::GetToolType(
     size_t pointer_index) const {
   return FromAndroidToolType(
       AMotionEvent_getToolType(event_.a_input_event(), pointer_index));
+}
+
+int MotionEventAndroidSourceNative::GetActionMasked() const {
+  return AMotionEvent_getAction(event_.a_input_event()) &
+         AMOTION_EVENT_ACTION_MASK;
+}
+
+int MotionEventAndroidSourceNative::GetButtonState() const {
+  return AMotionEvent_getButtonState(event_.a_input_event());
 }
 
 base::TimeTicks MotionEventAndroidSourceNative::GetHistoricalEventTime(

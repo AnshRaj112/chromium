@@ -33,8 +33,12 @@ class EVENTS_EXPORT MotionEventAndroidSourceJava
   float GetTouchMinorPix(size_t pointer_index) const override;
   float GetRawOrientation(size_t pointer_index) const override;
   float GetPressure(size_t pointer_index) const override;
+  float GetAxisHscroll(size_t pointer_index) const override;
+  float GetAxisVscroll(size_t pointer_index) const override;
   float GetRawTilt(size_t pointer_index) const override;
   MotionEvent::ToolType GetToolType(size_t pointer_index) const override;
+  int GetActionMasked() const override;
+  int GetButtonState() const override;
   base::TimeTicks GetHistoricalEventTime(
       size_t historical_index) const override;
   float GetHistoricalTouchMajorPix(size_t pointer_index,

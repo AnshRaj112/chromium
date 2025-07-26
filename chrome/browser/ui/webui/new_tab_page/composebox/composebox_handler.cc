@@ -53,6 +53,8 @@ void ComposeboxHandler::SubmitQuery(const std::string& query_text,
   OpenUrl(query_controller_->CreateAimUrl(query_text, query_start_time), disposition);
   metrics_recorder_->NotifySessionStateChanged(
       SessionState::kNavigationOccurred);
+  metrics_recorder_->RecordQueryMetrics(
+      query_text.size(), query_controller_->num_files_in_request());
 }
 
 void ComposeboxHandler::OpenUrl(GURL url,
@@ -82,17 +84,21 @@ void ComposeboxHandler::AddFile(
     file_info_metadata->mime_type_ = lens::MimeType::kPdf;
   } else if ((file_info_mojom->mime_type).find("image") != std::string::npos) {
     file_info_metadata->mime_type_ = lens::MimeType::kImage;
-    auto field_config = ntp_composebox::FeatureConfig::Get();
+    auto image_upload_config =
+        ntp_composebox::FeatureConfig::Get().config.composebox().image_upload();
     image_options = composebox::ImageEncodingOptions{
-        .max_size = field_config.downscale_max_image_size,
-        .max_height = field_config.downscale_max_image_height,
-        .max_width = field_config.downscale_max_image_width,
-        .compression_quality = field_config.image_compression_quality};
+        .enable_webp_encoding = image_upload_config.enable_webp_encoding(),
+        .max_size = image_upload_config.downscale_max_image_size(),
+        .max_height = image_upload_config.downscale_max_image_height(),
+        .max_width = image_upload_config.downscale_max_image_width(),
+        .compression_quality = image_upload_config.image_compression_quality()};
   } else {
     NOTREACHED();
   }
 
   std::move(callback).Run(file_info_metadata->file_token_);
+  metrics_recorder_->RecordFileSizeMetric(file_info_metadata->mime_type_,
+                                          file_bytes.size());
   query_controller_->StartFileUploadFlow(std::move(file_info_metadata),
                                          std::move(file_data),
                                          std::move(image_options));
@@ -112,7 +118,10 @@ void ComposeboxHandler::ClearFiles() {
 
 void ComposeboxHandler::OnFileUploadStatusChanged(
     const base::UnguessableToken& file_token,
+    lens::MimeType mime_type,
     composebox_query::mojom::FileUploadStatus file_upload_status,
     const std::optional<FileUploadErrorType>& error_type) {
   page_->OnFileUploadStatusChanged(file_token, file_upload_status, error_type);
+  metrics_recorder_->OnFileUploadStatusChanged(mime_type, file_upload_status,
+                                               error_type);
 }

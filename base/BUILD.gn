@@ -1230,6 +1230,8 @@ component("base") {
       "android/yield_to_looper_checker.cc",
       "android/yield_to_looper_checker.h",
       "debug/stack_trace_android.cc",
+      "files/file_android.cc",
+      "files/file_android.h",
       "files/file_util_android.cc",
       "files/scoped_file_android.cc",
       "memory/platform_shared_memory_mapper_android.cc",
@@ -1385,7 +1387,7 @@ component("base") {
       ":tasks_minimal_jni($default_toolchain)",
       "//build:robolectric_buildflags",
     ]
-    public_deps += [ "//third_party/jni_zero:jni_zero" ]
+    public_deps += [ "//third_party/jni_zero" ]
   }  # is_android || is_robolectric
 
   # Chromeos.
@@ -5399,7 +5401,7 @@ if (is_android) {
       "//third_party/androidx:androidx_test_runner_java",
       "//third_party/hamcrest:hamcrest_java",
       "//third_party/jni_zero:jni_zero_java",
-      "//third_party/junit:junit",
+      "//third_party/junit",
       "//third_party/mockito:mockito_java",
     ]
 
@@ -5460,7 +5462,7 @@ if (is_android) {
       ":base_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
       "//third_party/jni_zero:jni_zero_java",
-      "//third_party/junit:junit",
+      "//third_party/junit",
     ]
   }
 
@@ -5595,7 +5597,7 @@ if (is_android) {
       "//third_party/androidx:androidx_test_monitor_java",
       "//third_party/hamcrest:hamcrest_java",
       "//third_party/jni_zero:jni_zero_java",
-      "//third_party/junit:junit",
+      "//third_party/junit",
     ]
 
     srcjar_deps = [ ":base_java_test_support_uncommon_jni" ]
@@ -5647,7 +5649,7 @@ if (is_android) {
       "//third_party/androidx:androidx_test_monitor_java",
       "//third_party/hamcrest:hamcrest_java",
       "//third_party/jni_zero:jni_zero_java",
-      "//third_party/junit:junit",
+      "//third_party/junit",
     ]
   }
 

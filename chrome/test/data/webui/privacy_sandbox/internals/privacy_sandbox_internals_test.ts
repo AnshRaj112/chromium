@@ -22,7 +22,7 @@ import type {TextCopyButton} from 'chrome://privacy-sandbox-internals/text_copy_
 import type {ValueDisplayElement} from 'chrome://privacy-sandbox-internals/value_display.js';
 import {defaultLogicalFn, timestampLogicalFn} from 'chrome://privacy-sandbox-internals/value_display.js';
 import type {DictionaryValue, ListValue, Value} from 'chrome://resources/mojo/mojo/public/mojom/base/values.mojom-webui.js';
-import {assertEquals, assertFalse, assertNull, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {MockTimer} from 'chrome://webui-test/mock_timer.js';
 import {microtasksFinished} from 'chrome://webui-test/test_util.js';
 
@@ -55,6 +55,28 @@ async function waitForCondition(checkFn: () => boolean): Promise<void> {
     check();
   });
 }
+
+// Test suite for the Search Bar UI.
+suite('SearchBarUITest', function() {
+  let page: InternalsPage;
+
+  setup(async function() {
+    const browserProxy = new TestPrivacySandboxInternalsBrowserProxy();
+    PrivacySandboxInternalsBrowserProxy.setInstance(browserProxy);
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    page = document.createElement('internals-page');
+    document.body.appendChild(page);
+    await microtasksFinished();
+  });
+
+  test('search bar is visible', async function() {
+    const searchBar = await waitForElement(page.shadowRoot!, 'search-bar');
+    assertTrue(!!searchBar, 'Search bar element should be present.');
+    assertTrue(
+        searchBar.offsetWidth > 0 && searchBar.offsetHeight > 0,
+        'Search bar should be visible on the page.');
+  });
+});
 
 // Test suite for the sidebar toggle functionality.
 suite('SidebarToggleTest', function() {
@@ -115,6 +137,91 @@ suite('SidebarToggleTest', function() {
   });
 });
 
+// Test suite for Sidebar behavior within the live InternalsPage.
+suite('PrivacySandboxInternalsFrameListTest', function() {
+  let page: InternalsPage;
+  let shadowRoot: ShadowRoot;
+  let browserProxy: TestPrivacySandboxInternalsBrowserProxy;
+
+  setup(async function() {
+    browserProxy = new TestPrivacySandboxInternalsBrowserProxy();
+    browserProxy.testHandler.setPrefs([]);
+    PrivacySandboxInternalsBrowserProxy.setInstance(browserProxy);
+    Router.resetInstanceForTesting();
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    page = document.createElement('internals-page');
+    document.body.appendChild(page);
+    shadowRoot = page.shadowRoot!;
+    await waitForElement(shadowRoot, '[data-page-name="cookies"]');
+    await microtasksFinished();
+  });
+
+  test('SettingsCategoryHeaderCollapsesAndExpandsOnClick', async () => {
+    const prefsHeader = shadowRoot.querySelector<HTMLElement>(
+        'div[role="heading"].settings-category-header');
+    assertTrue(!!prefsHeader, 'The "Prefs" header should exist.');
+
+    assertFalse(
+        prefsHeader.hasAttribute('collapsed'),
+        'Prefs header should be expanded initially.');
+
+    prefsHeader.click();
+    await microtasksFinished();
+    assertTrue(
+        prefsHeader.hasAttribute('collapsed'),
+        'Prefs header should collapse after click.');
+  });
+
+  test('clickingGroupHeaderTogglesCollapseAndHidesSubGroup', async () => {
+    const groupHeaders = shadowRoot.querySelectorAll<HTMLElement>(
+        'div[role="heading"].settings-category-header');
+    assertEquals(2, groupHeaders.length, 'Should find two main group headers');
+    const contentSettingsHeader = groupHeaders[1]!;
+    const subGroupHeader = shadowRoot.querySelector<HTMLElement>(
+        'div[role="heading"].setting-header');
+    assertTrue(!!subGroupHeader, 'Sub-group header should exist.');
+
+    assertFalse(
+        contentSettingsHeader.hasAttribute('collapsed'),
+        'Content Settings header should be expanded by default.');
+    assertFalse(
+        subGroupHeader.hasAttribute('collapsed'),
+        'Sub-group header should be expanded by default.');
+
+    assertTrue(
+        !!subGroupHeader.offsetParent,
+        'Sub-group should be rendered initially.');
+
+    contentSettingsHeader.click();
+    await microtasksFinished();
+
+    assertTrue(
+        contentSettingsHeader.hasAttribute('collapsed'),
+        'Content Settings header should collapse after click.');
+    assertEquals(
+        null, subGroupHeader.offsetParent,
+        'Sub-group should become hidden when parent collapses.');
+
+    contentSettingsHeader.click();
+    await microtasksFinished();
+
+    assertFalse(
+        contentSettingsHeader.hasAttribute('collapsed'),
+        'Content Settings header should re-expand.');
+    assertTrue(
+        !!subGroupHeader.offsetParent, 'Sub-group should be visible again.');
+    assertFalse(
+        subGroupHeader.hasAttribute('collapsed'),
+        'Sub-group header should have retained its expanded state.');
+
+    subGroupHeader.click();
+    await microtasksFinished();
+    assertTrue(
+        subGroupHeader.hasAttribute('collapsed'),
+        'Sub-group header should collapse after its own click.');
+  });
+});
+
 // Test suite for routing within the Privacy Sandbox Internals page.
 suite('PrivacySandboxInternalsRoutingTest', function() {
   let page: InternalsPage;
@@ -145,8 +252,13 @@ suite('PrivacySandboxInternalsRoutingTest', function() {
   });
 
   test('defaultsToFirstTabOnLoad', async function() {
+    const allTabs =
+        Array.from(shadowRoot.querySelectorAll<HTMLElement>('[slot="tab"]'));
+    const firstSelectableTab =
+        allTabs.find((tab) => tab.getAttribute('role') !== 'heading');
+    const expectedIndex = allTabs.indexOf(firstSelectableTab!).toString();
     await waitForCondition(
-        () => tabContainer.getAttribute('selected-index') === '0');
+        () => tabContainer.getAttribute('selected-index') === expectedIndex);
     const params = new URLSearchParams(window.location.search);
     assertEquals(Page.TRACKING_PROTECTION, params.get('page'));
   });
@@ -191,8 +303,16 @@ suite('PrivacySandboxInternalsRoutingTest', function() {
     shadowRoot = page.shadowRoot!;
     tabContainer = await waitForElement(shadowRoot, '#ps-page');
 
+    const allTabs =
+        Array.from(shadowRoot.querySelectorAll<HTMLElement>('[slot="tab"]'));
+    const firstSelectableTab =
+        allTabs.find((tab) => tab.getAttribute('role') !== 'heading');
+
+    const expectedIndex = allTabs.indexOf(firstSelectableTab!).toString();
+
     await waitForCondition(
-        () => tabContainer.getAttribute('selected-index') === '0');
+        () => tabContainer.getAttribute('selected-index') === expectedIndex);
+
     const params = new URLSearchParams(window.location.search);
     assertEquals(
         Page.TRACKING_PROTECTION, params.get('page'),
@@ -200,8 +320,15 @@ suite('PrivacySandboxInternalsRoutingTest', function() {
   });
 
   test('defaultsToFirstTabWhenNoPageInUrl', async function() {
+    const allTabs =
+        Array.from(shadowRoot.querySelectorAll<HTMLElement>('[slot="tab"]'));
+    const firstSelectableTab =
+        allTabs.find((tab) => tab.getAttribute('role') !== 'heading');
+
+    const expectedIndex = allTabs.indexOf(firstSelectableTab!).toString();
+
     await waitForCondition(
-        () => tabContainer.getAttribute('selected-index') === '0');
+        () => tabContainer.getAttribute('selected-index') === expectedIndex);
     const params = new URLSearchParams(window.location.search);
     assertEquals(
         Page.TRACKING_PROTECTION, params.get('page'),
@@ -226,7 +353,7 @@ suite('PrivacySandboxInternalsRoutingTest', function() {
             Page.ADVERTISING);
 
     const advertisingTab = await waitForElement(
-        shadowRoot, `[data-page-name="${Page.ADVERTISING}"]`);
+        shadowRoot, `div[slot="tab"][data-page-name="${Page.ADVERTISING}"]`);
     const allTabs = Array.from(shadowRoot.querySelectorAll('[slot="tab"]'));
     const expectedIndex = allTabs.indexOf(advertisingTab).toString();
     assertEquals(expectedIndex, tabContainer.getAttribute('selected-index'));
@@ -253,8 +380,8 @@ suite('PrivacySandboxInternalsRoutingTest', function() {
         () => new URLSearchParams(window.location.search).get('page') ===
             Page.POPUPS);
 
-    const popupsTab =
-        await waitForElement(shadowRoot, `[data-page-name="${Page.POPUPS}"]`);
+    const popupsTab = await waitForElement(
+        shadowRoot, `div[slot="tab"][data-page-name="${Page.POPUPS}"]`);
     const allTabs = Array.from(shadowRoot.querySelectorAll('[slot="tab"]'));
     const expectedIndex = allTabs.indexOf(popupsTab).toString();
     assertEquals(expectedIndex, tabContainer.getAttribute('selected-index'));
@@ -338,20 +465,6 @@ suite('PSInternalsPageTpcdTabLoadingTest', function() {
 
     return foundTab;
   }
-
-  test('NoTpcdPanelIfDisabled', async () => {
-    setShouldShowTpcdMetadataGrants(false);
-    const anotherPanel = await waitForElement(
-        internalsPage.shadowRoot!, 'div[slot="panel"][title="COOKIES"]');
-    assertTrue(
-        !!anotherPanel,
-        'Panels that are not TPCD Metadata Grants should render normally.');
-    const tpcdPanel = internalsPage.shadowRoot!.querySelector(
-        'div[slot="panel"][title="TPCD_METADADATA_GRANTS"]');
-    assertNull(
-        tpcdPanel,
-        'The panel for TPCD Metadata Grants should not exist when the flag is disabled.');
-  });
 
   test('hidesTpcdMetadataGrantsTab', async () => {
     setShouldShowTpcdMetadataGrants(false);
@@ -764,6 +877,12 @@ suite('ExpandableJsonViewerElement', function() {
     jsonViewer.configure(preElement, kJsonViewerTitle);
   });
 
+  const getChildElementByIdOrFail = (id: string) => {
+    const elem = jsonViewer.$(`#${id}`);
+    assertTrue(!!elem);
+    return elem;
+  };
+
   test('rendersPassedChildElement', () => {
     const preElementFromDOM = jsonViewer.$('#json-content > pre');
     assertTrue(!!preElementFromDOM);
@@ -784,6 +903,63 @@ suite('ExpandableJsonViewerElement', function() {
 
   test('rendersTitleInJsonHeader', () => {
     assertEquals(jsonViewer.getTitleTextForTesting(), kJsonViewerTitle);
+  });
+
+  test('clickingJsonHeaderSwitchesIcons', async () => {
+    const jsonHeaderElement = jsonViewer.$('#json-header')!;
+    const openIcon = getChildElementByIdOrFail('open-icon');
+    const closeIcon = getChildElementByIdOrFail('close-icon');
+
+    // Only shows open icon by default
+    assertEquals(
+        window.getComputedStyle(openIcon).getPropertyValue('display'), 'block');
+    assertEquals(
+        window.getComputedStyle(closeIcon).getPropertyValue('display'), 'none');
+
+    // Check that only close-icon is visible when content is expanded
+    jsonHeaderElement.click();
+    await microtasksFinished();
+    assertEquals(
+        window.getComputedStyle(openIcon).getPropertyValue('display'), 'none');
+    assertEquals(
+        window.getComputedStyle(closeIcon).getPropertyValue('display'),
+        'block');
+
+    // Only open-icon is visible when collapsed after being expanded
+    jsonHeaderElement.click();
+    await microtasksFinished();
+    assertEquals(
+        window.getComputedStyle(openIcon).getPropertyValue('display'), 'block');
+    assertEquals(
+        window.getComputedStyle(closeIcon).getPropertyValue('display'), 'none');
+  });
+
+  test('clickingJsonHeaderTogglesJsonContentVisibility', async () => {
+    const jsonHeaderElement = jsonViewer.$('#json-header')!;
+    const jsonContent = getChildElementByIdOrFail('json-content');
+
+    // Hides json-content by default
+    assertEquals(
+        window.getComputedStyle(jsonContent).getPropertyValue('height'), '0px');
+    assertEquals(
+        window.getComputedStyle(jsonContent).getPropertyValue('overflow'),
+        'hidden');
+
+    jsonHeaderElement.click();
+    await microtasksFinished();
+    assertNotEquals(
+        window.getComputedStyle(jsonContent).getPropertyValue('height'), '0px');
+    assertEquals(
+        window.getComputedStyle(jsonContent).getPropertyValue('overflow'),
+        'auto');
+
+    jsonHeaderElement.click();
+    await microtasksFinished();
+    assertEquals(
+        window.getComputedStyle(jsonContent).getPropertyValue('height'), '0px');
+    assertEquals(
+        window.getComputedStyle(jsonContent).getPropertyValue('overflow'),
+        'hidden');
   });
 });
 

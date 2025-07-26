@@ -59,7 +59,10 @@ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab.TabCreationState;
+import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabObserver;
+import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncFeatures;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
 import org.chromium.chrome.browser.tabmodel.TabClosingSource;
@@ -197,7 +200,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
                     closeInstance(item.instanceId, item.taskId);
                     cleanupSyncedTabGroupsIfLastInstance();
                 },
-                () -> openNewWindow("Android.WindowManager.NewWindow"),
+                () -> openNewWindow("Android.WindowManager.NewWindow", /* incognito= */ false),
                 MultiWindowUtils.getMaxInstances(),
                 info);
     }
@@ -452,7 +455,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     @Override
-    protected void openNewWindow(String umaAction) {
+    protected void openNewWindow(String umaAction, boolean incognito) {
         Intent intent = new Intent(mActivity, ChromeTabbedActivity.class);
         onMultiInstanceModeStarted();
         MultiWindowUtils.setOpenInOtherWindowIntentExtras(
@@ -460,6 +463,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
         intent.putExtra(IntentHandler.EXTRA_PREFER_NEW, true);
+        intent.putExtra(IntentHandler.EXTRA_OPEN_NEW_INCOGNITO_WINDOW, incognito);
         IntentUtils.addTrustedIntentExtras(intent);
         if (mMultiWindowModeStateDispatcher.canEnterMultiWindowMode()
                 || mMultiWindowModeStateDispatcher.isInMultiWindowMode()
@@ -721,7 +725,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
         mTabModelObserver =
                 new TabModelSelectorTabModelObserver(selector) {
                     @Override
-                    public void didSelectTab(Tab tab, int type, int lastId) {
+                    public void didSelectTab(Tab tab, @TabSelectionType int type, int lastId) {
                         // We will check if |mActiveTab| is the same as the selected |tab| to avoid
                         // a superfluous update to an instance's stored active tab info that
                         // remains unchanged.
@@ -760,7 +764,10 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
 
                     @Override
                     public void didAddTab(
-                            Tab tab, int type, int creationState, boolean markedForSelection) {
+                            Tab tab,
+                            @TabLaunchType int type,
+                            @TabCreationState int creationState,
+                            boolean markedForSelection) {
                         writeTabCount(mInstanceId, selector);
                     }
 
@@ -1413,7 +1420,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
             // Just try to launch a Chrome window to inform user that maximum number of instances
             // limit is exceeded. This will pop up a toast message and the tab will not be removed
             // from the exiting window.
-            openNewWindow("Android.WindowManager.NewWindow");
+            openNewWindow("Android.WindowManager.NewWindow", /* incognito= */ false);
         }
     }
 

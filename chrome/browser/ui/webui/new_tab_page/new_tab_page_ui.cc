@@ -14,6 +14,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -29,6 +30,7 @@
 #include "chrome/browser/new_tab_page/modules/v2/calendar/google_calendar_page_handler.h"
 #include "chrome/browser/new_tab_page/modules/v2/calendar/outlook_calendar_page_handler.h"
 #include "chrome/browser/new_tab_page/modules/v2/most_relevant_tab_resumption/most_relevant_tab_resumption_page_handler.h"
+#include "chrome/browser/new_tab_page/modules/v2/tab_groups/tab_groups_page_handler.h"
 #include "chrome/browser/new_tab_page/new_tab_page_util.h"
 #include "chrome/browser/page_image_service/image_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -480,11 +482,15 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
        IDS_NTP_COMPOSE_CANCEL_BUTTON_A11Y_LABEL_INPUT},
       {"composeboxImageUploadButtonTitle",
        IDS_NTP_COMPOSE_IMAGE_UPLOAD_BUTTON_A11Y_LABEL},
-      {"composeboxFileUploadButtonTitle",
-       IDS_NTP_COMPOSE_FILE_UPLOAD_BUTTON_A11Y_LABEL},
+      {"composeboxPdfUploadButtonTitle",
+       IDS_NTP_COMPOSE_PDF_UPLOAD_BUTTON_A11Y_LABEL},
       {"composeboxPlaceholderText", IDS_NTP_COMPOSE_PLACEHOLDER_TEXT},
       {"composeboxSubmitButtonTitle", IDS_NTP_COMPOSE_SUBMIT_BUTTON_A11Y_LABEL},
       {"composeboxDeleteFileTitle", IDS_NTP_COMPOSE_DELETE_FILE_A11Y_LABEL},
+      {"composeboxFileUploadStartedText",
+       IDS_NTP_COMPOSE_FILE_UPLOAD_STARTED_A11Y_TEXT},
+      {"composeboxFileUploadCompleteText",
+       IDS_NTP_COMPOSE_FILE_UPLOAD_COMPLETE_A11Y_TEXT},
       {"composeboxFileUploadInvalidEmptySize",
        IDS_NTP_COMPOSE_FILE_UPLOAD_INVALID_EMPTY_SIZE},
       {"composeboxFileUploadInvalidTooLarge",
@@ -513,10 +519,18 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
   source->AddBoolean("waitToLoadModules", microsoft_module_enabled);
 
   // ComposeBox LoadTimeData
-  source->AddString("composeboxImageFileTypes", "image/*");
-  source->AddString("composeboxAttachmentFileTypes", ".pdf,application/pdf");
-  source->AddInteger("composeboxFileMaxSize", 1000000);
-  source->AddInteger("composeboxFileMaxCount", 1);
+  auto composebox_config =
+      ntp_composebox::FeatureConfig::Get().config.composebox();
+  const std::string image_mime_types =
+      composebox_config.image_upload().mime_types_allowed();
+  source->AddString("composeboxImageFileTypes", image_mime_types);
+  const std::string attachment_mime_types =
+      composebox_config.attachment_upload().mime_types_allowed();
+  source->AddString("composeboxAttachmentFileTypes", attachment_mime_types);
+  source->AddInteger("composeboxFileMaxSize",
+                     composebox_config.attachment_upload().max_size_bytes());
+  source->AddInteger("composeboxFileMaxCount",
+                     composebox_config.max_num_files());
 
   source->AddBoolean("searchboxShowComposeEntrypoint",
                      ntp_composebox::IsNtpSearchboxComposeEntrypointEnabled(
@@ -527,13 +541,9 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
                          omnibox::IsAimAllowedByPolicy(profile->GetPrefs()));
 
   source->AddBoolean("composeboxCloseByEscape",
-                     ntp_composebox::FeatureConfig::Get()
-                         .config.composebox()
-                         .close_by_escape());
+                     composebox_config.close_by_escape());
   source->AddBoolean("composeboxCloseByClickOutside",
-                     ntp_composebox::FeatureConfig::Get()
-                         .config.composebox()
-                         .close_by_click_outside());
+                     composebox_config.close_by_click_outside());
 
   SearchboxHandler::SetupWebUIDataSource(
       source, profile,
@@ -772,6 +782,13 @@ void NewTabPageUI::BindInterface(
   foo_handler_ = std::make_unique<FooHandler>(std::move(pending_page_handler));
 }
 #endif
+
+void NewTabPageUI::BindInterface(
+    mojo::PendingReceiver<ntp::tab_groups::mojom::PageHandler>
+        pending_page_handler) {
+  tab_groups_handler_ = std::make_unique<TabGroupsPageHandler>(
+      std::move(pending_page_handler), web_contents());
+}
 
 void NewTabPageUI::BindInterface(
     mojo::PendingReceiver<ntp::most_relevant_tab_resumption::mojom::PageHandler>

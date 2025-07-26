@@ -320,6 +320,7 @@
         "Win": "experimental",
         "Mac": "experimental",
         "Linux": "experimental",
+        "ChromeOS": "experimental",
         "default": "",
       },
       origin_trial_feature_name: "AIPromptAPIMultimodalInput",
@@ -335,6 +336,7 @@
         "Win": "stable",
         "Mac": "stable",
         "Linux": "stable",
+        "ChromeOS": "stable",
         "default": "",
       },
     },
@@ -348,6 +350,7 @@
         "Win": "experimental",
         "Mac": "experimental",
         "Linux": "experimental",
+        "ChromeOS": "experimental",
         "default": "",
       },
       origin_trial_feature_name: "AIPromptAPIMultimodalInput",
@@ -372,9 +375,11 @@
         "Win": "experimental",
         "Mac": "experimental",
         "Linux": "experimental",
+        "ChromeOS": "experimental",
         "default": "",
       },
       origin_trial_feature_name: "AIRewriterAPI",
+      origin_trial_os: ["win", "mac", "linux"],
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
@@ -389,6 +394,7 @@
         "Win": "stable",
         "Mac": "stable",
         "Linux": "stable",
+        "ChromeOS": "stable",
         "default": "",
       },
     },
@@ -402,9 +408,11 @@
         "Win": "experimental",
         "Mac": "experimental",
         "Linux": "experimental",
+        "ChromeOS": "experimental",
         "default": "",
       },
       origin_trial_feature_name: "AIWriterAPI",
+      origin_trial_os: ["win", "mac", "linux"],
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
@@ -1349,7 +1357,7 @@
       status: "experimental",
     },
     {
-      name: "CSSLetterSpacingPercentage",
+      name: "CSSLetterAndWordSpacingPercentage",
       status: "experimental",
     },
     {
@@ -3317,6 +3325,10 @@
       status: "stable",
     },
     {
+      name: "OffsetParentNewSpecBehaviorForFixedPosition",
+      status: "stable",
+    },
+    {
       name: "OmitBlurEventOnElementRemoval",
       status: "test"
     },
@@ -3531,7 +3543,7 @@
     {
       // https://chromestatus.com/feature/5198846820352000
       name: "PaymentLinkDetection",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "PaymentMethodChangeEvent",
@@ -3593,7 +3605,7 @@
       // The flag will enable us to land the feature over multiple CLs, and will
       // be enabled after the feature has been fully implemented.
       name: "PermissionElementIcon",
-      status: "experimental",
+      status: "stable",
       depends_on: ["PermissionElement"],
     },
     {
@@ -3725,14 +3737,6 @@
     {
       name: "PrivateNetworkAccessNullIpAddress",
       status: "experimental",
-      base_feature: "none",
-    },
-    {
-      name: "PrivateNetworkAccessPermissionPrompt",
-      origin_trial_feature_name: "PrivateNetworkAccessPermissionPrompt",
-      origin_trial_os: ["win", "mac", "linux", "fuchsia", "chromeos"],
-      status: "stable",
-      public: true,
       base_feature: "none",
     },
     {
@@ -4886,6 +4890,11 @@
       status: "stable",
     },
     {
+      // https://crbug.com/41492459
+      name: "TextOverflowString",
+      status: "test",
+    },
+    {
       // crbug.com/431660829
       name: "TextSpacingTrimFallback",
       status: "stable",
@@ -5018,6 +5027,7 @@
         "Win": "stable",
         "Mac": "stable",
         "Linux": "stable",
+        "ChromeOS": "stable",
         "default": "",
       },
       origin_trial_feature_name: "TranslationAPI",
@@ -5159,6 +5169,7 @@
       // This flag uses the original DOM text for input when the password
       // echo is enabled to create the offset_map.
       name: "UseOriginalDomOffsetsForOffsetMap",
+      status: "test",
     },
     {
       name: "UsePositionForPointInFlexibleBoxWithSingleChildElement",
@@ -5265,7 +5276,7 @@
     },
     {
       // When enabled, makes links `:visited` even when the visit results in an
-      // HTTP error response code (4XX-5XX).
+      // HTTP error response code of 404.
       name: "VisitedLinksOnErrorNavigation",
     },
     {
@@ -5486,7 +5497,6 @@
     },
     {
       name: "WebFontResizeLCP",
-      status: "experimental",
     },
     {
       name: "WebGLDeveloperExtensions",
@@ -5706,13 +5716,6 @@
       depends_on: ["WebXR"],
       public: true,
       status: "experimental",
-      base_feature: "none",
-    },
-    {
-      name: "WebXRHandInput",
-      depends_on: ["WebXR"],
-      public: true,
-      status: "stable",
       base_feature: "none",
     },
     {

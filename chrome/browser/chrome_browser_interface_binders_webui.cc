@@ -83,6 +83,7 @@
 #include "chrome/browser/new_tab_page/modules/v2/calendar/google_calendar.mojom.h"
 #include "chrome/browser/new_tab_page/modules/v2/calendar/outlook_calendar.mojom.h"
 #include "chrome/browser/new_tab_page/modules/v2/most_relevant_tab_resumption/most_relevant_tab_resumption.mojom.h"
+#include "chrome/browser/new_tab_page/modules/v2/tab_groups/tab_groups.mojom.h"
 #include "chrome/browser/new_tab_page/new_tab_page_util.h"
 #include "chrome/browser/ui/lens/lens_overlay_untrusted_ui.h"
 #include "chrome/browser/ui/lens/lens_side_panel_untrusted_ui.h"
@@ -649,6 +650,9 @@ void PopulateChromeWebUIFrameBinders(
                                          SuggestInternalsUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
+      password_manager::mojom::PageHandlerFactory, PasswordManagerUI>(map);
+
+  RegisterWebUIControllerInterfaceBinder<
       customize_color_scheme_mode::mojom::
           CustomizeColorSchemeModeHandlerFactory,
       CustomizeChromeUI, settings::SettingsUI>(map);
@@ -687,6 +691,11 @@ void PopulateChromeWebUIFrameBinders(
   if (IsDriveModuleEnabled()) {
     RegisterWebUIControllerInterfaceBinder<
         file_suggestion::mojom::DriveSuggestionHandler, NewTabPageUI>(map);
+  }
+
+  if (base::FeatureList::IsEnabled(ntp_features::kNtpTabGroupsModule)) {
+    RegisterWebUIControllerInterfaceBinder<ntp::tab_groups::mojom::PageHandler,
+                                           NewTabPageUI>(map);
   }
 
   if (base::FeatureList::IsEnabled(

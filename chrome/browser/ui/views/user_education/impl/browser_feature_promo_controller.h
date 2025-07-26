@@ -17,6 +17,12 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/views/interaction/element_tracker_views.h"
 
+class BrowserFeaturePromoControllerBase {
+ protected:
+  static user_education::UserEducationContextPtr GetContextForHelpBubbleImpl(
+      const ui::TrackedElement* anchor_element);
+};
+
 // Wrapper for classes which implement some descendant of
 // `FeaturePromoControllerCommon`. Provides overrides of methods common to all
 // browser feature promo controllers. Derive your controller from this instead
@@ -26,36 +32,28 @@
 // for examples.)
 template <typename T>
   requires std::derived_from<T, user_education::FeaturePromoControllerCommon>
-class BrowserFeaturePromoController : public T {
+class BrowserFeaturePromoController : public T,
+                                      public BrowserFeaturePromoControllerBase {
  public:
   template <typename... Args>
-  explicit BrowserFeaturePromoController(BrowserView* browser_view,
-                                         Args&&... args)
-      : T(std::forward<Args>(args)...), browser_view_(browser_view) {
-    CHECK(browser_view_);
-  }
+  explicit BrowserFeaturePromoController(Args&&... args)
+      : T(std::forward<Args>(args)...) {}
   ~BrowserFeaturePromoController() override = default;
 
   // FeaturePromoController:
 
-  ui::ElementContext GetAnchorContext() const override {
-    return views::ElementTrackerViews::GetContextForView(browser_view_);
-  }
-
-  const ui::AcceleratorProvider* GetAcceleratorProvider() const override {
-    return browser_view_;
-  }
-
-  std::u16string GetTutorialScreenReaderHint() const override {
+  std::u16string GetTutorialScreenReaderHint(
+      const ui::AcceleratorProvider* accelerator_provider) const override {
     return BrowserHelpBubble::GetFocusTutorialBubbleScreenReaderHint(
-        GetAcceleratorProvider());
+        accelerator_provider);
   }
 
   std::u16string GetFocusHelpBubbleScreenReaderHint(
       user_education::FeaturePromoSpecification::PromoType promo_type,
-      ui::TrackedElement* anchor_element) const override {
+      ui::TrackedElement* anchor_element,
+      const ui::AcceleratorProvider* accelerator_provider) const override {
     return BrowserHelpBubble::GetFocusHelpBubbleScreenReaderHint(
-        promo_type, GetAcceleratorProvider(), anchor_element);
+        promo_type, accelerator_provider, anchor_element);
   }
 
   std::u16string GetBodyIconAltText() const override {
@@ -70,11 +68,10 @@ class BrowserFeaturePromoController : public T {
     return feature_engagement::events::kFocusHelpBubbleAcceleratorPromoRead;
   }
 
- protected:
-  BrowserView* browser_view() const { return browser_view_; }
-
- private:
-  const raw_ptr<BrowserView> browser_view_ = nullptr;
+  user_education::UserEducationContextPtr GetContextForHelpBubble(
+      const ui::TrackedElement* anchor_element) const override {
+    return GetContextForHelpBubbleImpl(anchor_element);
+  }
 };
 
 #endif  // CHROME_BROWSER_UI_VIEWS_USER_EDUCATION_IMPL_BROWSER_FEATURE_PROMO_CONTROLLER_H_

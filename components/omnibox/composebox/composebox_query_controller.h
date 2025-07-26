@@ -90,6 +90,7 @@ class ComposeboxQueryController {
    public:
     virtual void OnFileUploadStatusChanged(
         const base::UnguessableToken& file_token,
+        lens::MimeType mime_type,
         FileUploadStatus file_upload_status,
         const std::optional<FileUploadErrorType>& error_type) = 0;
 
@@ -207,6 +208,8 @@ class ComposeboxQueryController {
 
   // Clear entire file cache.
   virtual void ClearFiles();
+
+  int num_files_in_request() { return num_files_in_request_; }
 
  protected:
   // Returns the EndpointFetcher to use with the given params. Protected to
@@ -368,6 +371,9 @@ class ComposeboxQueryController {
   // to determine if the session is active when handling cluster info
   // expiration.
   int session_id_ = 0;
+
+  // The number of files that are sent in the AIM request.
+  int num_files_in_request_ = 0;
 
   base::WeakPtrFactory<ComposeboxQueryController> weak_ptr_factory_{this};
 };

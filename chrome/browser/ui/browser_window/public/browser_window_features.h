@@ -41,7 +41,6 @@ class CommentsSidePanelCoordinator;
 class CookieControlsBubbleCoordinator;
 class DataSharingBubbleController;
 class DesktopBrowserWindowCapabilities;
-class DownloadToolbarUIController;
 class ExclusiveAccessManager;
 class FindBarController;
 class HistoryClustersSidePanelCoordinator;
@@ -78,6 +77,10 @@ class PdfInfoBarController;
 }  // namespace pdf::infobar
 #endif
 
+#if !BUILDFLAG(IS_CHROMEOS)
+class DownloadToolbarUIController;
+#endif
+
 #if defined(USE_AURA)
 class OverscrollPrefManager;
 #endif  // defined(USE_AURA)
@@ -93,6 +96,7 @@ class Mv2DisabledDialogController;
 
 namespace tabs {
 class TabDeclutterController;
+class VerticalTabStripStateController;
 }  // namespace tabs
 
 namespace commerce {
@@ -238,6 +242,10 @@ class BrowserWindowFeatures {
     return tab_declutter_controller_.get();
   }
 
+  tabs::VerticalTabStripStateController* vertical_tab_strip_state_controller() {
+    return vertical_tab_strip_state_controller_.get();
+  }
+
   tabs::GlicNudgeController* glic_nudge_controller() {
     return glic_nudge_controller_.get();
   }
@@ -269,9 +277,11 @@ class BrowserWindowFeatures {
     return extension_side_panel_manager_.get();
   }
 
+#if !BUILDFLAG(IS_CHROMEOS)
   DownloadToolbarUIController* download_toolbar_ui_controller() {
     return download_toolbar_ui_controller_.get();
   }
+#endif
 
   tab_groups::MostRecentSharedTabUpdateStore*
   most_recent_shared_tab_update_store() {
@@ -438,6 +448,9 @@ class BrowserWindowFeatures {
 
   std::unique_ptr<tabs::TabDeclutterController> tab_declutter_controller_;
 
+  std::unique_ptr<tabs::VerticalTabStripStateController>
+      vertical_tab_strip_state_controller_;
+
   std::unique_ptr<MemorySaverOptInIPHController>
       memory_saver_opt_in_iph_controller_;
 
@@ -473,7 +486,9 @@ class BrowserWindowFeatures {
 
   std::unique_ptr<media_router::CastBrowserController> cast_browser_controller_;
 
+#if !BUILDFLAG(IS_CHROMEOS)
   std::unique_ptr<DownloadToolbarUIController> download_toolbar_ui_controller_;
+#endif
 
   std::unique_ptr<actor::ui::ActorOverlayWindowController>
       actor_overlay_window_controller_;

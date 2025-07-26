@@ -22,7 +22,6 @@
 #include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/command_updater.h"
-#include "chrome/browser/download/bubble/download_bubble_prefs.h"
 #include "chrome/browser/media/router/media_router_feature.h"
 #include "chrome/browser/performance_manager/public/user_tuning/user_tuning_utils.h"
 #include "chrome/browser/profiles/profile.h"
@@ -853,6 +852,14 @@ void ToolbarView::OnThemeChanged() {
 
   if (display_mode_ == DisplayMode::NORMAL) {
     LoadImages();
+
+    if (toolbar_divider_) {
+      const SkColor toolbar_extension_separator_color =
+          GetColorProvider()->GetColor(kColorToolbarExtensionSeparatorEnabled);
+      toolbar_divider_->SetBackground(views::CreateRoundedRectBackground(
+          toolbar_extension_separator_color,
+          GetLayoutConstant(TOOLBAR_DIVIDER_CORNER_RADIUS)));
+    }
   }
 
   SchedulePaint();
@@ -1040,11 +1047,6 @@ void ToolbarView::LayoutCommon() {
   if (toolbar_divider_ && extensions_container_) {
     views::ManualLayoutUtil(layout_manager_)
         .SetViewHidden(toolbar_divider_, !extensions_container_->GetVisible());
-    const SkColor toolbar_extension_separator_color =
-        GetColorProvider()->GetColor(kColorToolbarExtensionSeparatorEnabled);
-    toolbar_divider_->SetBackground(views::CreateRoundedRectBackground(
-        toolbar_extension_separator_color,
-        GetLayoutConstant(TOOLBAR_DIVIDER_CORNER_RADIUS)));
   }
   // Cast button visibility is controlled externally.
 }

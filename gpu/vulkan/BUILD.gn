@@ -76,7 +76,7 @@ if (enable_vulkan) {
       ":vulkan_function_pointers",
       "//base",
       "//third_party/vulkan_memory_allocator",
-      "//ui/gfx:gfx",
+      "//ui/gfx",
     ]
   }
 
@@ -228,6 +228,10 @@ if (enable_vulkan) {
       sources += [ "tests/native_window_android.cc" ]
       deps += [ "//ui/gl" ]
     }
+
+    # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+    # enable the diagnostic by removing this line.
+    configs += [ "//build/config/compiler:no_exit_time_destructors" ]
   }
 
   # TODO(penghuang): support more platforms
@@ -251,7 +255,7 @@ if (enable_vulkan) {
 
       deps = [
         ":test_support",
-        "//base:base",
+        "//base",
         "//base/test:test_support",
         "//components/viz/common:vulkan_context_provider",
         "//gpu/ipc/service",
@@ -274,6 +278,10 @@ if (enable_vulkan) {
 
         deps += [ "//ui/ozone" ]
       }
+
+      # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+      # enable the diagnostic by removing this line.
+      configs += [ "//build/config/compiler:no_exit_time_destructors" ]
     }
   }
 }

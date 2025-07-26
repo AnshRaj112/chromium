@@ -4293,6 +4293,7 @@ IN_PROC_BROWSER_TEST_P(ServiceWorkerWebRequestApiTest,
 // both the normal and incognito contexts are active. Regression test for
 // crbug.com/934398.
 // TODO(crbug.com/41493389): enable this flaky test
+// Both Initiator Incognito tests build but don't run on desktop android.
 #if BUILDFLAG(IS_LINUX) && defined(ADDRESS_SANITIZER) && defined(LEAK_SANITIZER)
 #define MAYBE_Initiator_SpanningIncognito DISABLED_Initiator_SpanningIncognito
 #else
@@ -4313,12 +4314,11 @@ IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
   const ExtensionId extension_id = extension->id();
   EXPECT_TRUE(ready_listener.WaitUntilSatisfied());
 
-  Browser* incognito_browser = CreateIncognitoBrowser(profile());
-  ASSERT_TRUE(incognito_browser);
+  ASSERT_TRUE(PlatformOpenURLOffTheRecord(profile(), GURL("about:blank")));
 
   // iframe.html loads an iframe to title1.html. The extension listens for the
   // request to title1.html and records the request initiator.
-  GURL url = embedded_test_server()->GetURL("google.com", "/iframe.html");
+  const GURL url = embedded_test_server()->GetURL("google.com", "/iframe.html");
   const std::string url_origin = url::Origin::Create(url).Serialize();
 
   static constexpr char kScript[] = R"(
@@ -4334,7 +4334,7 @@ IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
 
   // The extension isn't enabled in incognito. Se we shouldn't intercept the
   // request to |url|.
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(incognito_browser, url));
+  ASSERT_TRUE(PlatformOpenURLOffTheRecord(profile(), url));
   result = ExecuteScriptAndReturnString(extension_id, profile(), kScript);
   ASSERT_TRUE(result);
   EXPECT_EQ("[]", *result);
@@ -4347,7 +4347,7 @@ IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
   EXPECT_TRUE(ready_listener.WaitUntilSatisfied());
 
   // Now we should be able to intercept the incognito request.
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(incognito_browser, url));
+  ASSERT_TRUE(NavigateToURL(url));
   result = ExecuteScriptAndReturnString(extension_id, profile(), kScript);
   ASSERT_TRUE(result);
   EXPECT_EQ(base::StringPrintf("[\"%s\"]", url_origin.c_str()), *result);
@@ -4375,8 +4375,7 @@ IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
   ASSERT_TRUE(extension);
   EXPECT_TRUE(ready_listener.WaitUntilSatisfied());
 
-  Browser* incognito_browser = CreateIncognitoBrowser(profile());
-  ASSERT_TRUE(incognito_browser);
+  PlatformOpenURLOffTheRecord(profile(), GURL("about:blank"));
   EXPECT_TRUE(incognito_ready_listener.WaitUntilSatisfied());
 
   // iframe.html loads an iframe to title1.html. The extension listens for the
@@ -4395,7 +4394,7 @@ IN_PROC_BROWSER_TEST_P(ExtensionWebRequestApiTestWithContextType,
   )";
 
   ASSERT_TRUE(NavigateToURL(url_normal));
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(incognito_browser, url_incognito));
+  ASSERT_TRUE(PlatformOpenURLOffTheRecord(profile(), url_incognito));
   std::optional<std::string> result =
       ExecuteScriptAndReturnString(extension->id(), profile(), kScript);
   ASSERT_TRUE(result);
@@ -6275,11 +6274,8 @@ class ManifestV3WebRequestApiTest : public ExtensionWebRequestApiTest {
   }
 };
 
-#if !BUILDFLAG(IS_ANDROID)
 // Tests a service worker-based extension intercepting requests with
 // webRequestBlocking.
-// TODO(crbug.com/391921314): Enable on desktop Android when InstallExtension()
-// is supported (for LoadPolicyExtension).
 IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest, WebRequestBlocking) {
   ASSERT_TRUE(StartEmbeddedTestServer());
   static constexpr char kManifest[] =
@@ -6451,6 +6447,7 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest,
       << errors[0]->message();
 }
 
+#if !BUILDFLAG(IS_ANDROID)
 // Tests an extension returning a promise that never resolves from a webRequest
 // blocking handler. The request should hang forever.
 IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest,
@@ -6615,11 +6612,8 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest,
   EXPECT_EQ(1, get_third_count());
 }
 
-#if !BUILDFLAG(IS_ANDROID)
 // Tests that a service worker-based extension with webRequestBlocking can
 // intercept requests after the service worker stops.
-// TODO(crbug.com/391921314): Enable on desktop Android when InstallExtension()
-// is supported (for LoadPolicyExtension).
 IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest,
                        WebRequestBlocking_AfterWorkerShutdown) {
   ASSERT_TRUE(StartEmbeddedTestServer());
@@ -6683,7 +6677,6 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest,
     EXPECT_EQ(net::ERR_BLOCKED_BY_CLIENT, nav_observer.last_net_error_code());
   }
 }
-#endif  // !BUILDFLAG(IS_ANDROID)
 
 // Tests a service worker-based extension using webRequest for observational
 // purposes receives events after the worker stops.
@@ -7191,6 +7184,7 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest, TestOnAuthRequiredTab) {
   EXPECT_EQ(auth_url, GetActiveWebContents()->GetLastCommittedURL());
   EXPECT_TRUE(navigation_observer.last_navigation_succeeded());
 }
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 class ManifestV3WebRequestApiTestWithBypassRedirectChecksPerRequest
     : public ManifestV3WebRequestApiTest,
@@ -7325,6 +7319,7 @@ class OnAuthRequiredApiTest : public ExtensionApiTest {
   base::ScopedTempDir service_worker_dir_;
 };
 
+#if !BUILDFLAG(IS_ANDROID)
 // Tests that an MV3 extension can use the `webRequestAuthProvider` permission
 // to intercept and handle `onAuthRequired` events coming from an extension
 // service worker. This test does the following:
@@ -7333,6 +7328,7 @@ class OnAuthRequiredApiTest : public ExtensionApiTest {
 //   (3) The extension attempts to fetch a resource that requires http auth.
 //   (4) This triggers the listener in (3), which supplies credentials
 //   (5) Checks that the fetch succeeded.
+// Fails on Android crbug.com/371324825
 IN_PROC_BROWSER_TEST_F(OnAuthRequiredApiTest,
                        TestOnAuthRequiredExtensionServiceWorker) {
   // After the extension loads, trigger an async request to fetch an http auth
@@ -7361,6 +7357,7 @@ IN_PROC_BROWSER_TEST_F(OnAuthRequiredApiTest,
 
   ASSERT_TRUE(result_catcher.GetNextResult());
 }
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 // This test is similar to TestOnAuthRequiredExtensionServiceWorker but the
 // service worker is hosted by a website instead of the extension istelf.
@@ -7492,6 +7489,7 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest, AsyncListenerRegistration) {
   will_register_listener.Reply("unused");
 }
 
+#if !BUILDFLAG(IS_ANDROID)
 // Tests behavior when a service worker is stopped while processing an event.
 IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest,
                        ServiceWorkerGoesAwayWhileHandlingRequest) {
@@ -7724,7 +7722,7 @@ IN_PROC_BROWSER_TEST_F(ManifestV3WebRequestApiTest, RecordUkmOnNavigation) {
   ExtensionTestMessageListener listener("ready");
   ASSERT_TRUE(LoadExtension(test_dir2.UnpackedPath()));
   EXPECT_TRUE(listener.WaitUntilSatisfied());
-#endif  // BUILDFLAG(IS_ANDROID)
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 // We don't support manifest version 2 on android, so only the first extension
 // will be loaded on android.

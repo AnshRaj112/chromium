@@ -70,6 +70,9 @@ FillDataType GetFillDataTypeFromFillingPayload(
           [](const CreditCard*) { return FillDataType::kCreditCard; },
           [](const EntityInstance*) { return FillDataType::kAutofillAi; },
           [](const VerifiedProfile*) { return FillDataType::kAutofillProfile; },
+          [](const OtpFillData*) {
+            return FillDataType::kOneTimePasswordValue;
+          },
       },
       filling_payload);
 }
@@ -300,7 +303,8 @@ struct FormFiller::AugmentedFillingPayload {
   using Variant = std::variant<const AutofillProfile*,
                                const CreditCard*,
                                EntityPayload,
-                               const VerifiedProfile*>;
+                               const VerifiedProfile*,
+                               const OtpFillData*>;
 
   AugmentedFillingPayload(const FillingPayload& filling_payload,
                           FormStructure& form_structure,
@@ -321,6 +325,9 @@ struct FormFiller::AugmentedFillingPayload {
                 },
                 [](const VerifiedProfile* verified_profile) -> Variant {
                   return verified_profile;
+                },
+                [](const OtpFillData* otp_filling_payload) -> Variant {
+                  return otp_filling_payload;
                 }},
             filling_payload)) {}
 
@@ -332,6 +339,9 @@ struct FormFiller::AugmentedFillingPayload {
             [](const EntityPayload&) { return FillingProduct::kAutofillAi; },
             [](const VerifiedProfile*) {
               return FillingProduct::kIdentityCredential;
+            },
+            [](const OtpFillData*) {
+              return FillingProduct::kOneTimePassword;
             }},
         variant);
   }
@@ -385,6 +395,9 @@ struct FormFiller::RefillContext {
             // Verified Profiles doesn't support refills.
             [](const VerifiedProfile*)
                 -> std::variant<CreditCard, AutofillProfile> { NOTREACHED(); },
+            // OTP filling doesn't support refills.
+            [](const OtpFillData*)
+                -> std::variant<CreditCard, AutofillProfile> { NOTREACHED(); },
             [](const auto* x) {
               return std::variant<CreditCard, AutofillProfile>(*x);
             }},
@@ -423,15 +436,36 @@ struct FormFiller::RefillContext {
   std::optional<FormData> filled_form;
 };
 
+FormFiller::RefillOptions::RefillOptions() = default;
+
+FormFiller::RefillOptions FormFiller::RefillOptions::NotRefill() {
+  return {};
+}
+
+FormFiller::RefillOptions FormFiller::RefillOptions::Refill(
+    DenseSet<FieldTypeGroup> originally_filled) {
+  RefillOptions r;
+  r.originally_filled_ = originally_filled;
+  return r;
+}
+
+bool FormFiller::RefillOptions::is_refill() const {
+  return originally_filled_.has_value();
+}
+
+bool FormFiller::RefillOptions::may_refill(FieldType field_type) const {
+  CHECK(is_refill());
+  return originally_filled_->contains(GroupTypeOfFieldType(field_type));
+}
+
 DenseSet<FieldFillingSkipReason> FormFiller::GetFillingSkipReasonsForField(
     const FormFieldData& field,
     const AutofillField& autofill_field,
     const AutofillField& trigger_field,
+    const RefillOptions& refill_options,
     base::flat_map<FieldType, size_t>& type_count,
-    const std::optional<DenseSet<FieldTypeGroup>> type_groups_originally_filled,
     const base::flat_set<FieldGlobalId>& blocked_fields,
-    FillingProduct filling_product,
-    bool is_refill) {
+    FillingProduct filling_product) {
   DenseSet<FieldFillingSkipReason> skip_reasons;
   const bool is_trigger_field =
       autofill_field.global_id() == trigger_field.global_id();
@@ -483,8 +517,10 @@ DenseSet<FieldFillingSkipReason> FormFiller::GetFillingSkipReasonsForField(
   // Don't fill previously autofilled fields except the initiating field or
   // when it's a refill or for credit card fields, when
   // `kAutofillPaymentsFieldSwapping` is enabled.
-  add_if(field.is_autofilled() && !is_trigger_field && !is_refill &&
-             !AllowPaymentSwapping(trigger_field, autofill_field, is_refill),
+  add_if(field.is_autofilled() && !is_trigger_field &&
+             !refill_options.is_refill() &&
+             !AllowPaymentSwapping(trigger_field, autofill_field,
+                                   refill_options.is_refill()),
          FieldFillingSkipReason::kAlreadyAutofilled);
 
   FieldType field_type = autofill_field.Type().GetStorableType();
@@ -493,9 +529,7 @@ DenseSet<FieldFillingSkipReason> FormFiller::GetFillingSkipReasonsForField(
 
   // On a refill, only fill fields from type groups that were present during
   // the initial fill.
-  add_if(is_refill && type_groups_originally_filled.has_value() &&
-             !base::Contains(*type_groups_originally_filled,
-                             GroupTypeOfFieldType(field_type)),
+  add_if(refill_options.is_refill() && !refill_options.may_refill(field_type),
          FieldFillingSkipReason::kRefillNotInInitialFill);
 
   // A field with a specific type is only allowed to be filled a limited
@@ -538,13 +572,11 @@ void FormFiller::Reset() {
 }
 
 base::flat_map<FieldGlobalId, DenseSet<FieldFillingSkipReason>>
-FormFiller::GetFieldFillingSkipReasons(
-    base::span<const FormFieldData> fields,
-    const FormStructure& form_structure,
-    const AutofillField& trigger_field,
-    std::optional<DenseSet<FieldTypeGroup>> type_groups_originally_filled,
-    FillingProduct filling_product,
-    bool is_refill) const {
+FormFiller::GetFieldFillingSkipReasons(base::span<const FormFieldData> fields,
+                                       const FormStructure& form_structure,
+                                       const AutofillField& trigger_field,
+                                       const RefillOptions& refill_options,
+                                       FillingProduct filling_product) const {
   // Counts the number of times a type was seen in the section to be filled.
   // This is used to limit the maximum number of fills per value.
   base::flat_map<FieldType, size_t> type_count;
@@ -569,9 +601,8 @@ FormFiller::GetFieldFillingSkipReasons(
     // suggestion.
     DenseSet<FieldFillingSkipReason> field_skip_reasons =
         GetFillingSkipReasonsForField(field, *autofill_field, trigger_field,
-                                      type_count, type_groups_originally_filled,
-                                      blocked_fields, filling_product,
-                                      is_refill);
+                                      refill_options, type_count,
+                                      blocked_fields, filling_product);
 
     // Usually, `skip_reasons[field_id].empty()` before executing the line
     // below. It may not be the case though because FieldGlobalIds may not be
@@ -770,6 +801,10 @@ void FormFiller::FillOrPreviewForm(
                               refill_context != nullptr &&
                               !refill_context->attempted_refill &&
                               !refill_trigger_reason;
+  RefillOptions refill_options =
+      refill_trigger_reason.has_value() && refill_context
+          ? RefillOptions::Refill(refill_context->type_groups_originally_filled)
+          : RefillOptions::NotRefill();
 
   std::vector<FormFieldData> result_fields = form.fields();
   CHECK_EQ(result_fields.size(), form_structure.field_count());
@@ -777,12 +812,9 @@ void FormFiller::FillOrPreviewForm(
   // `FormFiller::GetFieldFillingSkipReasons` returns for each field a generic
   // list of reason for skipping each field.
   base::flat_map<FieldGlobalId, DenseSet<FieldFillingSkipReason>> skip_reasons =
-      GetFieldFillingSkipReasons(
-          result_fields, form_structure, autofill_trigger_field,
-          refill_context ? refill_context->type_groups_originally_filled
-                         : std::optional<DenseSet<FieldTypeGroup>>(),
-          augmented_filling_payload.filling_product(),
-          refill_trigger_reason.has_value());
+      GetFieldFillingSkipReasons(result_fields, form_structure,
+                                 autofill_trigger_field, refill_options,
+                                 augmented_filling_payload.filling_product());
 
   // This loop sets the values to fill in the `result_fields`. The
   // `result_fields` are sent to the renderer, whereas the very similar
@@ -1125,6 +1157,13 @@ FormFiller::FieldFillingData FormFiller::GetFieldFillingData(
               -> std::pair<std::u16string, std::optional<FieldType>> {
             auto it = profile->find(autofill_field.Type().GetStorableType());
             std::u16string value = it == profile->end() ? u"" : it->second;
+            return {value, autofill_field.Type().GetStorableType()};
+          },
+          [&](const OtpFillData* otp_fill_data)
+              -> std::pair<std::u16string, std::optional<FieldType>> {
+            auto it = otp_fill_data->find(field_data.global_id());
+            const std::u16string& value =
+                it == otp_fill_data->end() ? u"" : it->second;
             return {value, autofill_field.Type().GetStorableType()};
           }},
       filling_payload.variant);

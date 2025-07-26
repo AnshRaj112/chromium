@@ -187,6 +187,7 @@
 #include "services/network/public/mojom/web_client_hints_types.mojom-shared.h"
 #include "services/network/public/mojom/web_client_hints_types.mojom.h"
 #include "services/network/public/mojom/web_sandbox_flags.mojom.h"
+#include "storage/browser/blob/blob_url_registry.h"
 #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
 #include "third_party/blink/public/common/blob/blob_utils.h"
 #include "third_party/blink/public/common/chrome_debug_urls.h"
@@ -2982,7 +2983,7 @@ void NavigationRequest::
               this, &browsing_context_group_swap_,
               ProcessAllocationContext::CreateForNavigationRequest(
                   ProcessAllocationNavigationStage::kNoURLLoader,
-                  navigation_id_));
+                  navigation_id_, IsInOutermostMainFrame()));
       result.has_value()) {
     render_frame_host_ = result.value()->GetSafeRef();
   } else {
@@ -4744,7 +4745,7 @@ void NavigationRequest::SelectFrameHostForOnResponseStarted(
                 this, &browsing_context_group_swap_,
                 ProcessAllocationContext::CreateForNavigationRequest(
                     ProcessAllocationNavigationStage::kAfterResponse,
-                    navigation_id_),
+                    navigation_id_, IsInOutermostMainFrame()),
                 reason_output);
         result.has_value()) {
       render_frame_host_ = result.value()->GetSafeRef();
@@ -5038,8 +5039,8 @@ NavigationRequest::CreateNavigationEarlyHintsManagerParams(
   auto result = frame_tree_node_->render_manager()->GetFrameHostForNavigation(
       this, &browsing_context_group_swap_,
       ProcessAllocationContext::CreateForNavigationRequest(
-          ProcessAllocationNavigationStage::kHandlingEarlyHints,
-          navigation_id_));
+          ProcessAllocationNavigationStage::kHandlingEarlyHints, navigation_id_,
+          IsInOutermostMainFrame()));
 
   // Early hints is an optimization; if it is not possible to get a suitable
   // RenderFrameHost for any reason, just bail out.
@@ -5249,7 +5250,7 @@ void NavigationRequest::SelectFrameHostForOnRequestFailedInternal(
               this, &browsing_context_group_swap_,
               ProcessAllocationContext::CreateForNavigationRequest(
                   ProcessAllocationNavigationStage::kAfterFailure,
-                  navigation_id_));
+                  navigation_id_, IsInOutermostMainFrame()));
       result.has_value()) {
     render_frame_host = result.value();
   } else {
@@ -5632,7 +5633,7 @@ void NavigationRequest::OnStartChecksComplete(
                       ProcessAllocationContext::CreateForNavigationRequest(
                           ProcessAllocationNavigationStage::
                               kAfterNetworkRequest,
-                          navigation_id));
+                          navigation_id, request->IsInOutermostMainFrame()));
           if (rfh_creation_result.has_value()) {
             request->SetExpectedProcessIfAssociated();
           }

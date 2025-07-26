@@ -17,8 +17,9 @@ function sanitizeString(text, shouldTrim) {
   // NOTE: This logic mirrors |AutocompleteMatch::SanitizeString()|.
   // 0x2028 = line separator; 0x2029 = paragraph separator.
   var kRemoveChars = /(\r|\n|\t|\u2028|\u2029)/gm;
-  if (shouldTrim)
+  if (shouldTrim) {
     text = text.trimLeft();
+  }
   return text.replace(kRemoveChars, '');
 }
 
@@ -43,10 +44,7 @@ function parseOmniboxDescription(input) {
   }
 
   // Otherwise, it's valid, so build up the result.
-  var result = {
-    description: '',
-    descriptionStyles: []
-  };
+  var result = {description: '', descriptionStyles: []};
 
   // Recursively walk the tree.
   function walk(node) {
@@ -64,7 +62,7 @@ function parseOmniboxDescription(input) {
            child.nodeName === 'url')) {
         var style = {
           'type': child.nodeName,
-          'offset': result.description.length
+          'offset': result.description.length,
         };
         $Array.push(result.descriptionStyles, style);
         walk(child);
@@ -76,7 +74,7 @@ function parseOmniboxDescription(input) {
       // forward compat.
       walk(child);
     }
-  };
+  }
   walk(root);
 
   return result;
@@ -117,7 +115,7 @@ apiBridge.registerCustomHook(function(bindingsAPI) {
               name: suggestion.actions[j].name,
               label: suggestion.actions[j].label,
               tooltipText: suggestion.actions[j].tooltipText,
-              icon: {}
+              icon: {},
             };
             verifyImageSize(icon);
             imageUtil.verifyImageData(icon);
@@ -143,35 +141,35 @@ if (!inServiceWorker) {
   apiBridge.registerCustomHook(function(bindingsAPI) {
     var apiFunctions = bindingsAPI.apiFunctions;
 
-    apiFunctions.setHandleRequest('setDefaultSuggestion',
-                                  function(details, callback) {
-      var parseResult = parseOmniboxDescription(details.description);
-      bindingUtil.sendRequest('omnibox.setDefaultSuggestion',
-                              [parseResult, callback],
-                              undefined);
-    });
+    apiFunctions.setHandleRequest(
+        'setDefaultSuggestion', function(details, callback) {
+          var parseResult = parseOmniboxDescription(details.description);
+          bindingUtil.sendRequest(
+              'omnibox.setDefaultSuggestion', [parseResult, callback],
+              undefined);
+        });
 
     apiFunctions.setUpdateArgumentsPostValidate(
         'sendSuggestions', function(requestId, userSuggestions) {
-      var suggestions = [];
-      for (var i = 0; i < userSuggestions.length; i++) {
-        var parseResult = parseOmniboxDescription(
-            userSuggestions[i].description);
-        parseResult.content = userSuggestions[i].content;
-        parseResult.deletable = userSuggestions[i].deletable;
-        $Array.push(suggestions, parseResult);
-      }
-      return [requestId, suggestions];
-    });
+          var suggestions = [];
+          for (var i = 0; i < userSuggestions.length; i++) {
+            var parseResult =
+                parseOmniboxDescription(userSuggestions[i].description);
+            parseResult.content = userSuggestions[i].content;
+            parseResult.deletable = userSuggestions[i].deletable;
+            $Array.push(suggestions, parseResult);
+          }
+          return [requestId, suggestions];
+        });
   });
 }
 
-bindingUtil.registerEventArgumentMassager('omnibox.onInputChanged',
-                                          function(args, dispatch) {
-  var text = args[0];
-  var requestId = args[1];
-  var suggestCallback = function(suggestions) {
-    chrome.omnibox.sendSuggestions(requestId, suggestions);
-  };
-  dispatch([text, suggestCallback]);
-});
+bindingUtil.registerEventArgumentMassager(
+    'omnibox.onInputChanged', function(args, dispatch) {
+      var text = args[0];
+      var requestId = args[1];
+      var suggestCallback = function(suggestions) {
+        chrome.omnibox.sendSuggestions(requestId, suggestions);
+      };
+      dispatch([text, suggestCallback]);
+    });

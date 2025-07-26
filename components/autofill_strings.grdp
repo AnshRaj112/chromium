@@ -300,10 +300,10 @@
     You can now use addresses from your Google Account
   </message>
   <message name="IDS_AUTOFILL_IPH_HOME_AND_WORK_ACCOUNT_PROFILE_SUGGESTION" desc="IPH bubble for a suggestion item suggesting that home and work account profiles are available to use.">
-    Your home and work addresses are now available in Chrome
+    Autofill your home and work addresses from your Google Account
   </message>
   <message name="IDS_AUTOFILL_IPH_HOME_AND_WORK_ACCOUNT_PROFILE_SUGGESTION_SCREENREADER" is_accessibility_with_no_ui="true" desc="IPH bubble for a suggestion item suggesting that home and work account profiles are available to use.">
-    Your home and work addresses are now available in Chrome
+    Autofill your home and work addresses from your Google Account
   </message>
 
   <!-- Autofill suggestion label separator -->
@@ -339,8 +339,14 @@
   <message name="IDS_AUTOFILL_ENABLE_PROFILES_TOGGLE_SUBLABEL" desc="Sublabel for a toggle that allows users to control whether addresses should be saved and forms should be autofilled with them." formatter_data="android_java">
     Includes information like phone numbers, email addresses, and shipping addresses
   </message>
-  <message name="IDS_AUTOFILL_LOCAL_PROFILE_ACCESSIBILITY_LABEL" desc="Accessibility label for icon used to identify user's local address profile"  formatter_data="android_java">
+  <message name="IDS_AUTOFILL_LOCAL_PROFILE_ICON_ACCESSIBILITY_LABEL" desc="Accessibility label for icon used to identify user's local address profile" formatter_data="android_java">
     Local address
+  </message>
+  <message name="IDS_AUTOFILL_HOME_PROFILE_ICON_ACCESSIBILITY_LABEL" desc="Accessibility label for icon used to identify user's home address profile" formatter_data="android_java">
+    Home address
+  </message>
+  <message name="IDS_AUTOFILL_WORK_PROFILE_ICON_ACCESSIBILITY_LABEL" desc="Accessibility label for icon used to identify user's work address profile" formatter_data="android_java">
+    Work address
   </message>
   <message name="IDS_AUTOFILL_ENABLE_CREDIT_CARDS_TOGGLE_SUBLABEL" desc="Sublabel for a toggle that allows users to control whether credit cards should be saved and forms should be autofilled with it." formatter_data="android_java">
     Fills in payment forms with your saved payment methods

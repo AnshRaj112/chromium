@@ -201,18 +201,24 @@ void ComposeboxQueryController::NotifySessionAbandoned() {
 
 GURL ComposeboxQueryController::CreateAimUrl(const std::string& query_text,
                                              base::Time query_start_time) {
+  num_files_in_request_ = 0;
   if (!active_files_.empty() && cluster_info_.has_value()) {
     // Since multiple file upload isn't supported right now, use the last file
     // uploaded to determine `vit` param.
     // TODO(crbug.com/428967670): Support multiple file upload.
     const std::unique_ptr<FileInfo>& last_file = active_files_.rbegin()->second;
+    // TODO(crbug.com/428967670): Update `num_files_in_request_` when more than
+    // 1 file is supported.
+    num_files_in_request_ = 1;
     if (IsValidFileUploadStatusForMultimodalRequest(
             last_file->upload_status_)) {
+      std::unique_ptr<lens::LensOverlayRequestId> request_id =
+          request_id_generator_.GetNextRequestId(
+              lens::RequestIdUpdateMode::kSearchUrl);
+      request_id->set_media_type(last_file->request_id_->media_type());
       return GetUrlForMultimodalAim(
           template_url_service_, kEntrypointParameterValue, query_start_time,
-          cluster_info_->search_session_id(),
-          request_id_generator_.GetNextRequestId(
-              lens::RequestIdUpdateMode::kSearchUrl),
+          cluster_info_->search_session_id(), std::move(request_id),
           last_file->mime_type_,
           send_lns_surface_ ? kLnsSurfaceParameterValue : std::string(),
           base::UTF8ToUTF16(query_text));
@@ -254,6 +260,10 @@ void ComposeboxQueryController::StartFileUploadFlow(
       current_file_info.mime_type_ == lens::MimeType::kPdf
           ? lens::RequestIdUpdateMode::kPageContentRequest
           : lens::RequestIdUpdateMode::kFullImageRequest);
+  current_file_info.request_id_->set_media_type(
+      current_file_info.mime_type_ == lens::MimeType::kPdf
+          ? lens::LensOverlayRequestId::MEDIA_TYPE_PDF
+          : lens::LensOverlayRequestId::MEDIA_TYPE_DEFAULT_IMAGE);
 
   // Preparing for the file upload request requires multiple async flows to
   // complete before the request is ready to be send to the server. Start the
@@ -366,6 +376,7 @@ void ComposeboxQueryController::ClearClusterInfo() {
   cluster_info_endpoint_fetcher_.reset();
   cluster_info_.reset();
   request_id_generator_.ResetRequestId();
+  num_files_in_request_ = 0;
 }
 
 void ComposeboxQueryController::ResetRequestClusterInfoState(int session_id) {
@@ -502,7 +513,8 @@ void ComposeboxQueryController::UpdateFileUploadStatus(
 
   file_info->upload_status_ = status;
   for (auto& observer : observers_) {
-    observer.OnFileUploadStatusChanged(file_token, status, error_type);
+    observer.OnFileUploadStatusChanged(file_token, file_info->mime_type_,
+                                       status, error_type);
   }
 }
 

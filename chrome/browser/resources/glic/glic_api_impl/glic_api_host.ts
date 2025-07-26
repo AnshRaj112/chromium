@@ -16,11 +16,11 @@ import type {Url} from '//resources/mojo/url/mojom/url.mojom-webui.js';
 
 import type {BrowserProxy} from '../browser_proxy.js';
 import {ContentSettingsType} from '../content_settings_types.mojom-webui.js';
-import type {FocusedTabData as FocusedTabDataMojo, GetPinCandidatesOptions as GetPinCandidatesOptionsMojo, GetTabContextOptions as TabContextOptionsMojo, OpenPanelInfo as OpenPanelInfoMojo, OpenSettingsOptions as OpenSettingsOptionsMojo, PanelOpeningData as PanelOpeningDataMojo, PanelState as PanelStateMojo, PinCandidate as PinCandidateMojo, PinCandidatesObserver, ScrollToSelector as ScrollToSelectorMojo, TabContext as TabContextMojo, TabData as TabDataMojo, WebClientHandlerInterface, WebClientInterface, ZeroStateSuggestionsOptions as ZeroStateSuggestionsOptionsMojo, ZeroStateSuggestionsV2 as ZeroStateSuggestionsV2Mojo} from '../glic.mojom-webui.js';
-import {PinCandidatesObserverReceiver, SettingsPageField as SettingsPageFieldMojo, WebClientHandlerRemote, WebClientMode, WebClientReceiver} from '../glic.mojom-webui.js';
+import type {ActorTaskState as ActorTaskStateMojo, FocusedTabData as FocusedTabDataMojo, GetPinCandidatesOptions as GetPinCandidatesOptionsMojo, GetTabContextOptions as TabContextOptionsMojo, OpenPanelInfo as OpenPanelInfoMojo, OpenSettingsOptions as OpenSettingsOptionsMojo, PanelOpeningData as PanelOpeningDataMojo, PanelState as PanelStateMojo, PinCandidate as PinCandidateMojo, PinCandidatesObserver, ScrollToSelector as ScrollToSelectorMojo, TabContext as TabContextMojo, TabData as TabDataMojo, ViewChangeRequest as ViewChangeRequestMojo, WebClientHandlerInterface, WebClientInterface, ZeroStateSuggestionsOptions as ZeroStateSuggestionsOptionsMojo, ZeroStateSuggestionsV2 as ZeroStateSuggestionsV2Mojo} from '../glic.mojom-webui.js';
+import {CurrentView as CurrentViewMojo, PinCandidatesObserverReceiver, SettingsPageField as SettingsPageFieldMojo, WebClientHandlerRemote, WebClientMode, WebClientReceiver} from '../glic.mojom-webui.js';
 import type {HostCapability as HostCapabilityMojo} from '../glic.mojom-webui.js';
-import type {ActInFocusedTabParams, DraggableArea, GetPinCandidatesOptions, HostCapability, Journal, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, Screenshot, ScrollToParams, TabContextOptions, WebPageData, ZeroStateSuggestions, ZeroStateSuggestionsOptions, ZeroStateSuggestionsV2} from '../glic_api/glic_api.js';
-import {ActInFocusedTabErrorReason, CaptureScreenshotErrorReason, CreateTaskErrorReason, DEFAULT_INNER_TEXT_BYTES_LIMIT, DEFAULT_PDF_SIZE_LIMIT, PerformActionsErrorReason, ScrollToErrorReason} from '../glic_api/glic_api.js';
+import type {ActInFocusedTabParams, ActorTaskState, DraggableArea, GetPinCandidatesOptions, HostCapability, Journal, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, Screenshot, ScrollToParams, TabContextOptions, ViewChangedNotification, ViewChangeRequest, WebPageData, ZeroStateSuggestions, ZeroStateSuggestionsOptions, ZeroStateSuggestionsV2} from '../glic_api/glic_api.js';
+import {ActInFocusedTabErrorReason, CaptureScreenshotErrorReason, ClientView, CreateTaskErrorReason, DEFAULT_INNER_TEXT_BYTES_LIMIT, DEFAULT_PDF_SIZE_LIMIT, PerformActionsErrorReason, ScrollToErrorReason} from '../glic_api/glic_api.js';
 import {ObservableValue} from '../observable.js';
 import type {ObservableValueReadOnly} from '../observable.js';
 import {OneShotTimer} from '../timer.js';
@@ -204,6 +204,12 @@ class WebClientImpl implements WebClientInterface {
         'glicWebClientBrowserIsOpenChanged', {browserIsOpen});
   }
 
+  notifyBrowserIsActiveChanged(browserIsActive: boolean): void {
+    // This isn't forwarded to the actual web client yet, as it's currently
+    // only needed for the responsiveness logic, which is here.
+    this.host.setBrowserIsActive(browserIsActive);
+  }
+
   notifyOsHotkeyStateChanged(hotkey: string): void {
     this.sender.requestNoResponse(
         'glicWebClientNotifyOsHotkeyStateChanged', {hotkey});
@@ -230,6 +236,26 @@ class WebClientImpl implements WebClientInterface {
     this.sender.requestNoResponse(
         'glicWebClientZeroStateSuggestionsChanged',
         {suggestions: suggestions, options: options});
+  }
+
+  notifyActorTaskStateChanged(taskId: number, state: ActorTaskStateMojo): void {
+    const clientState = state as number as ActorTaskState;
+    this.sender.requestNoResponse(
+        'glicWebClientNotifyActorTaskStateChanged',
+        {taskId, state: clientState});
+  }
+
+  requestViewChange(requestMojo: ViewChangeRequestMojo): void {
+    let request: ViewChangeRequest|undefined;
+    if (requestMojo.details.actuation) {
+      request = {desiredView: ClientView.ACTUATION};
+    } else if (requestMojo.details.conversation) {
+      request = {desiredView: ClientView.CONVERSATION};
+    }
+    if (!request) {
+      return;
+    }
+    this.sender.requestNoResponse('glicWebClientRequestViewChange', {request});
   }
 }
 
@@ -281,6 +307,7 @@ class HostMessageHandler implements HostMessageHandlerInterface {
         this.receiver.$.bindNewPipeAndPassRemote());
     const chromeVersion = initialState.chromeVersion.components;
     const hostCapabilities = initialState.hostCapabilities;
+    this.host.setBrowserIsActive(initialState.browserIsActive);
 
     return {
       initialState: replaceProperties(initialState, {
@@ -635,6 +662,11 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     this.handler.onSessionTerminated();
   }
 
+  glicBrowserOnTurnCompleted(request: {model: number, duration: number}): void {
+    this.handler.onTurnCompleted(
+        request.model, timeDeltaFromClient(request.duration));
+  }
+
   glicBrowserLogBeginAsyncEvent(request: {
     asyncEventId: number,
     taskId: number,
@@ -866,6 +898,27 @@ class HostMessageHandler implements HostMessageHandlerInterface {
   glicBrowserMaybeRefreshUserStatus(): void {
     this.handler.maybeRefreshUserStatus();
   }
+
+  glicBrowserOnViewChanged(request: {notification: ViewChangedNotification}):
+      void {
+    const {currentView} = request.notification;
+    switch (currentView) {
+      case ClientView.ACTUATION:
+        this.handler.onViewChanged({currentView: CurrentViewMojo.kActuation});
+        break;
+      case ClientView.CONVERSATION:
+        this.handler.onViewChanged(
+            {currentView: CurrentViewMojo.kConversation});
+        break;
+      default:
+        // The compiler should enforce that this is unreachable if types are
+        // correct; nonetheless check at runtime since TypeScript cannot
+        // guarantee this absolutely.
+        const _exhaustive: never = currentView;
+        throw new Error(
+            `glicBrowserOnViewChanged: invalid currentView: ${_exhaustive}`);
+    }
+  }
 }
 
 export class GlicApiHost implements PostMessageRequestHandler {
@@ -881,6 +934,7 @@ export class GlicApiHost implements PostMessageRequestHandler {
   private waitingOnPanelWillOpenValue = false;
   private clientActiveObs = ObservableValue.withValue(false);
   private panelOpenState = PanelOpenState.CLOSED;
+  private browserIsActive = true;
   private hasShownDebuggerAttachedWarning = false;
   detailedWebClientState = DetailedWebClientState.BOOTSTRAP_PENDING;
 
@@ -941,10 +995,18 @@ export class GlicApiHost implements PostMessageRequestHandler {
     }
   }
 
-  isClientActive() {
-    // TODO - crbug.com/416530284: Add check for Chrome window in focus.
+  setBrowserIsActive(browserIsActive: boolean) {
+    this.browserIsActive = browserIsActive;
+    this.clientActiveObs.assignAndSignal(this.isClientActive());
+  }
+
+  // Returns true if the user might be interacting with the client.
+  // That is, the panel is open, not in an error state, and either the panel
+  // itself is focused or a browser window it could be accessing is.
+  private isClientActive() {
     return this.panelOpenState === PanelOpenState.OPEN &&
-        this.webClientState.getCurrentValue() !== WebClientState.ERROR;
+        this.webClientState.getCurrentValue() !== WebClientState.ERROR &&
+        this.browserIsActive;
   }
 
   // Called when the web client is initialized.
@@ -955,6 +1017,7 @@ export class GlicApiHost implements PostMessageRequestHandler {
   }
 
   webClientInitializeFailed() {
+    console.warn('GlicApiHost: web client initialize failed');
     this.detailedWebClientState =
         DetailedWebClientState.WEB_CLIENT_INITIALIZE_FAILED;
     this.setWebClientState(WebClientState.ERROR);
@@ -1054,6 +1117,7 @@ export class GlicApiHost implements PostMessageRequestHandler {
         const ignoreUnresponsiveClient =
             await this.shouldAllowUnresponsiveClient();
         if (!ignoreUnresponsiveClient) {
+          console.warn('GlicApiHost: web client is unresponsive');
           this.detailedWebClientState =
               DetailedWebClientState.TEMPORARY_UNRESPONSIVE;
           this.setWebClientState(WebClientState.UNRESPONSIVE);
@@ -1091,6 +1155,7 @@ export class GlicApiHost implements PostMessageRequestHandler {
 
   startWebClientErrorTimer() {
     this.webClientErrorTimer.start(() => {
+      console.warn('GlicApiHost: web client is permanently unresponsive');
       this.detailedWebClientState =
           DetailedWebClientState.PERMANENT_UNRESPONSIVE;
       this.setWebClientState(WebClientState.ERROR);
@@ -1277,6 +1342,8 @@ function tabDataToClient(tabData: TabDataMojo|null, extras: ResponseExtras):
   }
 
   const isObservable = optionalToClient(tabData.isObservable);
+  const isMediaActive = optionalToClient(tabData.isMediaActive);
+  const isTabContentCaptured = optionalToClient(tabData.isTabContentCaptured);
   return {
     tabId: tabIdToClient(tabData.tabId),
     windowId: windowIdToClient(tabData.windowId),
@@ -1286,6 +1353,8 @@ function tabDataToClient(tabData: TabDataMojo|null, extras: ResponseExtras):
     faviconUrl,
     documentMimeType: tabData.documentMimeType,
     isObservable,
+    isMediaActive,
+    isTabContentCaptured,
   };
 }
 

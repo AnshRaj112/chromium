@@ -48,7 +48,6 @@
 #include "content/public/common/isolated_world_ids.h"
 #include "content/public/common/page_type.h"
 #include "content/public/test/test_utils.h"
-#include "ipc/message_filter.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "mojo/public/cpp/bindings/self_owned_associated_receiver.h"
@@ -864,6 +863,10 @@ class EvalJsResult {
     return testing::AllOf(IsOk(), testing::Field(&EvalJsResult::value_, m));
   }
   static auto IsError() { return testing::Not(IsOk()); }
+  template <typename M>
+  static auto ErrorIs(M m) {
+    return testing::AllOf(IsError(), testing::Field(&EvalJsResult::error, m));
+  }
 
   // Extract a result value of the requested type, or die trying.
   //

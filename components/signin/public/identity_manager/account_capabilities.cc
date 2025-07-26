@@ -11,8 +11,10 @@
 
 #include "base/containers/heap_array.h"
 #include "base/containers/span.h"
+#include "base/feature_list.h"
 #include "base/notreached.h"
 #include "components/signin/internal/identity_manager/account_capabilities_constants.h"
+#include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/tribool.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -72,6 +74,9 @@ signin::Tribool AccountCapabilities::GetCapabilityByName(
   return iterator->second ? signin::Tribool::kTrue : signin::Tribool::kFalse;
 }
 
+// clang-format off
+// keep-sorted start newline_separated=yes sticky_prefixes=#if group_prefixes=#endif,can,has,is,must,AccountCapabilities:: block=yes
+// clang-format on
 signin::Tribool AccountCapabilities::can_fetch_family_member_info() const {
   return GetCapabilityByName(kCanFetchFamilyMemberInfoCapabilityName);
 }
@@ -80,20 +85,15 @@ signin::Tribool AccountCapabilities::can_have_email_address_displayed() const {
   return GetCapabilityByName(kCanHaveEmailAddressDisplayedCapabilityName);
 }
 
-signin::Tribool AccountCapabilities::
-    can_show_history_sync_opt_ins_without_minor_mode_restrictions() const {
-  return GetCapabilityByName(
-      kCanShowHistorySyncOptInsWithoutMinorModeRestrictionsCapabilityName);
-}
-
 signin::Tribool AccountCapabilities::can_run_chrome_privacy_sandbox_trials()
     const {
   return GetCapabilityByName(kCanRunChromePrivacySandboxTrialsCapabilityName);
 }
 
-signin::Tribool AccountCapabilities::is_opted_in_to_parental_supervision()
-    const {
-  return GetCapabilityByName(kIsOptedInToParentalSupervisionCapabilityName);
+signin::Tribool AccountCapabilities::
+    can_show_history_sync_opt_ins_without_minor_mode_restrictions() const {
+  return GetCapabilityByName(
+      kCanShowHistorySyncOptInsWithoutMinorModeRestrictionsCapabilityName);
 }
 
 signin::Tribool AccountCapabilities::can_toggle_auto_updates() const {
@@ -102,6 +102,16 @@ signin::Tribool AccountCapabilities::can_toggle_auto_updates() const {
 
 signin::Tribool AccountCapabilities::can_use_chrome_ip_protection() const {
   return GetCapabilityByName(kCanUseChromeIpProtectionName);
+}
+
+#if BUILDFLAG(IS_CHROMEOS)
+signin::Tribool AccountCapabilities::can_use_chromeos_generative_ai() const {
+  return GetCapabilityByName(kCanUseChromeOSGenerativeAi);
+}
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
+signin::Tribool AccountCapabilities::can_use_copyeditor_feature() const {
+  return GetCapabilityByName(kCanUseCopyEditorFeatureName);
 }
 
 signin::Tribool AccountCapabilities::can_use_devtools_generative_ai_features()
@@ -113,20 +123,36 @@ signin::Tribool AccountCapabilities::can_use_edu_features() const {
   return GetCapabilityByName(kCanUseEduFeaturesCapabilityName);
 }
 
-signin::Tribool AccountCapabilities::can_use_manta_service() const {
-  return GetCapabilityByName(kCanUseMantaServiceName);
+signin::Tribool AccountCapabilities::can_use_generative_ai_in_recorder_app()
+    const {
+  return GetCapabilityByName(kCanUseGenerativeAiInRecorderApp);
 }
 
-signin::Tribool AccountCapabilities::can_use_copyeditor_feature() const {
-  return GetCapabilityByName(kCanUseCopyEditorFeatureName);
+signin::Tribool AccountCapabilities::can_use_generative_ai_photo_editing()
+    const {
+  return GetCapabilityByName(kCanUseGenerativeAiPhotoEditing);
+}
+
+signin::Tribool AccountCapabilities::can_use_manta_service() const {
+  return GetCapabilityByName(kCanUseMantaServiceName);
 }
 
 signin::Tribool AccountCapabilities::can_use_model_execution_features() const {
   return GetCapabilityByName(kCanUseModelExecutionFeaturesName);
 }
 
+signin::Tribool AccountCapabilities::can_use_speaker_label_in_recorder_app()
+    const {
+  return GetCapabilityByName(kCanUseSpeakerLabelInRecorderApp);
+}
+
 signin::Tribool AccountCapabilities::is_allowed_for_machine_learning() const {
   return GetCapabilityByName(kIsAllowedForMachineLearningCapabilityName);
+}
+
+signin::Tribool AccountCapabilities::is_opted_in_to_parental_supervision()
+    const {
+  return GetCapabilityByName(kIsOptedInToParentalSupervisionCapabilityName);
 }
 
 signin::Tribool AccountCapabilities::
@@ -143,26 +169,35 @@ signin::Tribool AccountCapabilities::is_subject_to_parental_controls() const {
   return GetCapabilityByName(kIsSubjectToParentalControlsCapabilityName);
 }
 
-signin::Tribool AccountCapabilities::can_use_speaker_label_in_recorder_app()
+signin::Tribool
+AccountCapabilities::should_be_addressed_in_feminine_grammatical_gender()
     const {
-  return GetCapabilityByName(kCanUseSpeakerLabelInRecorderApp);
+  return base::FeatureList::IsEnabled(switches::kGrammaticalGenderCapabilities)
+             ? GetCapabilityByName(
+                   kShouldBeAddressedInFeminineGrammaticalGender)
+             : signin::Tribool::kUnknown;
 }
 
-signin::Tribool AccountCapabilities::can_use_generative_ai_in_recorder_app()
+signin::Tribool
+AccountCapabilities::should_be_addressed_in_masculine_grammatical_gender()
     const {
-  return GetCapabilityByName(kCanUseGenerativeAiInRecorderApp);
+  return base::FeatureList::IsEnabled(switches::kGrammaticalGenderCapabilities)
+             ? GetCapabilityByName(
+                   kShouldBeAddressedInMasculineGrammaticalGender)
+             : signin::Tribool::kUnknown;
 }
 
-signin::Tribool AccountCapabilities::can_use_generative_ai_photo_editing()
-    const {
-  return GetCapabilityByName(kCanUseGenerativeAiPhotoEditing);
+signin::Tribool
+AccountCapabilities::should_be_addressed_in_neuter_grammatical_gender() const {
+  return base::FeatureList::IsEnabled(
+             switches::kGrammaticalGenderCapabilities) &&
+                 base::FeatureList::IsEnabled(
+                     switches::kNeuterGrammaticalGenderCapability)
+             ? GetCapabilityByName(kShouldBeAddressedInNeuterGrammaticalGender)
+             : signin::Tribool::kUnknown;
 }
 
-#if BUILDFLAG(IS_CHROMEOS)
-signin::Tribool AccountCapabilities::can_use_chromeos_generative_ai() const {
-  return GetCapabilityByName(kCanUseChromeOSGenerativeAi);
-}
-#endif  // BUILDFLAG(IS_CHROMEOS)
+// keep-sorted end
 
 bool AccountCapabilities::UpdateWith(const AccountCapabilities& other) {
   bool modified = false;

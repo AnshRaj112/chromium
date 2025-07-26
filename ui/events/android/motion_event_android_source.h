@@ -27,9 +27,12 @@ class EVENTS_EXPORT MotionEventAndroidSource {
   virtual float GetTouchMinorPix(size_t pointer_index) const = 0;
   virtual float GetRawOrientation(size_t pointer_index) const = 0;
   virtual float GetPressure(size_t pointer_index) const = 0;
+  virtual float GetAxisHscroll(size_t pointer_index) const = 0;
+  virtual float GetAxisVscroll(size_t pointer_index) const = 0;
   virtual float GetRawTilt(size_t pointer_index) const = 0;
   virtual MotionEvent::ToolType GetToolType(size_t pointer_index) const = 0;
-
+  virtual int GetActionMasked() const = 0;
+  virtual int GetButtonState() const = 0;
   virtual base::TimeTicks GetHistoricalEventTime(
       size_t historical_index) const = 0;
   virtual float GetHistoricalTouchMajorPix(size_t pointer_index,

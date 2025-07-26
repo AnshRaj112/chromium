@@ -48,14 +48,13 @@
   width: var(--ntp-composebox-width, 337px);
 }
 
-:host([show-error-scrim_]) #composebox {
-  opacity: 0.05;
-}
-
 #errorScrim {
   align-items: center;
-  color: var(--color-new-tab-page-composebox-font);
+  background-color: var(--color-new-tab-page-composebox-error-scrim-background);
+  border-radius: inherit;
+  color: var(--color-new-tab-page-composebox-error-scrim-foreground);
   display: flex;
+  font-size: 16px;
   flex-direction: column;
   gap: 12px;
   justify-content: center;
@@ -71,9 +70,19 @@
 }
 
 #dismissErrorButton {
-  --cr-button-background-color: var(--ntp-composebox-background-color);
-  --cr-button-border-color: var(--color-new-tab-page-composebox-font);
-  --cr-button-text-color: var(--color-new-tab-page-composebox-font);
+  --cr-button-background-color:
+      var(--color-new-tab-page-composebox-error-scrim-button-background);
+  --cr-button-border-color:
+      var(--color-new-tab-page-composebox-error-scrim-foreground);
+  --cr-button-text-color:
+      var(--color-new-tab-page-composebox-error-scrim-button-text);
+  --cr-icon-button-hover-background-color:
+      var(--color-new-tab-page-composebox-error-scrim-button-background-hover);
+  border: none;
+  font-size: 14px;
+  gap: 4px;
+  height: 44px;
+  width: 122px;
 }
 
 #composebox {
@@ -112,11 +121,11 @@
 }
 
 #input {
-  animation: color-change 3s infinite;
+  animation: color-change 5s infinite;
   background-color: inherit;
   border: none;
   box-sizing: border-box;
-  caret-color: var(--caret-color);
+  caret-color: var(--google-blue-500);
   color: var(--color-new-tab-page-composebox-font);
   display: block;
   field-sizing: content;
@@ -135,10 +144,10 @@
 }
 
 @keyframes color-change {
-  0% { --caret-color: blue; }
-  33% { --caret-color: red; }
-  67% { --caret-color: orange; }
-  100% { --caret-color: green; }
+  0%, 100%   { caret-color: var(--google-blue-500); }
+  25% { caret-color: var(--google-red-500); }
+  50%  { caret-color: var(--google-yellow-500); }
+  75% { caret-color: var(--google-green-500); }
 }
 
 #input::-webkit-search-decoration,

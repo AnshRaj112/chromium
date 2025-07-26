@@ -1022,6 +1022,24 @@ inline constexpr char kWebAuthnCablePairingsPrefName[] =
 inline constexpr char kSyncedDefaultSearchProviderGUID[] =
     "default_search_provider.synced_guid";
 
+#if BUILDFLAG(IS_ANDROID)
+// Deprecated 07/2025.
+constexpr char kObsoletePasswordAccessLossWarningShownAtStartupTimestamp[] =
+    "password_access_loss_warning_shown_at_startup_timestamp";
+constexpr char kObsoletePasswordAccessLossWarningShownTimestamp[] =
+    "password_access_loss_warning_shown_timestamp";
+constexpr char kObsoleteTimeOfLastMigrationAttempt[] =
+    "time_of_last_migration_attempt";
+constexpr char kObsoleteSettingsMigratedToUPMLocal[] =
+    "profile.settings_migrated_to_upm_local";
+constexpr char kObsoleteShouldShowPostPasswordMigrationSheetAtStartup[] =
+    "should_show_post_password_migration_sheet_at_startup";
+constexpr char kObsoleteUnenrolledFromGoogleMobileServicesDueToErrors[] =
+    "unenrolled_from_google_mobile_services_due_to_errors";
+constexpr char kObsoleteCurrentMigrationVersionToGoogleMobileServices[] =
+    "current_migration_version_to_google_mobile_services";
+#endif  // BUILDFLAG(IS_ANDROID)
+
 // Deprecated 07/2025.
 inline constexpr char kFirstSyncCompletedInFullSyncMode[] =
     "sync.first_full_sync_completed";
@@ -1034,6 +1052,30 @@ inline constexpr char kAssistantNumSessionsWhereOnboardingShown[] =
     "ash.assistant.num_sessions_where_onboarding_shown";
 inline constexpr char kAssistantTimeOfLastInteraction[] =
     "ash.assistant.time_of_last_interaction";
+
+// Deprecated 07/2025.
+inline constexpr char kAssistantConsentStatus[] =
+    "settings.voice_interaction.activity_control.consent_status";
+inline constexpr char kAssistantContextEnabled[] =
+    "settings.voice_interaction.context.enabled";
+inline constexpr char kAssistantDisabledByPolicy[] =
+    "settings.assistant.disabled_by_policy";
+inline constexpr char kAssistantEnabled[] =
+    "settings.voice_interaction.enabled";
+inline constexpr char kAssistantHotwordAlwaysOn[] =
+    "settings.voice_interaction.hotword.always_on";
+inline constexpr char kAssistantHotwordEnabled[] =
+    "settings.voice_interaction.hotword.enabled";
+inline constexpr char kAssistantLaunchWithMicOpen[] =
+    "settings.voice_interaction.launch_with_mic_open";
+inline constexpr char kAssistantNotificationEnabled[] =
+    "settings.voice_interaction.notification.enabled";
+inline constexpr char kAssistantOnboardingMode[] =
+    "settings.assistant.onboarding_mode";
+inline constexpr char kAssistantVoiceMatchEnabledDuringOobe[] =
+    "settings.voice_interaction.oobe_voice_match.enabled";
+inline constexpr char kAssistantNumFailuresSinceLastServiceRun[] =
+    "ash.assistant.num_failures_since_last_service_run";
 #endif
 
 // Deprecated 07/2025
@@ -1449,6 +1491,22 @@ void RegisterProfilePrefsForMigration(
   registry->RegisterStringPref(kLastUsedPairingFromSyncPublicKey, "");
   registry->RegisterStringPref(kSyncedDefaultSearchProviderGUID, std::string());
 
+#if BUILDFLAG(IS_ANDROID)
+  // Deprecated 07/2025.
+  registry->RegisterTimePref(
+      kObsoletePasswordAccessLossWarningShownAtStartupTimestamp, base::Time());
+  registry->RegisterTimePref(kObsoletePasswordAccessLossWarningShownTimestamp,
+                             base::Time());
+  registry->RegisterDoublePref(kObsoleteTimeOfLastMigrationAttempt, 0.0);
+  registry->RegisterBooleanPref(kObsoleteSettingsMigratedToUPMLocal, false);
+  registry->RegisterBooleanPref(
+      kObsoleteShouldShowPostPasswordMigrationSheetAtStartup, false);
+  registry->RegisterBooleanPref(
+      kObsoleteUnenrolledFromGoogleMobileServicesDueToErrors, false);
+  registry->RegisterIntegerPref(
+      kObsoleteCurrentMigrationVersionToGoogleMobileServices, 0);
+#endif  // BUILDFLAG(IS_ANDROID)
+
   // Deprecated 07/2025.
   registry->RegisterBooleanPref(kFirstSyncCompletedInFullSyncMode, false);
   registry->RegisterStringPref(kGoogleServicesSecondLastSyncingGaiaId,
@@ -1458,6 +1516,19 @@ void RegisterProfilePrefsForMigration(
   // Deprecated 07/2025.
   registry->RegisterIntegerPref(kAssistantNumSessionsWhereOnboardingShown, 0);
   registry->RegisterTimePref(kAssistantTimeOfLastInteraction, base::Time());
+
+  // Deprecated 07/2025.
+  registry->RegisterIntegerPref(kAssistantConsentStatus, 0);
+  registry->RegisterBooleanPref(kAssistantContextEnabled, false);
+  registry->RegisterBooleanPref(kAssistantDisabledByPolicy, false);
+  registry->RegisterBooleanPref(kAssistantEnabled, false);
+  registry->RegisterBooleanPref(kAssistantHotwordAlwaysOn, false);
+  registry->RegisterBooleanPref(kAssistantHotwordEnabled, false);
+  registry->RegisterBooleanPref(kAssistantLaunchWithMicOpen, false);
+  registry->RegisterBooleanPref(kAssistantNotificationEnabled, false);
+  registry->RegisterBooleanPref(kAssistantVoiceMatchEnabledDuringOobe, false);
+  registry->RegisterStringPref(kAssistantOnboardingMode, std::string());
+  registry->RegisterIntegerPref(kAssistantNumFailuresSinceLastServiceRun, 0);
 #endif
 
   // Deprecated 07/2025
@@ -1780,6 +1851,10 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
 
   registry->RegisterIntegerPref(prefs::kToastAlertLevel, 0);
 
+#if !BUILDFLAG(IS_ANDROID)
+  registry->RegisterStringPref(prefs::kNonMilestoneUpdateToastVersion, "");
+#endif  // !BUILDFLAG(IS_ANDROID)
+
   // This is intentionally last.
   RegisterLocalStatePrefsForMigration(registry);
 }
@@ -2053,7 +2128,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   ash::ApkWebAppService::RegisterProfilePrefs(registry);
   ash::app_time::AppActivityRegistry::RegisterProfilePrefs(registry);
   ash::app_time::AppTimeController::RegisterProfilePrefs(registry);
-  ash::assistant::prefs::RegisterProfilePrefs(registry);
   ash::auth::AuthFactorConfig::RegisterPrefs(registry);
   ash::bluetooth::DebugLogsManager::RegisterPrefs(registry);
   ash::bluetooth_config::BluetoothPowerControllerImpl::RegisterProfilePrefs(
@@ -2429,14 +2503,9 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
 
 #if BUILDFLAG(IS_ANDROID)
   // Added 11/2023, but DO NOT REMOVE after the usual year!
-  // TODO(crbug.com/40268177): The pref kPasswordsUseUPMLocalAndSeparateStores
-  // and this call (to compute said pref) should be removed once
-  // kUnifiedPasswordManagerLocalPasswordsAndroidWithMigration is launched and
-  // enough clients have migrated. UsesSplitStoresAndUPMForLocal() should be
-  // updated to check the GmsCoreVersion directly instead of the pref, or
-  // might be removed entirely, depending how the outdated GmsCore case is
-  // handled.
-  password_manager_android_util::SetUsesSplitStoresAndUPMForLocal(
+  // TODO(crbug.com/378653046): This call should be removed once enough time
+  // has passed.
+  password_manager_android_util::MaybeDeleteLoginDatabases(
       profile_prefs, profile_path,
       std::make_unique<
           password_manager_android_util::PasswordManagerUtilBridge>());
@@ -2714,6 +2783,21 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
   profile_prefs->ClearPref(kLastUsedPairingFromSyncPublicKey);
   profile_prefs->ClearPref(kSyncedDefaultSearchProviderGUID);
 
+#if BUILDFLAG(IS_ANDROID)
+  // Deprecated 07/2025.
+  profile_prefs->ClearPref(
+      kObsoletePasswordAccessLossWarningShownAtStartupTimestamp);
+  profile_prefs->ClearPref(kObsoletePasswordAccessLossWarningShownTimestamp);
+  profile_prefs->ClearPref(kObsoleteTimeOfLastMigrationAttempt);
+  profile_prefs->ClearPref(kObsoleteSettingsMigratedToUPMLocal);
+  profile_prefs->ClearPref(
+      kObsoleteShouldShowPostPasswordMigrationSheetAtStartup);
+  profile_prefs->ClearPref(
+      kObsoleteUnenrolledFromGoogleMobileServicesDueToErrors);
+  profile_prefs->ClearPref(
+      kObsoleteCurrentMigrationVersionToGoogleMobileServices);
+#endif  // BUILDFLAG(IS_ANDROID)
+
   // Added 07/2025.
   profile_prefs->ClearPref(kFirstSyncCompletedInFullSyncMode);
   profile_prefs->ClearPref(kGoogleServicesSecondLastSyncingGaiaId);
@@ -2722,6 +2806,19 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
   // Added 07/2025.
   profile_prefs->ClearPref(kAssistantNumSessionsWhereOnboardingShown);
   profile_prefs->ClearPref(kAssistantTimeOfLastInteraction);
+
+  // Added 07/2025.
+  profile_prefs->ClearPref(kAssistantConsentStatus);
+  profile_prefs->ClearPref(kAssistantContextEnabled);
+  profile_prefs->ClearPref(kAssistantDisabledByPolicy);
+  profile_prefs->ClearPref(kAssistantEnabled);
+  profile_prefs->ClearPref(kAssistantHotwordAlwaysOn);
+  profile_prefs->ClearPref(kAssistantHotwordEnabled);
+  profile_prefs->ClearPref(kAssistantLaunchWithMicOpen);
+  profile_prefs->ClearPref(kAssistantNotificationEnabled);
+  profile_prefs->ClearPref(kAssistantVoiceMatchEnabledDuringOobe);
+  profile_prefs->ClearPref(kAssistantOnboardingMode);
+  profile_prefs->ClearPref(kAssistantNumFailuresSinceLastServiceRun);
 #endif
 
   // Added 07/2025

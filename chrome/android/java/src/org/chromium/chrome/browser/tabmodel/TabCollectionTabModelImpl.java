@@ -6,6 +6,9 @@ package org.chromium.chrome.browser.tabmodel;
 
 import static org.chromium.base.ThreadUtils.assertOnUiThread;
 import static org.chromium.build.NullUtil.assumeNonNull;
+import static org.chromium.chrome.browser.tabmodel.TabGroupUtils.areAnyTabsPartOfSharedGroup;
+
+import android.text.TextUtils;
 
 import org.jni_zero.JNINamespace;
 import org.jni_zero.JniType;
@@ -41,6 +44,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -250,26 +254,35 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
 
     @Override
     public boolean supportsPendingClosures() {
+        // TODO(crbug.com/428977566): Support pending closures.
         return false;
     }
 
     @Override
     public boolean isClosurePending(@TabId int tabId) {
+        // TODO(crbug.com/428977566): Support pending closures.
         return false;
     }
 
     @Override
-    public void commitAllTabClosures() {}
+    public void commitAllTabClosures() {
+        // TODO(crbug.com/428977566): Support pending closures.
+    }
 
     @Override
-    public void commitTabClosure(@TabId int tabId) {}
+    public void commitTabClosure(@TabId int tabId) {
+        // TODO(crbug.com/428977566): Support pending closures.
+    }
 
     @Override
-    public void cancelTabClosure(@TabId int tabId) {}
+    public void cancelTabClosure(@TabId int tabId) {
+        // TODO(crbug.com/428977566): Support pending closures.
+    }
 
     @Override
     public void openMostRecentlyClosedEntry() {
         assertOnUiThread();
+        // TODO(crbug.com/428977566): Restore from pending closures first.
         mModelDelegate.openMostRecentlyClosedEntry(this);
         if (!mCurrentTabSupplier.hasValue()) {
             setIndex(0, TabSelectionType.FROM_NEW);
@@ -278,6 +291,8 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
 
     @Override
     public TabList getComprehensiveModel() {
+        // TODO(crbug.com/428977566): Return all tabs including pending closures. Pending closures
+        // may need to be invalidated when any tabs are moved, or added.
         return this;
     }
 
@@ -350,9 +365,7 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         if (tab == null) return;
 
         int currentIndex = indexOf(tab);
-        if (currentIndex == TabList.INVALID_TAB_INDEX || currentIndex == newIndex) {
-            return;
-        }
+        if (currentIndex == TabList.INVALID_TAB_INDEX || currentIndex == newIndex) return;
 
         // Clamp negative values here to ensure the tab moves to index 0 if negative. The size_t
         // cast in C++ otherwise results in the tab going to the end of the list which is not
@@ -397,8 +410,6 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
             return;
         }
 
-        // TODO(crbug.com/429145597): Handle auto grouping for certain launch types and on restore.
-
         for (TabModelObserver obs : mTabModelObservers) obs.willAddTab(tab, type);
 
         boolean hasAnyTabs = mCurrentTabSupplier.hasValue();
@@ -407,6 +418,16 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
                         || (!hasAnyTabs && type == TabLaunchType.FROM_LONGPRESS_BACKGROUND);
         index = mOrderController.determineInsertionIndex(type, index, tab);
 
+        Tab parentTab = getTabById(tab.getParentId());
+        boolean groupWithParent = shouldGroupWithParent(tab, parentTab);
+        if (groupWithParent) {
+            assumeNonNull(parentTab);
+            if (parentTab.getTabGroupId() == null) {
+                createSingleTabGroup(parentTab);
+            }
+            tab.setTabGroupId(parentTab.getTabGroupId());
+        }
+
         Token tabGroupId = tab.getTabGroupId();
         assert !(tabGroupId != null && tab.getIsPinned())
                 : "Pinned and grouped states are mutually exclusive.";
@@ -414,14 +435,7 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         if (tabGroupId != null && !tabGroupExists(tabGroupId)) {
             // TODO(crbug.com/429145597): Restore title, color, and collapsed state from persistence
             // layer.
-            @TabGroupColorId int colorId = TabGroupColorUtils.getNextSuggestedColorId(this);
-            TabCollectionTabModelImplJni.get()
-                    .createTabGroup(
-                            mNativeTabCollectionTabModelImplPtr,
-                            tabGroupId,
-                            /* title= */ "",
-                            colorId,
-                            /* isCollapsed= */ false);
+            createDetachedTabGroup(tabGroupId);
         }
 
         TabCollectionTabModelImplJni.get()
@@ -449,6 +463,16 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         tabAddedToModel(tab);
         for (TabModelObserver obs : mTabModelObservers) {
             obs.didAddTab(tab, type, creationState, selectTab);
+        }
+        if (groupWithParent) {
+            // TODO(crbug.com/434015906): Wait until after didAddTab before notifying observers. The
+            // sequencing here is incorrect as the tab is already grouped at this point; however,
+            // current clients don't care and we may be able to remove `willMergeTabToGroup` from
+            // the observer interface entirely.
+            for (TabGroupModelFilterObserver observer : mTabGroupObservers) {
+                observer.willMergeTabToGroup(tab, Tab.INVALID_TAB_ID, tabGroupId);
+                observer.didMergeTabToGroup(tab);
+            }
         }
 
         if (selectTab) setIndex(finalIndex, TabSelectionType.FROM_NEW);
@@ -563,6 +587,8 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
 
     @Override
     public void completeInitialization() {
+        // NOTE: This method is only called on the regular tab model. Incognito tab models do not
+        // get notified.
         assertOnUiThread();
         assert !mInitializationComplete : "TabCollectionTabModelImpl initialized multiple times.";
         mInitializationComplete = true;
@@ -651,8 +677,12 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
             }
         }
 
+        int offset = tabs.size() - 1;
+        Tab lastTab = tabs.get(offset);
+        curIndex += offset;
+        finalIndex += offset;
         for (TabGroupModelFilterObserver observer : mTabGroupObservers) {
-            observer.didMoveTabGroup(firstTab, finalIndex, curIndex);
+            observer.didMoveTabGroup(lastTab, curIndex, finalIndex);
         }
     }
 
@@ -731,7 +761,19 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
     public int representativeIndexOf(@Nullable Tab tab) {
         // TODO(crbug.com/428692223): Revisit the performance of this method by doing it in C++.
         if (tab == null) return TabList.INVALID_TAB_INDEX;
-        return getRepresentativeTabList().indexOf(tab);
+        Token tabGroupId = tab.getTabGroupId();
+        boolean isTabGroup = tabGroupId != null;
+
+        List<Tab> representativeTabList = getRepresentativeTabList();
+        for (int i = 0; i < representativeTabList.size(); i++) {
+            Tab representativeTab = representativeTabList.get(i);
+            if (representativeTab == tab
+                    || (isTabGroup
+                            && Objects.equals(tabGroupId, representativeTab.getTabGroupId()))) {
+                return i;
+            }
+        }
+        return TabList.INVALID_TAB_INDEX;
     }
 
     @Override
@@ -802,18 +844,34 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         if (tab == null) return;
 
         Token tabGroupId = tab.getTabGroupId();
-        if (tabGroupId == null) return;
+        if (tabGroupId != null) {
+            moveGroupToIndex(tabGroupId, newIndex);
+            return;
+        }
 
-        moveGroupToIndex(tabGroupId, newIndex);
+        // TODO(crbug.com/433947821): TabListMediator uses this API for individual tab reordering
+        // and expects to get a notification that a group has moved. However, this is not a group.
+        // We should consider refactoring TabListMediator to use a different API for individual tab
+        // reordering (or also listen to didMoveTab()).
+        int curIndex = indexOf(tab);
+        int finalIndex =
+                moveTabInternal(
+                        tab,
+                        curIndex,
+                        newIndex,
+                        /* newTabGroupId= */ null,
+                        /* isPinned= */ tab.getIsPinned());
+        if (finalIndex != curIndex) {
+            for (TabGroupModelFilterObserver observer : mTabGroupObservers) {
+                observer.didMoveTabGroup(tab, curIndex, finalIndex);
+            }
+        }
     }
 
     @Override
     public boolean willMergingCreateNewGroup(List<Tab> tabsToMerge) {
         assertOnUiThread();
-        for (Tab tab : tabsToMerge) {
-            if (tab.getTabGroupId() != null) return false;
-        }
-        return true;
+        return getCandidateTabGroupIdsForMerge(tabsToMerge).isEmpty();
     }
 
     @Override
@@ -821,25 +879,44 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         assertOnUiThread();
         assert tab.getTabGroupId() == null;
 
-        // TODO(crbug.com/429145597): Investigate using mergeTabsToGroup instead.
-        Token tabGroupId = createDetachedTabGroup();
-        int index = indexOf(tab);
-        moveTabInternal(tab, index, index, tabGroupId, /* isPinned= */ false);
-
-        for (TabGroupModelFilterObserver observer : mTabGroupObservers) {
-            observer.didCreateNewGroup(tab, this);
-        }
+        mergeListOfTabsToGroup(Collections.singletonList(tab), tab, /* notify= */ true);
     }
 
     @Override
-    public void createTabGroupForTabGroupSync(List<Tab> tabs, Token tabGroupId) {}
+    public void createTabGroupForTabGroupSync(List<Tab> tabs, Token tabGroupId) {
+        if (tabs.isEmpty()) return;
+
+        mergeListOfTabsToGroupInternal(tabs, tabs.get(0), /* notify= */ false, tabGroupId);
+    }
 
     @Override
     public void mergeTabsToGroup(
-            @TabId int sourceTabId, @TabId int destinationTabId, boolean skipUpdateTabModel) {}
+            @TabId int sourceTabId, @TabId int destinationTabId, boolean skipUpdateTabModel) {
+        Tab sourceTab = getTabById(sourceTabId);
+        if (sourceTab == null) return;
+
+        Tab destinationTab = getTabById(destinationTabId);
+        if (destinationTab == null) return;
+
+        List<Tab> tabsToMerge;
+        Token sourceTabGroupId = sourceTab.getTabGroupId();
+        if (sourceTabGroupId == null) {
+            tabsToMerge = Collections.singletonList(sourceTab);
+        } else {
+            tabsToMerge = getTabsInGroup(sourceTabGroupId);
+        }
+        // TODO(crbug.com/429145597): Investigate if we need to do more when skipUpdateTabModel is
+        // true. We cannot do what TabGroupModelFilterImpl does, which skips all TabModel updates
+        // despite updating the group data as that would put the TabCollection storage layer into a
+        // bad state.
+        mergeListOfTabsToGroup(tabsToMerge, destinationTab, !skipUpdateTabModel);
+    }
 
     @Override
-    public void mergeListOfTabsToGroup(List<Tab> tabs, Tab destinationTab, boolean notify) {}
+    public void mergeListOfTabsToGroup(List<Tab> tabs, Tab destinationTab, boolean notify) {
+        mergeListOfTabsToGroupInternal(
+                tabs, destinationTab, notify, /* tabGroupIdForNewGroup= */ null);
+    }
 
     @Override
     public TabUngrouper getTabUngrouper() {
@@ -851,7 +928,9 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
             Tab tab,
             int originalIndex,
             @TabId int originalRootId,
-            @Nullable Token originalTabGroupId) {}
+            @Nullable Token originalTabGroupId) {
+        // TODO(crbug.com/432794806): Support undoable group operations.
+    }
 
     @Override
     public Set<Token> getAllTabGroupIds() {
@@ -878,12 +957,17 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
 
     @Override
     public boolean isTabGroupHiding(@Nullable Token tabGroupId) {
+        // TODO(crbug.com/428977566): This is used to differentiate a deletion from a hide.
+        // Presently all tab group closures are treated as deletions. This should be tracked
+        // based on the parameters provided in closeTabs() and the tracking information can be
+        // dropped once the tab closure is complete.
         return false;
     }
 
     @Override
     public LazyOneshotSupplier<Set<Token>> getLazyAllTabGroupIds(
             List<Tab> tabsToExclude, boolean includePendingClosures) {
+        // TODO(crbug.com/429145597): Implement this method using a filter on getAllTabGroupIds().
         return LazyOneshotSupplier.fromValue(Collections.emptySet());
     }
 
@@ -1080,6 +1164,22 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
 
     // Internal methods.
 
+    private boolean shouldGroupWithParent(Tab tab, @Nullable Tab parentTab) {
+        if (parentTab == null) return false;
+
+        @TabLaunchType int tabLaunchType = tab.getLaunchType();
+        boolean shouldGroupWithParentForTabListInterface =
+                tabLaunchType == TabLaunchType.FROM_TAB_LIST_INTERFACE
+                        && parentTab.getTabGroupId() != null;
+
+        return mModelDelegate.isTabModelRestored()
+                && (tabLaunchType == TabLaunchType.FROM_TAB_GROUP_UI
+                        || tabLaunchType == TabLaunchType.FROM_LONGPRESS_FOREGROUND_IN_GROUP
+                        || tabLaunchType == TabLaunchType.FROM_LONGPRESS_BACKGROUND_IN_GROUP
+                        || tabLaunchType == TabLaunchType.FROM_COLLABORATION_BACKGROUND_IN_GROUP
+                        || shouldGroupWithParentForTabListInterface);
+    }
+
     private void finalizeTabClosure(Tab tab, @TabClosingSource int closingSource) {
         mTabContentManager.removeTabThumbnail(tab.getId());
 
@@ -1165,7 +1265,7 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         }
 
         for (Map.Entry<Token, @Nullable Tab> tabGroupShownTab : tabGroupShownTabs.entrySet()) {
-            // TODO(crbug.com/429145597):: Keep these open for undoable closures.
+            // TODO(crbug.com/429145597): Keep these open for undoable closures.
             if (tabGroupShownTab.getValue() == null) {
                 TabCollectionTabModelImplJni.get()
                         .closeDetachedTabGroup(
@@ -1203,6 +1303,100 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         // The C++ side will adjust to a valid index.
         moveTabInternal(
                 tab, currentIndex, currentIndex, /* newTabGroupId= */ null, isPinned);
+    }
+
+    public void mergeListOfTabsToGroupInternal(
+            List<Tab> tabs,
+            Tab destinationTab,
+            boolean notify,
+            @Nullable Token tabGroupIdForNewGroup) {
+        assertOnUiThread();
+        if (mNativeTabCollectionTabModelImplPtr == 0) return;
+
+        if (areAnyTabsPartOfSharedGroup(this, tabs, destinationTab.getTabGroupId())) return;
+
+        List<Token> candidateTabGroupIds = getCandidateTabGroupIdsForMerge(tabs);
+        boolean willCreateNewGroup =
+                candidateTabGroupIds.isEmpty() && destinationTab.getTabGroupId() == null;
+        assert tabGroupIdForNewGroup == null || willCreateNewGroup
+                : "A new tab group ID should not be provided if the merge contains a tab group.";
+
+        boolean wasDestinationTabInGroup = destinationTab.getTabGroupId() != null;
+
+        final Token destinationTabGroupId;
+        final boolean adoptCandidateGroupId;
+        if (wasDestinationTabInGroup) {
+            // Case 1: The destination tab is already part of a group we will reuse it.
+            destinationTabGroupId = destinationTab.getTabGroupId();
+            adoptCandidateGroupId = false;
+        } else if (willCreateNewGroup) {
+            // Case 2: None of the tabs are part of a group and we will create a new group.
+            destinationTabGroupId =
+                    tabGroupIdForNewGroup == null ? Token.createRandom() : tabGroupIdForNewGroup;
+            createDetachedTabGroup(destinationTabGroupId);
+            adoptCandidateGroupId = false;
+        } else {
+            // Case 3: At least one of the tabs being merged is part of a group. Reuse the first
+            // group found's metadata.
+            destinationTabGroupId = candidateTabGroupIds.get(0);
+            adoptCandidateGroupId = true;
+        }
+        assert destinationTabGroupId != null;
+        // All other candidate groups will be consumed/deleted. Ensure the destinationTabGroupId is
+        // kept if it came from the list of candidateTabGroupIds.
+        candidateTabGroupIds.remove(destinationTabGroupId);
+
+        if (adoptCandidateGroupId) {
+            moveGroupToIndex(destinationTabGroupId, indexOf(destinationTab));
+        }
+
+        if (!wasDestinationTabInGroup) {
+            int index = indexOf(destinationTab);
+            moveTabInternal(
+                    destinationTab, index, index, destinationTabGroupId, /* isPinned= */ false);
+        }
+
+        // Adopt the title of the first candidate group with a title that was merged into the
+        // destination group if the destination group does not have a title.
+        if (TextUtils.isEmpty(getTabGroupTitle(destinationTabGroupId))) {
+            for (Token tabGroupId : candidateTabGroupIds) {
+                String title = getTabGroupTitle(tabGroupId);
+                if (!TextUtils.isEmpty(title)) {
+                    setTabGroupTitle(destinationTabGroupId, title);
+                    break;
+                }
+            }
+        }
+
+        int endIndex = getCount();
+        for (Tab tab : tabs) {
+            if (tab == destinationTab) continue;
+
+            if (destinationTabGroupId.equals(tab.getTabGroupId())) continue;
+
+            // Move all the tabs to the end of the tab group. The native code will find the right
+            // index to insert the tab.
+            moveTabInternal(
+                    tab, indexOf(tab), endIndex, destinationTabGroupId, /* isPinned= */ false);
+        }
+
+        for (TabGroupModelFilterObserver observer : mTabGroupObservers) {
+            if (willCreateNewGroup) {
+                observer.didCreateNewGroup(destinationTab, this);
+            }
+
+            // TODO(crbug.com/429145597): If notify is set trigger the undo snackbar.
+
+            for (Token tabGroupId : candidateTabGroupIds) {
+                observer.didRemoveTabGroup(
+                        Tab.INVALID_TAB_ID, tabGroupId, DidRemoveTabGroupReason.MERGE);
+
+                // TODO(crbug.com/429145597): Don't delete this yet if the undo snackbar is
+                // triggered. Instead wait for the undo bar to be dismissed.
+                TabCollectionTabModelImplJni.get()
+                        .closeDetachedTabGroup(mNativeTabCollectionTabModelImplPtr, tabGroupId);
+            }
+        }
     }
 
     /**
@@ -1319,8 +1513,22 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
         return finalIndex;
     }
 
-    private Token createDetachedTabGroup() {
-        Token tabGroupId = Token.createRandom();
+    private List<Token> getCandidateTabGroupIdsForMerge(List<Tab> tabsToMerge) {
+        HashSet<Token> processedTabGroups = new HashSet<>();
+        List<Token> candidateTabGroupIds = new ArrayList<>();
+        for (Tab tab : tabsToMerge) {
+            Token tabGroupId = tab.getTabGroupId();
+            if (tabGroupId == null || processedTabGroups.contains(tabGroupId)) continue;
+
+            if (tabsToMerge.containsAll(getTabsInGroup(tabGroupId))) {
+                candidateTabGroupIds.add(tabGroupId);
+            }
+            processedTabGroups.add(tabGroupId);
+        }
+        return candidateTabGroupIds;
+    }
+
+    private void createDetachedTabGroup(Token tabGroupId) {
         @TabGroupColorId int colorId = TabGroupColorUtils.getNextSuggestedColorId(this);
 
         TabCollectionTabModelImplJni.get()
@@ -1330,7 +1538,6 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
                         /* title= */ "",
                         colorId,
                         /* isCollapsed= */ false);
-        return tabGroupId;
     }
 
     /**
@@ -1339,7 +1546,7 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
      */
     private boolean wasLastTabInGroupAndNotifyDidMoveTabOutOfGroup(
             Tab tab, Token oldTabGroupId, int finalIndex) {
-        int prevFilterIndex = getFirstTabIndexInGroup(oldTabGroupId);
+        int prevFilterIndex = representativeIndexOf(getLastShownTabForGroup(oldTabGroupId));
         boolean isLastTabInGroup = prevFilterIndex == TabList.INVALID_TAB_INDEX;
         if (isLastTabInGroup) {
             prevFilterIndex = finalIndex;
@@ -1348,13 +1555,6 @@ public class TabCollectionTabModelImpl extends TabModelJniBridge
             observer.didMoveTabOutOfGroup(tab, prevFilterIndex);
         }
         return isLastTabInGroup;
-    }
-
-    private int getFirstTabIndexInGroup(Token tabGroupId) {
-        // TODO(crbug.com/428692223): Optimize this by requesting it from the collection.
-        List<Tab> tabsInGroup = getTabsInGroup(tabGroupId);
-        if (tabsInGroup.isEmpty()) return TabList.INVALID_TAB_INDEX;
-        return indexOf(tabsInGroup.get(0));
     }
 
     private @Nullable Tab getLastShownTabForGroup(Token tabGroupId) {

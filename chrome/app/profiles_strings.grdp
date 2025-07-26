@@ -548,11 +548,6 @@
         Sorry, your password could not be verified. Please try again.
       </message>
     </if>
-    <!-- On Sign-in Avatar Button Label Desktop -->
-    <!-- TODO(crbug.com/417928515): Finalize the string and make it translateable. -->
-    <message translateable="false" name="IDS_AVATAR_BUTTON_MAKING_CHROME_YOURS" desc="">
-      Making Chrome Yours
-    </message>
   </if>
 
   <if expr="not is_chromeos and not is_android">
@@ -702,6 +697,9 @@
     </message>
     <message name="IDS_ENTERPRISE_VALUE_PROPOSITION_CONSUMER_SUBTITLE" desc="Subtitle the value proposition dialog for creating an enterprise profile.">
       Sign in to get your passwords and more on all your devices
+    </message>
+    <message name="IDS_ENTERPRISE_VALUE_PROPOSITION_CONSUMER_SUBTITLE_WITH_BOOKMARKS" desc="Subtitle the value proposition dialog for creating an enterprise profile.">
+      Sign in to get your passwords, bookmarks, and more on all your devices
     </message>
     <message name="IDS_ENTERPRISE_VALUE_PROPOSITION_SCHOOL_SUBTITLE" desc="Subtitle the value proposition dialog for creating an enterprise profile for school.">
       Set up a school profile to save and use your passwords and more in your account

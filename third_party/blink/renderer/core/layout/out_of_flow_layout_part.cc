@@ -1512,7 +1512,7 @@ void OutOfFlowLayoutPart::LayoutFragmentainerDescendants(
   // add repeated elements to every fragmentainer that exists, but if there's a
   // nested OOF that triggers creation of additional fragmentainers, we'll need
   // to add the fixed-positioned elements to those as well.
-  wtf_size_t previous_repeaded_fixedpos_resume_idx = WTF::kNotFound;
+  wtf_size_t previous_repeaded_fixedpos_resume_idx = kNotFound;
 
   while (!descendants->empty()) {
     ComputeInlineContainingBlocksForFragmentainer(*descendants);
@@ -1690,7 +1690,7 @@ void OutOfFlowLayoutPart::LayoutFragmentainerDescendants(
         // fragmentainers in the next iteration (because of nested OOFs), we
         // need to resume those when a new fragmentainer is added.
         DCHECK(container_builder_->Node().IsPaginatedRoot());
-        DCHECK(previous_repeaded_fixedpos_resume_idx == WTF::kNotFound ||
+        DCHECK(previous_repeaded_fixedpos_resume_idx == kNotFound ||
                previous_repeaded_fixedpos_resume_idx <=
                    descendants_to_layout.size());
         previous_repeaded_fixedpos_resume_idx = descendants_to_layout.size();
@@ -2341,31 +2341,6 @@ OutOfFlowLayoutPart::TryCalculateOffset(
   const InsetModifiedContainingBlock imcb = ComputeInsetModifiedContainingBlock(
       node_info.node, space.AvailableSize(), alignment, insets, static_position,
       container_writing_direction, candidate_writing_direction);
-
-  {
-    auto& document = node_info.node.GetDocument();
-    if (alignment.inline_alignment.GetPosition() != ItemPosition::kNormal) {
-      if (insets.inline_start && insets.inline_end) {
-        UseCounter::Count(document,
-                          WebFeature::kOutOfFlowJustifySelfBothInsets);
-      } else if (insets.inline_start || insets.inline_end) {
-        UseCounter::Count(document,
-                          WebFeature::kOutOfFlowJustifySelfSingleInset);
-      } else {
-        UseCounter::Count(document, WebFeature::kOutOfFlowJustifySelfNoInsets);
-      }
-    }
-
-    if (alignment.block_alignment.GetPosition() != ItemPosition::kNormal) {
-      if (insets.block_start && insets.block_end) {
-        UseCounter::Count(document, WebFeature::kOutOfFlowAlignSelfBothInsets);
-      } else if (insets.block_start || insets.block_end) {
-        UseCounter::Count(document, WebFeature::kOutOfFlowAlignSelfSingleInset);
-      } else {
-        UseCounter::Count(document, WebFeature::kOutOfFlowAlignSelfNoInsets);
-      }
-    }
-  }
 
   const BoxStrut border_padding = ComputeBorders(space, node_info.node) +
                                   ComputePadding(space, candidate_style);

@@ -45,8 +45,8 @@ constexpr int kImageCompressionQuality = 30;
 constexpr int kImageMaxArea = 1000000;
 constexpr int kImageMaxHeight = 1000;
 constexpr int kImageMaxWidth = 1000;
+constexpr char kClientUploadDurationQueryParameter[] = "cud";
 constexpr char kQuerySubmissionTimeQueryParameter[] = "qsubts";
-constexpr char kUserPerceivedQuerySubmissionTimeQueryParameter[] = "pqsubts";
 constexpr char kQueryText[] = "query";
 
 class MockPage : public composebox::mojom::Page {
@@ -173,10 +173,14 @@ class ComposeboxHandlerTest : public ChromeRenderViewHostTestHarness {
     // Set all the feature params here to keep the test consistent if future
     // default values are changed.
     scoped_config_.Get().enabled = true;
-    scoped_config_.Get().downscale_max_image_size = kImageMaxArea;
-    scoped_config_.Get().image_compression_quality = kImageCompressionQuality;
-    scoped_config_.Get().downscale_max_image_height = kImageMaxHeight;
-    scoped_config_.Get().downscale_max_image_width = kImageMaxWidth;
+
+    auto* image_upload = scoped_config_.Get()
+                             .config.mutable_composebox()
+                             ->mutable_image_upload();
+    image_upload->set_downscale_max_image_size(kImageMaxArea);
+    image_upload->set_downscale_max_image_width(kImageMaxWidth);
+    image_upload->set_downscale_max_image_height(kImageMaxHeight);
+    image_upload->set_image_compression_quality(kImageCompressionQuality);
   }
 
   ComposeboxHandler& handler() { return *handler_; }
@@ -218,15 +222,15 @@ class ComposeboxHandlerTest : public ChromeRenderViewHostTestHarness {
     EXPECT_TRUE(net::GetValueForKeyInQuery(
         url, kQuerySubmissionTimeQueryParameter, &qsubts_param));
 
-    std::string pqsubts_param;
+    std::string cud_param;
     EXPECT_TRUE(net::GetValueForKeyInQuery(
-        url, kUserPerceivedQuerySubmissionTimeQueryParameter, &pqsubts_param));
+        url, kClientUploadDurationQueryParameter, &cud_param));
 
     GURL result_url = url;
     result_url = net::AppendOrReplaceQueryParameter(
         result_url, kQuerySubmissionTimeQueryParameter, std::nullopt);
     result_url = net::AppendOrReplaceQueryParameter(
-        result_url, kUserPerceivedQuerySubmissionTimeQueryParameter,
+        result_url, kClientUploadDurationQueryParameter,
         std::nullopt);
     return result_url;
   }
@@ -359,13 +363,14 @@ TEST_F(ComposeboxHandlerTest, AddFile_Image) {
 
   EXPECT_EQ(callback_token, controller_file_info->file_token_);
   EXPECT_TRUE(image_options.has_value());
+
+  auto image_upload = scoped_config().Get().config.composebox().image_upload();
   EXPECT_EQ(image_options->max_height,
-            scoped_config().downscale_max_image_height);
-  EXPECT_EQ(image_options->max_size, scoped_config().downscale_max_image_size);
-  EXPECT_EQ(image_options->max_width,
-            scoped_config().downscale_max_image_width);
+            image_upload.downscale_max_image_height());
+  EXPECT_EQ(image_options->max_size, image_upload.downscale_max_image_size());
+  EXPECT_EQ(image_options->max_width, image_upload.downscale_max_image_width());
   EXPECT_EQ(image_options->compression_quality,
-            scoped_config().image_compression_quality);
+            image_upload.image_compression_quality());
 }
 
 TEST_F(ComposeboxHandlerTest, DeleteFile_Success) {
@@ -415,7 +420,8 @@ TEST_P(ComposeboxHandlerFileUploadStatusTest, FileUploadStatusChanged) {
 
   const auto expected_status = GetParam();
   base::UnguessableToken token = base::UnguessableToken::Create();
-  handler().OnFileUploadStatusChanged(token, expected_status, std::nullopt);
+  handler().OnFileUploadStatusChanged(token, lens::MimeType::kPdf,
+                                      expected_status, std::nullopt);
   mock_page_.FlushForTesting();
 
   EXPECT_EQ(expected_status, status);

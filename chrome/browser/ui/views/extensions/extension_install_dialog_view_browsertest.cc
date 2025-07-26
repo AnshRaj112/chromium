@@ -1029,8 +1029,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionInstallDialogPictureInPictureInputProtectorTest,
   // Ensure that the extension install dialog and picture-in-picture widgets
   // overlap.
   ResizeWidgetAndWaitIfNeeded(
-      delegate_view->GetWidget(),
-      browser_view->GetWidget()->GetWindowBoundsInScreen(), pip_window_manager);
+      browser_view->GetWidget(),
+      delegate_view->GetWidget()->GetWindowBoundsInScreen(),
+      pip_window_manager);
   ASSERT_TRUE(
       WidgetsOverlap(delegate_view->GetWidget(), browser_view->GetWidget()));
 
@@ -1079,8 +1080,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionInstallDialogPictureInPictureInputProtectorTest,
   // Occlude, and immediately un-occlude, the extension install dialog with a
   // picture-in-picture window.
   ResizeWidgetAndWaitIfNeeded(
-      delegate_view->GetWidget(),
-      browser_view->GetWidget()->GetWindowBoundsInScreen(), pip_window_manager);
+      browser_view->GetWidget(),
+      delegate_view->GetWidget()->GetWindowBoundsInScreen(),
+      pip_window_manager);
   ASSERT_TRUE(
       WidgetsOverlap(delegate_view->GetWidget(), browser_view->GetWidget()));
 

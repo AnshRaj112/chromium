@@ -439,7 +439,6 @@ class WaylandConnection {
   // capabilities to create wl_buffers.
   std::unique_ptr<WaylandBufferFactory> buffer_factory_;
 
-  std::unique_ptr<WaylandSeat> seat_;
   std::unique_ptr<WaylandCursor> cursor_;
   std::unique_ptr<WaylandDataDeviceManager> data_device_manager_;
   std::unique_ptr<WaylandOutputManager> output_manager_;
@@ -451,6 +450,7 @@ class WaylandConnection {
   std::unique_ptr<WaylandZwpRelativePointerManager>
       zwp_relative_pointer_manager_;
   std::unique_ptr<WaylandZwpPointerGestures> zwp_pointer_gestures_;
+  std::unique_ptr<WaylandSeat> seat_;
   std::unique_ptr<WaylandBufferManagerHost> buffer_manager_host_;
   std::unique_ptr<XdgActivation> xdg_activation_;
   std::unique_ptr<XdgForeignWrapper> xdg_foreign_;

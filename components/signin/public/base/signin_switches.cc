@@ -221,9 +221,22 @@ BASE_FEATURE(kFullscreenSignInPromoUseDate,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
+// Enables access to the Grammatical Gender account capabilities. Note that the
+// Neuter gender is also behind the additional flag,
+// kNeuterGrammaticalGenderCapability.
+BASE_FEATURE(kGrammaticalGenderCapabilities,
+             "GrammaticalGenderCapabilities",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kInterceptBubblesDismissibleByAvatarButton,
              "InterceptBubblesDismissibleByAvatarButton",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables access to the Neuter grammatical gender account capability. Note that
+// this is also behind the additional flag, kGrammaticalGenderCapabilities.
+BASE_FEATURE(kNeuterGrammaticalGenderCapability,
+             "NeuterGrammaticalGenderCapability",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kOfferMigrationToDiceUsers,
              "OfferMigrationToDiceUsers",
@@ -270,6 +283,10 @@ BASE_FEATURE(kSignInPromoMaterialNextUI,
              "SignInPromoMaterialNextUI",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kChromeIdentitySurveyAddressBubbleSignin,
+             "ChromeIdentitySurveyAddressBubbleSignin",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kChromeIdentitySurveyDiceWebSigninAccepted,
              "ChromeIdentitySurveyDiceWebSigninAccepted",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -282,20 +299,20 @@ BASE_FEATURE(kChromeIdentitySurveyFirstRunSignin,
              "ChromeIdentitySurveyFirstRunSignin",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kChromeIdentitySurveyProfilePickerAddProfileSignin,
-             "ChromeIdentitySurveyProfilePickerAddProfileSignin",
+BASE_FEATURE(kChromeIdentitySurveyPasswordBubbleSignin,
+             "ChromeIdentitySurveyPasswordBubbleSignin",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kChromeIdentitySurveyProfileMenuDismissed,
+             "ChromeIdentitySurveyProfileMenuDismissed",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kChromeIdentitySurveyProfileMenuSignin,
              "ChromeIdentitySurveyProfileMenuSignin",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kChromeIdentitySurveyPasswordBubbleSignin,
-             "ChromeIdentitySurveyPasswordBubbleSignin",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kChromeIdentitySurveyAddressBubbleSignin,
-             "ChromeIdentitySurveyAddressBubbleSignin",
+BASE_FEATURE(kChromeIdentitySurveyProfilePickerAddProfileSignin,
+             "ChromeIdentitySurveyProfilePickerAddProfileSignin",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kChromeIdentitySurveySigninInterceptProfileSeparation,
@@ -303,16 +320,17 @@ BASE_FEATURE(kChromeIdentitySurveySigninInterceptProfileSeparation,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kChromeIdentitySurveySigninPromoBubbleDismissed,
-             "ChromeIdentitySurveyBubbleSigninPromoDismissed",
+             "ChromeIdentitySurveySigninPromoBubbleDismissed",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfileMenu,
-             "ChromeIdentitySurveySwitchProfileFromProfileMenus",
+             "ChromeIdentitySurveySwitchProfileFromProfileMenu",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfilePicker,
              "ChromeIdentitySurveySwitchProfileFromProfilePicker",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)

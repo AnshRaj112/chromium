@@ -15,9 +15,11 @@
 #include "base/containers/to_vector.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
+#include "base/strings/string_util.h"
 #include "base/strings/string_view_util.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/threading/thread_restrictions.h"
@@ -59,11 +61,13 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
+#include "base/test/bind.h"
 #include "chrome/browser/ssl/ssl_browsertest_util.h"
 #include "net/base/features.h"
 #include "net/cert/internal/trust_store_chrome.h"
 #include "net/cert/x509_util.h"
 #include "net/test/cert_builder.h"
+#include "third_party/boringssl/src/include/openssl/ssl.h"
 #endif
 
 namespace {
@@ -1446,6 +1450,12 @@ INSTANTIATE_TEST_SUITE_P(
                     CTEnforcement::kDisabledByProto,
                     CTEnforcement::kDisabledByFeature));
 
+std::string X509CertificateToString(scoped_refptr<net::X509Certificate> cert) {
+  std::vector<std::string> pem_encoded_chain;
+  EXPECT_TRUE(cert->GetPEMEncodedChain(&pem_encoded_chain));
+  return base::JoinString(pem_encoded_chain, "\n");
+}
+
 // Checks that navigation responses were served over a connection where the
 // server provided the given `expected_server_certificate_chain`. Note that this
 // checks the certificate chain that the server served, not the chain that the
@@ -1479,7 +1489,12 @@ class CertificateCheckingThrottle : public content::NavigationThrottle {
     EXPECT_TRUE(navigation_handle()
                     ->GetSSLInfo()
                     ->unverified_cert->EqualsIncludingChain(
-                        expected_server_certificate_chain_.get()));
+                        expected_server_certificate_chain_.get()))
+        << "\n\nExpected server chain: "
+        << X509CertificateToString(expected_server_certificate_chain_)
+        << "\n\nObserved unverified server chain: "
+        << X509CertificateToString(
+               navigation_handle()->GetSSLInfo()->unverified_cert);
     ++num_responses_;
     return content::NavigationThrottle::PROCEED;
   }
@@ -1537,6 +1552,20 @@ class PKIMetadataComponentChromeRootStoreUpdateWithDoHServerTest
     net::SSLServerConfig server_config;
     server_config.intermediate_trust_anchor_id =
         base::ToVector(kIntermediateTrustAnchorId);
+    // TODO(crbug.com/431064813): this callback just adds some debugging
+    // info to try to investigate a flake. It can be removed once the cause of
+    // the flake is found.
+    server_config.client_hello_callback_for_testing =
+        base::BindLambdaForTesting([&](const SSL_CLIENT_HELLO* client_hello) {
+          const uint8_t* data = nullptr;
+          size_t len = 0;
+          SSL_early_callback_ctx_extension_get(
+              client_hello, TLSEXT_TYPE_trust_anchors, &data, &len);
+          LOG(ERROR) << "Trust anchor IDs from Client Hello: "
+                     << base::HexEncode(data, len);
+          return true;
+        });
+
     net::EmbeddedTestServer::ServerCertificateConfig certificate_config;
     certificate_config.intermediate =
         net::EmbeddedTestServer::IntermediateType::kInHandshake;
@@ -1711,6 +1740,9 @@ IN_PROC_BROWSER_TEST_F(
             ->CloneWithDifferentIntermediates({});
     ASSERT_EQ(server_certificate->intermediate_buffers().size(), 0u);
     SetExpectedCertificateOnResponses(server_certificate);
+
+    // TODO(crbug.com/431064813): remove after debugging test flake.
+    LOG(ERROR) << "Beginning navigation with Trust Anchor IDs";
 
     ASSERT_TRUE(ui_test_utils::NavigateToURL(
         browser(), trust_anchor_ids_server_.GetURL(kHostname, "/simple.html")));

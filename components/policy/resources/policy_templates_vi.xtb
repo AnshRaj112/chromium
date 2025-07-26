@@ -854,6 +854,33 @@ Nếu bạn đặt chính sách này thành Bật, thì nút bật tắt sẽ xu
 Nếu bạn không đặt chính sách này hoặc đặt chính sách này thành Tắt, thì nút bật tắt sẽ ẩn.
 
 Lưu ý: Chính sách này chỉ ảnh hưởng đến giao diện người dùng. ChromeOS sẽ giữ nguyên chế độ cài đặt hiện tại khi ẩn giao diện người dùng.</translation>
+<translation id="1579027593897822029">Danh sách thao tác sẽ diễn ra khi hết thời gian chờ do chính sách <ph name="IDLE_TIMEOUT_POLICY_NAME" /> quy định.
+
+Cảnh báo: Nếu bạn đặt chính sách này thì dữ liệu cá nhân trên máy có thể bị ảnh hưởng và bị xoá vĩnh viễn. Bạn nên kiểm tra chế độ cài đặt của mình trước khi triển khai để tránh trường hợp vô tình xoá dữ liệu cá nhân.
+
+Nếu bạn không đặt chính sách <ph name="IDLE_TIMEOUT_POLICY_NAME" />, chính sách này sẽ không có hiệu lực.
+
+Khi hết thời gian chờ do chính sách <ph name="IDLE_TIMEOUT_POLICY_NAME" /> quy định, trình duyệt sẽ thực hiện các thao tác được định cấu hình trong chính sách này.
+
+Nếu bạn để trống hoặc không đặt chính sách này thì chính sách <ph name="IDLE_TIMEOUT_POLICY_NAME" /> sẽ không có hiệu lực.
+
+Các thao tác được hỗ trợ là:
+
+"<ph name="CLOSE_BROWSERS_ACTION" />": đóng tất cả cửa sổ trình duyệt và PWA của hồ sơ này. Chưa hỗ trợ trên Android và iOS.
+
+"<ph name="CLOSE_TABS_ACTION" />": đóng toàn bộ thẻ đang mở trong các cửa sổ đang mở. Chỉ hỗ trợ trên iOS.
+
+"<ph name="SHOW_PROFILE_PICKER_ACTION" />": hiện cửa sổ Bộ chọn hồ sơ. Chưa hỗ trợ trên Android và iOS.
+
+"<ph name="SIGN_OUT_ACTION" />": Đăng xuất người dùng đang đăng nhập. Chỉ hỗ trợ trên iOS.
+
+"<ph name="CLEAR_BROWSING_HISTORY_ACTION" />", "<ph name="CLEAR_DOWNLOAD_HISTORY_ACTION" />", "<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />", "<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />", "<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />", "<ph name="CLEAR_AUTOFILL_ACTION" />", "<ph name="CLEAR_SITE_SETTINGS_ACTION" />", "<ph name="CLEAR_HOSTED_APP_DATA_ACTION" />": xoá dữ liệu duyệt web tương ứng. Hãy xem chính sách <ph name="CLEAR_BROWSING_DATA_ON_EXIT_LIST_POLICY_NAME" /> để biết thêm chi tiết. Các loại được hỗ trợ trên iOS là "<ph name="CLEAR_BROWSING_HISTORY_ACTION" />", "<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />", "<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />", "<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />" và "<ph name="CLEAR_AUTOFILL_ACTION" />"
+
+"<ph name="RELOAD_PAGES_ACTION" />": tải lại tất cả trang web. Đối với một số trang, người dùng có thể được nhắc xác nhận trước. Chưa hỗ trợ trên iOS.
+
+Người dùng sẽ vẫn đăng nhập vào Tài khoản Google khi xoá cookie bằng "<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />".
+
+Việc đặt "<ph name="CLEAR_BROWSING_HISTORY_ACTION" />", "<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />", "<ph name="CLEAR_AUTOFILL_ACTION" />" và "<ph name="CLEAR_SITE_SETTINGS_ACTION" />" sẽ tắt tính năng đồng bộ hoá đối với các loại dữ liệu tương ứng nếu "<ph name="CHROME_SYNC_NAME" />" không bị tắt bằng cách đặt chính sách <ph name="SYNC_DISABLED_POLICY_NAME" /> và <ph name="BROWSER_SIGNIN_POLICY_NAME" /> cũng không bị tắt.</translation>
 <translation id="1583248206450240930">Sử dụng <ph name="PRODUCT_FRAME_NAME" /> theo mặc định</translation>
 <translation id="1587585749332985896">Không cho phép sử dụng Chế độ không có giao diện người dùng</translation>
 <translation id="1588240398285670601">Cài đặt của trình duyệt</translation>
@@ -1073,7 +1100,6 @@ gặp sự cố do thay đổi này. Phiên bản cuối cùng hỗ trợ chính
 
       Lưu ý: Tùy chọn cài đặt này sẽ ghi đè chính sách <ph name="REMOTE_ACCESS_HOST_DOMAIN_POLICY_NAME" />, nếu có.</translation>
 <translation id="172374442286684480">Cho phép tất cả trang web lưu dữ liệu trên máy</translation>
-<translation id="1725541103767528536">Cho phép tự động điền bằng AI nhưng không tham gia cải tiến các mô hình AI.</translation>
 <translation id="1729169799290004131">Việc đặt chính sách này sẽ chỉ định tỷ lệ phần trăm độ sáng màn hình, tắt các tính năng tự động điều chỉnh độ sáng. Độ sáng màn hình ban đầu sẽ thay đổi theo giá trị của chính sách nhưng người dùng có thể thay đổi giá trị này.
 
       Nếu bạn không đặt chính sách này, các tùy chọn kiểm soát màn hình của người dùng và tính năng tự động điều chỉnh độ sáng sẽ không bị ảnh hưởng.
@@ -1506,6 +1532,9 @@ Thông thường, chính sách này bị Disabled (Tắt) để chống lừa đ
 <translation id="208566302163036794">Chặn các tính năng đã tắt</translation>
 <translation id="2086040449830622332">Bật Hộp cát LPAC dịch vụ in</translation>
 <translation id="208623333578980446">Cho phép khóa chế độ thức của màn hình để quản lý nguồn điện</translation>
+<translation id="2086505225896497574">Việc bạn đặt chính sách này sẽ chỉ định mã nhận dạng bên phụ thuộc của WebAuthn mà hệ thống sẽ không hiển thị lời nhắc khi trang web yêu cầu chứng chỉ chứng thực từ khoá bảo mật trên màn hình đăng nhập. Hệ thống cũng sẽ gửi một tín hiệu tới khoá bảo mật để cho biết có thể sử dụng chứng thực doanh nghiệp. Nếu bạn không đặt chính sách này thì khi các trang web yêu cầu chứng thực của khoá bảo mật, hệ thống sẽ hiển thị lời nhắc cho người dùng.
+
+Chính sách thiết bị này tương đương với chính sách người dùng <ph name="SECURITY_KEY_PERMIT_ATTESTATION_POLICY_NAME" /> hiện tại, nhưng áp dụng cho hồ sơ đăng nhập trên màn hình đăng nhập.</translation>
 <translation id="2089541797660774692">Bật tính năng báo cáo trên đám mây qua trình duyệt được quản lý</translation>
 <translation id="2090712407517297305">Trang Nhật ký duyệt web trên Chrome được sắp xếp theo nhóm sẽ hiển thị tại chrome://history/grouped.</translation>
 <translation id="2090939118981888335">Nếu bạn đặt chính sách này thành Bật, proxy nén dữ liệu sẽ được phép hoạt động. Nếu bạn đặt chính sách này thành Tắt, proxy nén dữ liệu sẽ không được phép hoạt động.
@@ -1711,7 +1740,6 @@ Nếu đặt chính sách này, thì bạn cần đặt chính sách <ph name="P
 Nếu bạn đặt chính sách này thành Tắt, người dùng sẽ không có chức năng này.
 
       Nếu bạn đặt chính sách này, người dùng sẽ không thay đổi được trong <ph name="PRODUCT_NAME" />. Nếu bạn không đặt chính sách này, hệ thống sẽ cho phép kiểm tra xem thông tin đăng nhập có bị rò rỉ hay không. Tuy nhiên, người dùng có thể tắt tính năng này.</translation>
-<translation id="220834508664708052">Cho phép tự động điền bằng AI và cải tiến các mô hình AI.</translation>
 <translation id="2208976000652006649">Tham số cho URL tìm kiếm sử dụng POST</translation>
 <translation id="2212011154693551439">Trang Nhật ký duyệt web trên Chrome được sắp xếp theo nhóm sẽ hiển thị tại chrome://history/grouped theo mặc định.</translation>
 <translation id="2212207215880394506">Không cho phép dùng tính năng Chỉnh sửa ảnh bằng AI tạo sinh.</translation>
@@ -3326,15 +3354,6 @@ Nếu bạn đặt chính sách này thành Tắt, tính năng gợi ý khi vi�
 <translation id="3387999258705169775">Hành vi mặc định cho hàm setTimeout() được lồng.</translation>
 <translation id="3388628790024977864">Không cho phép quy trình <ph name="CLOUD_UPLOAD_NAME" /> cho <ph name="GOOGLE_DRIVE_NAME" /> và <ph name="GOOGLE_WORKSPACE_NAME" /></translation>
 <translation id="3389088527709746815">Bật chế độ xác thực gnubby đối với máy chủ truy cập từ xa</translation>
-<translation id="3393332712712388726">Danh sách mẫu URL. Các yêu cầu bắt nguồn từ trang web do các nguồn gốc trùng khớp phân phát sẽ không phải trải qua bước kiểm tra <ph name="LOCAL_NETWORK_ACCESS" />.
-
-Nếu một nguồn gốc được áp dụng cả chính sách này và LocalNetworkAccessBlockedForUrls, thì LocalNetworkAccessBlockedForUrls sẽ được ưu tiên.
-
-Đối với những nguồn gốc không được áp dụng các mẫu nêu ở đây, cấu hình cá nhân của người dùng sẽ được áp dụng.
-
-Để biết thông tin chi tiết về mẫu URL hợp lệ, vui lòng truy cập https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns.
-
-Hãy truy cập https://github.com/explainers-by-googlers/local-network-access để biết các quy định hạn chế về <ph name="LOCAL_NETWORK_ACCESS" />.</translation>
 <translation id="3395744872155955051">Cho phép chọn tệp trực tiếp từ <ph name="GOOGLE_DRIVE_NAME" /></translation>
 <translation id="3397883909301547525">Không hiển thị ứng dụng đề xuất trong trình chạy <ph name="PRODUCT_OS_NAME" /></translation>
 <translation id="3398051852031115795">Hoạt động mặc định của hệ thống (phụ thuộc vào kích thước màn hình)</translation>
@@ -5242,6 +5261,19 @@ Sau quá trình thiết lập ban đầu, người dùng có thể bật hoặc 
 <translation id="468822697351680932">Sử dụng chính sách SiteList của Internet Explorer làm nguồn quy tắc</translation>
 <translation id="4693190628432874457">Bật tính năng báo cáo vị trí của thiết bị</translation>
 <translation id="4693779768620889402">Đích dựa trên tiện ích</translation>
+<translation id="4693956469331697434">Định cấu hình chế độ cài đặt thời gian lưu giữ dữ liệu duyệt web cho <ph name="PRODUCT_NAME" />. Chính sách này cho phép quản trị viên định cấu hình (theo loại dữ liệu) thời điểm trình duyệt xoá dữ liệu. Điều này hữu ích đối với những khách hàng làm việc với dữ liệu nhạy cảm của khách hàng.
+
+Cảnh báo: Nếu bạn đặt chính sách này thì dữ liệu cá nhân trên máy có thể bị ảnh hưởng và bị xoá vĩnh viễn. Bạn nên kiểm tra chế độ cài đặt của mình trước khi triển khai để tránh trường hợp vô tình xoá dữ liệu cá nhân.
+
+Dữ liệu duyệt web gồm có các loại sau đây: <ph name="DATA_TYPE_BROWSING_HISTORY" />, <ph name="DATA_TYPE_DOWNLOAD_HISTORY" />, <ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />, <ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />, <ph name="DATA_TYPE_PASSWORD" />, <ph name="DATA_TYPE_AUTOFILL" />, <ph name="DATA_TYPE_SITE_SETTINGS" /> và <ph name="DATA_TYPE_HOSTED_APP_DATA" />. <ph name="DATA_TYPE_DOWNLOAD_HISTORY" /> và <ph name="DATA_TYPE_HOSTED_APP_DATA" /> không được hỗ trợ trên Android.
+
+Trình duyệt sẽ tự động xoá dữ liệu thuộc các loại đã chọn có khoảng thời gian lưu giữ quá <ph name="TIME_TO_LIVE_IN_HOURS" />. Giá trị tối thiểu có thể đặt là 1 giờ.
+
+Dữ liệu hết hạn sẽ bị xoá sau 15 giây kể từ khi trình duyệt khởi động, sau đó sẽ bị xoá sau mỗi 30 phút trong khi trình duyệt đang chạy.
+
+Người dùng sẽ vẫn đăng nhập vào Tài khoản Google của mình khi xoá cookie.
+
+Cho đến Chrome 114, chính sách này yêu cầu đặt chính sách <ph name="SYNC_DISABLED_POLICY_NAME" /> thành true (đúng). Kể từ Chrome 115, việc bạn đặt chính sách này sẽ tắt tính năng đồng bộ hoá đối với các loại dữ liệu tương ứng nếu "<ph name="CHROME_SYNC_NAME" />" không bị tắt bằng cách đặt chính sách <ph name="SYNC_DISABLED_POLICY_NAME" /> và <ph name="BROWSER_SIGNIN_POLICY_NAME" /> cũng không bị tắt.</translation>
 <translation id="4694138212536142867">Bật tính năng báo cáo trạng thái phần cứng của thiết bị</translation>
 <translation id="4697581738794063407">Kiểm soát tính năng lọc tham số URL</translation>
 <translation id="4698895924806859508">Không báo cáo sự kiện mạng</translation>
@@ -5518,6 +5550,19 @@ Nếu bạn đặt chính sách này thành <ph name="ALLOW_PASSTHROUGH_OF_SEARC
 <translation id="4918261735182294270">Cho phép người dùng chọn có bật <ph name="CHROME_SYNC_NAME" /> hay không</translation>
 <translation id="491889618361437456">Bật tính năng tích hợp <ph name="GOOGLE_CALENDAR_NAME" /></translation>
 <translation id="4919122295221518724">Cho phép thắt chặt việc xử lý nội dung hỗn hợp</translation>
+<translation id="4919341087029582581">Định cấu hình danh sách các loại dữ liệu duyệt web cần xoá khi người dùng đóng tất cả cửa sổ trình duyệt.
+
+Cảnh báo: Nếu bạn đặt chính sách này thì dữ liệu cá nhân trên máy có thể bị ảnh hưởng và bị xoá vĩnh viễn. Bạn nên kiểm tra chế độ cài đặt của mình trước khi triển khai để tránh trường hợp vô tình xoá dữ liệu cá nhân.
+
+Dữ liệu duyệt web gồm có các loại sau đây: nhật ký duyệt web (<ph name="DATA_TYPE_BROWSING_HISTORY" />), nhật ký tải xuống (<ph name="DATA_TYPE_DOWNLOAD_HISTORY" />), cookie (<ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />), bộ nhớ đệm (<ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />), dữ liệu tự động điền (<ph name="DATA_TYPE_AUTOFILL" />), mật khẩu (<ph name="DATA_TYPE_PASSWORD" />), các chế độ cài đặt trang web (<ph name="DATA_TYPE_SITE_SETTINGS" />) và dữ liệu ứng dụng đã lưu trữ (<ph name="DATA_TYPE_HOSTED_APP_DATA" />). Chính sách này không được ưu tiên hơn <ph name="ALLOW_DELETING_BROWSER_HISTORY_POLICY_NAME" />.
+
+Người dùng sẽ vẫn đăng nhập vào Tài khoản Google của mình khi xoá cookie.
+
+Cho đến Chrome 114, chính sách này yêu cầu đặt chính sách <ph name="SYNC_DISABLED_POLICY_NAME" /> thành true (đúng). Kể từ Chrome 115, việc bạn đặt chính sách này sẽ tắt tính năng đồng bộ hoá đối với các loại dữ liệu tương ứng nếu "<ph name="CHROME_SYNC_NAME" />" không bị tắt bằng cách đặt chính sách <ph name="SYNC_DISABLED_POLICY_NAME" /> và <ph name="BROWSER_SIGNIN_POLICY_NAME" /> cũng không bị tắt.
+
+Nếu vì lý do nào đó mà quá trình xoá dữ liệu đã bắt đầu nhưng chưa hoàn tất, thì dữ liệu duyệt web sẽ bị xoá vào lần tải cấu hình tiếp theo.
+
+Nếu <ph name="PRODUCT_NAME" /> không thoát đúng cách (ví dụ: nếu trình duyệt hoặc hệ điều hành gặp sự cố), thì dữ liệu duyệt web sẽ không bị xoá vì trình duyệt đóng không phải là do việc đóng tất cả cửa sổ trình duyệt.</translation>
 <translation id="4921553515199936667">Nếu bạn đặt chính sách này thành true (đúng) hoặc không đặt, quá trình giải mã video sẽ được tăng tốc phần cứng khi có thể.
 
 Nếu bạn đặt chính sách này thành false (sai), quá trình giải mã video sẽ không bao giờ được tăng tốc phần cứng.
@@ -6857,6 +6902,7 @@ Chính sách này ảnh hưởng đến cả quy trình xác thực khi đăng n
       Lưu ý: Hãy phân tách các giá trị bằng dấu phẩy.</translation>
 <translation id="5693469654327063861">Cho phép di chuyển dữ liệu</translation>
 <translation id="56936613186060503">Trình quản lý tải xuống sẽ không có lựa chọn lưu tệp vào <ph name="GOOGLE_DRIVE_NAME" />.</translation>
+<translation id="569457565603183">URL/miền đã tự động cho phép chứng thực Khoá bảo mật trực tiếp trên màn hình đăng nhập</translation>
 <translation id="5695209488612697377">Cho phép sử dụng nhà cung cấp dịch vụ tìm kiếm mặc định trên trình đơn ngữ cảnh.
 
           Nếu bạn tắt chính sách này, thì mục trình đơn ngữ cảnh tìm kiếm sẽ không hiện đối với nhà cung cấp dịch vụ tìm kiếm mặc định.
@@ -7048,17 +7094,6 @@ Nếu bạn không đặt chính sách này thì hành vi của chính sách s�
 <translation id="5860010874344790473">Nếu bạn đặt chính sách thành Bật, thiết bị sẽ gửi nhật ký hệ thống đến máy chủ quản lý, để cho phép quản trị viên theo dõi nhật ký hệ thống.
 
       Nếu bạn không đặt hoặc đặt chính sách này thành Tắt, thì thiết bị sẽ không báo cáo nhật ký hệ thống.</translation>
-<translation id="5860520143792505638">Danh sách mẫu URL. Trang web do các nguồn gốc trùng khớp phân phát sẽ không thể gửi yêu cầu <ph name="LOCAL_NETWORK_ACCESS" />.
-
-Nếu một nguồn gốc được áp dụng cả chính sách này và LocalNetworkAccessAllowedForUrls, thì chính sách này sẽ được ưu tiên.
-
-Tuỳ thuộc vào giai đoạn triển khai <ph name="LOCAL_NETWORK_ACCESS" />, bạn cũng có thể cần bật LocalNetworkAccessRestrictionsEnabled để chính sách này chặn các yêu cầu <ph name="LOCAL_NETWORK_ACCESS" />.
-
-Đối với những nguồn gốc không được áp dụng các mẫu nêu ở đây, cấu hình cá nhân của người dùng sẽ được áp dụng.
-
-Để biết thông tin chi tiết về mẫu URL hợp lệ, vui lòng truy cập https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns.
-
-Hãy truy cập https://github.com/explainers-by-googlers/local-network-access để biết các quy định hạn chế về <ph name="LOCAL_NETWORK_ACCESS" />.</translation>
 <translation id="5861856285460256766">Cấu hình mã truy cập dành cho cha mẹ</translation>
 <translation id="5864898931148094192">Kiểm soát chế độ hiển thị của thông tin về nguồn gốc tiện ích trên trang Thẻ mới</translation>
 <translation id="5868414965372171132">Cấu hình mạng ở mức người dùng</translation>
@@ -11629,11 +11664,6 @@ Nếu bạn đặt chính sách này thành Disabled (Tắt) thì tất cả cá
       Nếu một mẫu URL có trong cả chính sách này và chính sách <ph name="SENSORS_BLOCKED_FOR_URLS_POLICY_NAME" /> thì chính sách thứ hai sẽ được ưu tiên và việc sử dụng cảm biến chuyển động hoặc cảm biến ánh sáng sẽ bị chặn.
 
       Để biết thông tin chi tiết về các mẫu <ph name="URL_LABEL" /> hợp lệ, vui lòng xem tại https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. Cho phép sử dụng ký tự đại diện <ph name="WILDCARD_VALUE" />.</translation>
-<translation id="9002299469625801504">Nếu bạn đặt chính sách này thành Bật thì bất cứ khi nào một cảnh báo dự kiến sẽ xuất hiện trong <ph name="DEV_TOOLS_NAME" /> do không kiểm tra được <ph name="LOCAL_NETWORK_ACCCESS" />, yêu cầu chính sẽ bị chặn.
-
-Nếu bạn đặt chính sách này thành Tắt hoặc không đặt, các yêu cầu <ph name="LOCAL_NETWORK_ACCESS" /> sẽ sử dụng chế độ xử lý mặc định cho các yêu cầu này.
-
-Hãy truy cập https://github.com/explainers-by-googlers/local-network-access để biết các quy định hạn chế về <ph name="LOCAL_NETWORK_ACCESS" />.</translation>
 <translation id="9003823644527627017">Định cấu hình máy ảo Bruschetta trên <ph name="PRODUCT_OS_NAME" /></translation>
 <translation id="9004469022085379212">Nếu bạn đặt chính sách này thành Bật, thì thiết bị sẽ chạy máy ảo trên <ph name="PRODUCT_OS_NAME" />. Bạn phải bật <ph name="VIRTUAL_MACHINES_ALLOWED_POLICY_NAME" /> và <ph name="CROSTINI_ALLOWED_POLICY_NAME" /> thì mới có thể sử dụng <ph name="PRODUCT_CROSTINI_NAME" />. Nếu bạn đặt chính sách này thành Tắt, thì thiết bị sẽ không thể chạy máy ảo. Khi bạn chuyển chính sách này thành Tắt, chính sách sẽ được áp dụng cho các máy ảo mới đang khởi động, chứ không phải các máy đã chạy.
 
@@ -11666,7 +11696,6 @@ Lưu ý: Hiện tại, hệ thống sẽ chỉ xem xét mục nhập đầu tiê
       Nếu một ngôn ngữ có trong cả chính sách này và chính sách <ph name="SPELLCHECK_LANGUAGE_POLICY_NAME" />, thì chính sách nhắc đến sau sẽ được ưu tiên và ngôn ngữ có tính năng kiểm tra chính tả đó sẽ bật.
 
       Các ngôn ngữ hiện được hỗ trợ là: tiếng Hà Lan (Nam Phi), tiếng Bulgaria, tiếng Catalan, tiếng Séc, tiếng Đan Mạch, tiếng Đức, tiếng Hy Lạp, tiếng Anh – Úc, tiếng Anh – Canada, tiếng Anh – Anh, tiếng Anh – Mỹ, tiếng Tây Ban Nha, tiếng Tây Ban Nha – Mỹ La tinh, tiếng Tây Ban Nha – Argentina, tiếng Tây Ban Nha – Tây Ban Nha, tiếng Tây Ban Nha – Mexico, tiếng Tây Ban Nha – Mỹ, tiếng Estonia, tiếng Ba Tư, tiếng Faroe, tiếng Pháp, tiếng Do Thái, tiếng Hindi, tiếng Croatia, tiếng Hungary, tiếng Indonesia, tiếng Ý, tiếng Hàn, tiếng Lithuania, tiếng Latvia, tiếng Bokmål, tiếng Hà Lan, tiếng Ba Lan, tiếng Bồ Đào Nha – Brazil, tiếng Bồ Đào Nha – Bồ Đào Nha, tiếng Romania, tiếng Nga, tiếng Serbia – Croatia, tiếng Slovak, tiếng Slovenia, tiếng Albania, tiếng Serbia, tiếng Thụy Điển, tiếng Tamil, tiếng Tajik, tiếng Thổ Nhĩ Kỳ, tiếng Ukraina, tiếng Việt.</translation>
-<translation id="900867836818807386">Cài đặt tính năng Tự động điền bằng AI</translation>
 <translation id="9009119876570708617">Chính sách này đã bị xóa kể từ phiên bản M85, hãy dùng <ph name="POLICY_NAME" /> để cho phép nội dung không an toàn trên từng trang web.
        Chính sách này kiểm soát việc xử lý nội dung hỗn hợp (nội dung HTTP trên các trang web HTTPS) trong trình duyệt.
        Nếu bạn không đặt hoặc đặt chính sách này thành true, thì nội dung hỗn hợp là âm thanh và video sẽ được nâng cấp tự động lên HTTPS (tức là URL sẽ được viết lại dưới dạng HTTPS mà không có phiên bản dự phòng nếu không có sẵn tài nguyên qua HTTPS), còn với nội dung hỗn hợp là hình ảnh thì một cảnh báo "Không bảo mật" sẽ hiển thị trong thanh URL.
@@ -11952,7 +11981,6 @@ Chính sách này không có hiệu lực nếu bạn đặt <ph name="METRICS_R
 Giá trị mặc định là RollbackDisabled.</translation>
 <translation id="9197740283131855199">Tỷ lệ phần trăm xác định độ trễ mờ màn hình nếu người dùng hoạt động sau khi màn hình bị làm mờ</translation>
 <translation id="9200828125069750521">Tham số cho URL hình ảnh sử dụng POST</translation>
-<translation id="9202520409249547230">Không cho phép tự động điền bằng AI.</translation>
 <translation id="9204520300236345497">Cho phép sử dụng giá trị nhận dạng cho nội dung được bảo vệ cùng các trang web. Điều này có thể giúp nâng cao chất lượng phát nội dung được bảo vệ.</translation>
 <translation id="9204863016826119209">Những ứng dụng Android được cài đặt và liệt kê trong chính sách này có thể sử dụng khóa công ty.</translation>
 <translation id="9206472508136116830">Không cho phép khám phá lượt chia sẻ tệp bằng NetBIOS</translation>

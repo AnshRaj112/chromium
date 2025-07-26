@@ -115,11 +115,11 @@ class GpuMemoryBufferVideoFramePoolTest : public ::testing::Test {
 
     int dimension_aligned = (dimension + 1) & ~1;
     y_data_ =
-        base::HeapArray<uint8_t>::Uninit(multiplier * dimension * dimension);
-    u_data_ = base::HeapArray<uint8_t>::Uninit(multiplier * dimension_aligned *
-                                               dimension_aligned / 4);
-    v_data_ = base::HeapArray<uint8_t>::Uninit(multiplier * dimension_aligned *
-                                               dimension_aligned / 4);
+        base::HeapArray<uint8_t>::WithSize(multiplier * dimension * dimension);
+    u_data_ = base::HeapArray<uint8_t>::WithSize(
+        multiplier * dimension_aligned * dimension_aligned / 4);
+    v_data_ = base::HeapArray<uint8_t>::WithSize(
+        multiplier * dimension_aligned * dimension_aligned / 4);
 
     // Initialize the last pixel of each plane
     int y_size = multiplier * dimension * dimension;
@@ -393,10 +393,6 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest, CreateOne10BppHardwareFrame) {
 
 TEST_F(GpuMemoryBufferVideoFramePoolTest,
        CreateOne10BppHardwareFrameWithOddSize) {
-#if BUILDFLAG(IS_MAC)
-  // TODO(crbug.com/366375486): Resolve data mismatch failure and re-enable.
-  GTEST_SKIP();
-#else
   scoped_refptr<VideoFrame> software_frame =
       CreateTestYUVVideoFrameWithOddSize(17, 10);
   scoped_refptr<VideoFrame> frame;
@@ -423,10 +419,30 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest,
     ASSERT_EQ(kYValue, y_plane_data[288]);
     ASSERT_EQ(kUValue, u_plane_data[80]);
     ASSERT_EQ(kVValue, v_plane_data[80]);
+
+    // Compare the last pixel of each plane in |software_frame| and |frame|.
+    auto* client_si = sii_->MostRecentMappableSharedImage();
+    EXPECT_TRUE(!!client_si);
+    auto mapping = client_si->Map();
+
+    // Note: The output is in YV12, i.e. the `u` and `v` planes are swapped.
+    const auto* y_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(0).data());
+    const auto* v_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(1).data());
+    const auto* u_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(2).data());
+
+    auto y_stride = mapping->Stride(0);
+    EXPECT_EQ(y_plane_data[288] >> 2, y_memory[y_stride * 16 + 16]);
+    auto v_stride = mapping->Stride(1);
+    EXPECT_EQ(v_plane_data[80] >> 2, v_memory[v_stride * 8 + 8]);
+    auto u_stride = mapping->Stride(2);
+    EXPECT_EQ(u_plane_data[80] >> 2, u_memory[u_stride * 8 + 8]);
+
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
   }
-#endif
 }
 
 TEST_F(GpuMemoryBufferVideoFramePoolTest, ReuseFirstResource) {
@@ -598,6 +614,26 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest,
               software_frame->visible_data(VideoFrame::Plane::kUV)[9246]);
     ASSERT_EQ(kVValue,
               software_frame->visible_data(VideoFrame::Plane::kUV)[9247]);
+
+    auto* client_si = sii_->MostRecentMappableSharedImage();
+    EXPECT_TRUE(!!client_si);
+    auto mapping = client_si->Map();
+
+    const auto* y_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(0).data());
+    const auto* uv_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(1).data());
+
+    // Compare the last pixel of each plane in |software_frame| and |frame|.
+    // y_memory = 135x135, uv_memory = 136x68.
+    auto y_stride = mapping->Stride(0);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kY)[18224],
+              y_memory[y_stride * 134 + 134]);
+    auto uv_stride = mapping->Stride(1);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kUV)[9246],
+              uv_memory[uv_stride * 67 + 134]);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kUV)[9247],
+              uv_memory[uv_stride * 67 + 135]);
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
   }
@@ -635,14 +671,26 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest, CreateOneHardwareP010Frame) {
   EXPECT_TRUE(frame->HasSharedImage());
   EXPECT_EQ(1u, sii_->shared_image_count());
   EXPECT_TRUE(frame->metadata().read_lock_fences_enabled);
+
+  auto* client_si = sii_->MostRecentMappableSharedImage();
+  EXPECT_TRUE(!!client_si);
+  auto mapping = client_si->Map();
+
+  const auto* y_memory =
+      reinterpret_cast<uint16_t*>(mapping->GetMemoryForPlane(0).data());
+  const auto* uv_memory =
+      reinterpret_cast<uint16_t*>(mapping->GetMemoryForPlane(1).data());
+
+  EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kY)[0] << 6,
+            y_memory[0]);
+  EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kU)[0] << 6,
+            uv_memory[0]);
+  EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kV)[0] << 6,
+            uv_memory[1]);
 }
 
 TEST_F(GpuMemoryBufferVideoFramePoolTest,
        CreateOneHardwareP010FrameWithOddSize) {
-#if BUILDFLAG(IS_MAC)
-  // TODO(crbug.com/366375486): Resolve data mismatch failure and re-enable.
-  GTEST_SKIP();
-#else
   scoped_refptr<VideoFrame> software_frame =
       CreateTestYUVVideoFrameWithOddSize(7, 10);
   scoped_refptr<VideoFrame> frame;
@@ -672,10 +720,27 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest,
     ASSERT_EQ(kYValue, y_plane_data[48]);
     ASSERT_EQ(kUValue, u_plane_data[15]);
     ASSERT_EQ(kVValue, v_plane_data[15]);
+
+    auto* client_si = sii_->MostRecentMappableSharedImage();
+    EXPECT_TRUE(!!client_si);
+    auto mapping = client_si->Map();
+
+    const auto* y_memory =
+        reinterpret_cast<uint16_t*>(mapping->GetMemoryForPlane(0).data());
+    const auto* uv_memory =
+        reinterpret_cast<uint16_t*>(mapping->GetMemoryForPlane(1).data());
+
+    // Compare the last pixel of each plane in |software_frame| and |frame|.
+    // y_memory = 7x7, uv_memory = 8x4, scale = 16-10 = 6.
+    auto y_stride = mapping->Stride(0);
+    EXPECT_EQ(y_plane_data[48], y_memory[y_stride / 2 * 6 + 6] >> 6);
+    auto uv_stride = mapping->Stride(1);
+    EXPECT_EQ(u_plane_data[15], uv_memory[uv_stride / 2 * 3 + 6] >> 6);
+    EXPECT_EQ(v_plane_data[15], uv_memory[uv_stride / 2 * 3 + 7] >> 6);
+
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
   }
-#endif
 }
 
 TEST_F(GpuMemoryBufferVideoFramePoolTest, CreateOneHardwareXR30FrameBT709) {
@@ -694,6 +759,13 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest, CreateOneHardwareXR30FrameBT709) {
   EXPECT_TRUE(frame->HasSharedImage());
   EXPECT_EQ(1u, sii_->shared_image_count());
   EXPECT_TRUE(frame->metadata().read_lock_fences_enabled);
+
+  auto* client_si = sii_->MostRecentMappableSharedImage();
+  EXPECT_TRUE(!!client_si);
+
+  auto mapping = client_si->Map();
+  void* memory = static_cast<void*>(mapping->GetMemoryForPlane(0).data());
+  EXPECT_EQ(as_xr30(0, 311, 0), *static_cast<uint32_t*>(memory));
 }
 
 TEST_F(GpuMemoryBufferVideoFramePoolTest, CreateOneHardwareXR30FrameBT601) {

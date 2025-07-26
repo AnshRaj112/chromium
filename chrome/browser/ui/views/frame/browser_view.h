@@ -144,6 +144,9 @@ class BrowserView : public BrowserWindow,
   METADATA_HEADER(BrowserView, views::ClientView)
 
  public:
+  // The width of the vertical tab strip.
+  static constexpr int kVerticalTabStripWidth = 240;
+
   explicit BrowserView(std::unique_ptr<Browser> browser);
   BrowserView(const BrowserView&) = delete;
   BrowserView& operator=(const BrowserView&) = delete;
@@ -631,6 +634,7 @@ class BrowserView : public BrowserWindow,
   void PreHandleDragUpdate(const content::DropData& drop_data,
                            const gfx::PointF& point) override;
   void PreHandleDragExit() override;
+  void HandleDragEnded() override;
   bool HandleKeyboardEvent(const input::NativeWebKeyboardEvent& event) override;
   std::unique_ptr<FindBar> CreateFindBar() override;
   web_modal::WebContentsModalDialogHost* GetWebContentsModalDialogHost()
@@ -1268,6 +1272,9 @@ class BrowserView : public BrowserWindow,
   // scrim, ntp footer, etc). contents_container_view_ only exists if the split
   // view feature is disabled.
   raw_ptr<ContentsContainerView> contents_container_view_ = nullptr;
+
+  // The view responsible for housing the contents of the vertical tab strip.
+  raw_ptr<views::View> vertical_tab_strip_container_ = nullptr;
 
   // The side panel aligned to the left or the right side of the browser window
   // depending on the kSidePanelHorizontalAlignment pref's value.

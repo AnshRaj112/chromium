@@ -420,24 +420,6 @@ void PersonalDataManagerAndroid::RecordAndLogCreditCardUse(JNIEnv* env,
   }
 }
 
-jboolean PersonalDataManagerAndroid::HasProfiles(JNIEnv* env) {
-  return !address_data_manager().GetProfiles().empty();
-}
-
-jboolean PersonalDataManagerAndroid::HasCreditCards(JNIEnv* env) {
-  return !payments_data_manager().GetCreditCards().empty();
-}
-
-jboolean PersonalDataManagerAndroid::IsFidoAuthenticationAvailable(
-    JNIEnv* env) {
-  // Don't show toggle switch if user is unable to downstream cards.
-  if (!payments_data_manager().IsPaymentsDownloadActive()) {
-    return false;
-  }
-  // Show the toggle switch only if FIDO authentication is available.
-  return IsCreditCardFidoAuthenticationEnabled();
-}
-
 // static
 ScopedJavaLocalRef<jobject>
 PersonalDataManagerAndroid::CreateJavaBankAccountFromNative(
@@ -838,6 +820,16 @@ static jlong JNI_PersonalDataManager_Init(JNIEnv* env,
           env, obj, PersonalDataManagerFactory::GetForBrowserContext(profile),
           profile->GetPrefs());
   return reinterpret_cast<intptr_t>(personal_data_manager_android);
+}
+
+jboolean PersonalDataManagerAndroid::IsCardEligibleForBenefits(
+    JNIEnv* env,
+    const std::string& guid) {
+  if (const CreditCard* card =
+          payments_data_manager().GetCreditCardByGUID(guid)) {
+    return payments_data_manager().IsCardEligibleForBenefits(*card);
+  }
+  return false;
 }
 
 }  // namespace autofill

@@ -249,17 +249,16 @@ CGFloat CompactButtonHorizontalPadding() {
 #if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   if (@available(iOS 26, *)) {
     UIButtonConfiguration* buttonConfiguration =
-        [UIButtonConfiguration glassButtonConfiguration];
+        [UIButtonConfiguration prominentGlassButtonConfiguration];
     buttonConfiguration.title = title;
     buttonConfiguration.image = image;
-    buttonConfiguration.baseForegroundColor =
-        UIColorFromRGB(kTabGridToolbarTextButtonColor);
     button = [UIButton buttonWithConfiguration:buttonConfiguration
                                  primaryAction:nil];
+    button.tintColor = TabGridGlassButtonTintColor();
   } else {
 #endif
     button = [UIButton systemButtonWithPrimaryAction:nil];
-    button.tintColor = UIColorFromRGB(kTabGridToolbarTextButtonColor);
+    button.tintColor = UIColor.whiteColor;
     [button setTitle:title forState:UIControlStateNormal];
     [button setImage:image forState:UIControlStateNormal];
 #if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
@@ -275,7 +274,6 @@ CGFloat CompactButtonHorizontalPadding() {
         .active = YES;
   }
 #endif
-  button.tintColor = UIColorFromRGB(kTabGridToolbarTextButtonColor);
 
   if (targetSelector) {
     [button addTarget:self
@@ -507,10 +505,8 @@ CGFloat CompactButtonHorizontalPadding() {
   [self hideAllButtons];
 
   BOOL useCompactLayout = [self shouldUseCompactLayout];
-  BOOL hideToolbar =
-      self.mode == TabGridMode::kSearch ||
-      (!useCompactLayout && (self.page == TabGridPageRemoteTabs ||
-                             self.page == TabGridPageTabGroups));
+  BOOL hideToolbar = self.mode == TabGridMode::kSearch ||
+                     (!useCompactLayout && (self.page == TabGridPageTabGroups));
   if (hideToolbar) {
     self.hidden = YES;
     [self updateBackgroundVisibility];
@@ -533,8 +529,7 @@ CGFloat CompactButtonHorizontalPadding() {
   }
 
   if (useCompactLayout) {
-    if (self.page == TabGridPageRemoteTabs ||
-        self.page == TabGridPageTabGroups) {
+    if (self.page == TabGridPageTabGroups) {
       _doneButton.hidden = NO;
     } else if (self.isInTabGroupView) {
       _smallNewTabButton.hidden = NO;

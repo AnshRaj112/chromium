@@ -52,6 +52,7 @@
 #include "components/password_manager/core/browser/password_manager_util.h"
 #include "components/password_manager/core/browser/password_reuse_manager.h"
 #include "components/password_manager/core/browser/password_save_manager_impl.h"
+#include "components/password_manager/core/browser/undo_password_change_controller.h"
 #include "components/password_manager/core/common/password_manager_constants.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
@@ -68,6 +69,7 @@
 #include "components/password_manager/core/browser/first_cct_page_load_passwords_ukm_recorder.h"
 #include "components/password_manager/core/browser/password_feature_manager.h"
 #include "components/password_manager/core/browser/password_sync_util.h"
+#include "components/password_manager/core/browser/split_stores_and_local_upm.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_WIN)
@@ -112,7 +114,14 @@ void RecordMetricsForLoginWithChangedPassword(
     bool login_successful) {
   const PasswordForm* change_password_login =
       password_manager_util::FindLoginWithChangedPassword(submitted_manager);
-  if (!change_password_login) {
+  if (!change_password_login || !change_password_login->GetPasswordBackup()) {
+    return;
+  }
+  // If date_last_used is set after the backup creation time, it means that
+  // there was already a successful login after the password change flow. We
+  // don't want to count these cases as login with changed password.
+  if (change_password_login->date_last_used >
+      change_password_login->GetPasswordBackupDateCreated()) {
     return;
   }
 
@@ -129,7 +138,7 @@ void RecordMetricsForLoginWithChangedPassword(
   }
 
   ukm::builders::PasswordManager_ChangeSubmission(ukm_id)
-      .SetLogInWithPasswordChangeSubmission(login_successful)
+      .SetLogInWithPasswordChangeSubmission(static_cast<int>(outcome))
       .Record(ukm::UkmRecorder::Get());
   base::UmaHistogramEnumeration(kLogInWithPasswordChangeSubmissionHistogram,
                                 outcome);
@@ -461,17 +470,17 @@ void RecordProvisionalSaveFailure(
 
 void HandleFailedLoginDetectionForPasswordChange(
     PasswordManagerDriver* driver,
+    UndoPasswordChangeController* undo_controller,
     const PasswordFormManager& submitted_manager,
     ukm::SourceId ukm_id) {
-
   RecordMetricsForLoginWithChangedPassword(submitted_manager, ukm_id,
                                            /*login_successful=*/false);
 
   // Proactive recovery on mobile will be implemented via touch to fill instead.
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   // Create a copy of the submitted form because it will soon be destroyed.
-  driver->GetPasswordAutofillManager()->OnLoginPotentiallyFailed(
-      *submitted_manager.GetSubmittedForm());
+  undo_controller->OnLoginPotentiallyFailed(
+      driver, *submitted_manager.GetSubmittedForm());
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 }
 
@@ -529,30 +538,16 @@ void PasswordManager::RegisterProfilePrefs(
   registry->RegisterBooleanPref(prefs::kOfferToSavePasswordsEnabledGMS, true);
   registry->RegisterBooleanPref(prefs::kAccountStorageNoticeShown, false);
   registry->RegisterBooleanPref(prefs::kAutoSignInEnabledGMS, true);
-  registry->RegisterBooleanPref(prefs::kSettingsMigratedToUPMLocal, false);
-  registry->RegisterIntegerPref(
-      prefs::kCurrentMigrationVersionToGoogleMobileServices, 0);
-  registry->RegisterDoublePref(prefs::kTimeOfLastMigrationAttempt, 0.0);
-  registry->RegisterIntegerPref(
-      prefs::kPasswordsUseUPMLocalAndSeparateStores,
-      static_cast<int>(prefs::UseUpmLocalAndSeparateStoresState::kOff));
-  registry->RegisterBooleanPref(
-      prefs::kUnenrolledFromGoogleMobileServicesDueToErrors, false);
+  RegisterLegacySplitStoresPref(registry);
   registry->RegisterStringPref(prefs::kUPMErrorUIShownTimestamp, "0");
   registry->RegisterIntegerPref(
       prefs::kPasswordGenerationBottomSheetDismissCount, 0);
-  registry->RegisterBooleanPref(
-      prefs::kShouldShowPostPasswordMigrationSheetAtStartup, false);
   // This pref is used to decide whether the PasswordStore can be connected to
   // the new Android backend without migrating existing entries in the
   // LoginDatabase. In doubt, it's best to assume that's not the case, otherwise
   // passwords might be left behind. In practice, the default value should make
   // little difference, the pref is always written on startup.
   registry->RegisterBooleanPref(prefs::kEmptyProfileStoreLoginDatabase, false);
-  registry->RegisterTimePref(
-      prefs::kPasswordAccessLossWarningShownAtStartupTimestamp, base::Time());
-  registry->RegisterTimePref(prefs::kPasswordAccessLossWarningShownTimestamp,
-                             base::Time());
   registry->RegisterBooleanPref(prefs::kUpmAutoExportCsvNeedsDeletion, false);
   registry->RegisterBooleanPref(prefs::kUpmUnmigratedPasswordsExported, false);
 #endif  // BUILDFLAG(IS_ANDROID)
@@ -640,8 +635,10 @@ void PasswordManager::OnGeneratedPasswordAccepted(
       GetMatchedManagerForForm(driver, form_data.renderer_id());
   if (!manager) {
     // Form manager might not be present at the time manual password generation
-    // is triggered.
+    // is triggered, but if password generation was possible, so should be the
+    // creation of a new form manager.
     manager = CreateFormManager(driver, form_data);
+    CHECK(manager);
   }
 
   manager->OnGeneratedPasswordAccepted(form_data, generation_element_id,
@@ -1062,10 +1059,6 @@ void PasswordManager::CreateFormManagers(
   // Find new forms.
   std::vector<const FormData*> new_forms_data;
   for (const FormData& form_data : forms_data) {
-    if (!client_->IsFillingEnabled(form_data.url())) {
-      continue;
-    }
-
     PasswordFormManager* manager =
         GetMatchedManagerForForm(driver, form_data.renderer_id());
     if (!manager) {
@@ -1091,6 +1084,11 @@ void PasswordManager::CreateFormManagers(
 PasswordFormManager* PasswordManager::CreateFormManager(
     PasswordManagerDriver* driver,
     const autofill::FormData& form) {
+  // Do not proceed if the form cannot not be filled.
+  if (!client_->IsFillingEnabled(form.url())) {
+    return nullptr;
+  }
+
   auto manager = std::make_unique<PasswordFormManager>(
       client_,
       driver ? driver->AsWeakPtr() : base::WeakPtr<PasswordManagerDriver>(),
@@ -1146,6 +1144,10 @@ PasswordFormManager* PasswordManager::ProvisionallySaveForm(
     RecordProvisionalSaveFailure(
         client_, PasswordManagerMetricsRecorder::NO_MATCHING_FORM);
     matched_manager = CreateFormManager(driver, submitted_form);
+    if (!matched_manager) {
+      // The form manager could not be created, saving can not proceed.
+      return nullptr;
+    }
   }
 
   if (is_manual_fallback && matched_manager->GetFormFetcher()->GetState() ==
@@ -1647,8 +1649,9 @@ void PasswordManager::OnLoginFailed(PasswordManagerDriver* driver,
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   MaybeTriggerHatsSurvey(*submitted_manager);
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
-  HandleFailedLoginDetectionForPasswordChange(driver, *submitted_manager,
-                                              client_->GetUkmSourceId());
+  HandleFailedLoginDetectionForPasswordChange(
+      driver, client_->GetUndoPasswordChangeController(), *submitted_manager,
+      client_->GetUkmSourceId());
 
   ResetSubmittedManager();
   base::UmaHistogramBoolean("PasswordManager.FailedLoginDetected", false);
@@ -1661,8 +1664,9 @@ void PasswordManager::OnLoginPotentiallyFailed(
     logger->LogMessage(Logger::STRING_PASSWORD_POTENTIALLY_FAILED_LOGIN);
   }
 
-  HandleFailedLoginDetectionForPasswordChange(driver, *GetSubmittedManager(),
-                                              client_->GetUkmSourceId());
+  HandleFailedLoginDetectionForPasswordChange(
+      driver, client_->GetUndoPasswordChangeController(),
+      *GetSubmittedManager(), client_->GetUkmSourceId());
 
   base::UmaHistogramBoolean("PasswordManager.FailedLoginDetected", true);
 }
@@ -1718,7 +1722,9 @@ void PasswordManager::ProcessAutofillPredictions(
     }
     // Otherwise, create it and use predictions (which may trigger filling).
     manager = CreateFormManager(driver, form);
-    manager->ProcessServerPredictions(server_predictions_);
+    if (manager) {
+      manager->ProcessServerPredictions(server_predictions_);
+    }
     return;
   }
 
@@ -1756,9 +1762,11 @@ void PasswordManager::ProcessClassificationModelPredictions(
   PasswordFormManager* manager =
       GetMatchedManagerForForm(driver, form.renderer_id());
   if (!manager) {
-    if (ModelPredictionsContainCredentialTypes(predictions_for_form)) {
-      manager = CreateFormManager(driver, form);
-    } else {
+    if (!ModelPredictionsContainCredentialTypes(predictions_for_form)) {
+      return;
+    }
+    manager = CreateFormManager(driver, form);
+    if (!manager) {
       return;
     }
   }

@@ -51,7 +51,7 @@ std::vector<WebContentsStateByteBuffer> AllTabsWebContentsStateByteBuffer(
 
   for (int i = 0; i < jbyte_buffers_count; ++i) {
     web_contents_states.emplace_back(
-        ScopedJavaLocalRef<jobject>(
+        ScopedJavaLocalRef<jobject>::Adopt(
             env, env->GetObjectArrayElement(jbyte_buffers.obj(), i)),
         saved_state_versions[i]);
   }
@@ -72,13 +72,10 @@ std::vector<std::optional<tab_groups::TabGroupId>> JavaTokensToTabGroupIds(
     JNIEnv* env,
     const JavaParamRef<jobjectArray>& jtab_group_ids) {
   std::vector<std::optional<tab_groups::TabGroupId>> tab_group_ids;
-  size_t array_length = env->GetArrayLength(jtab_group_ids.obj());
-  tab_group_ids.reserve(array_length);
-  for (size_t i = 0; i < array_length; ++i) {
-    auto jtab_group_id = env->GetObjectArrayElement(jtab_group_ids.obj(), i);
-    std::optional<tab_groups::TabGroupId> tab_group_id = JavaTokenToTabGroupId(
-        env, ScopedJavaLocalRef<jobject>(env, jtab_group_id));
-    tab_group_ids.push_back(std::move(tab_group_id));
+  auto array_reader = jtab_group_ids.ReadElements();
+  tab_group_ids.reserve(array_reader.size());
+  for (auto element : array_reader) {
+    tab_group_ids.push_back(JavaTokenToTabGroupId(env, element));
   }
   return tab_group_ids;
 }
@@ -324,11 +321,10 @@ static void JNI_HistoricalTabSaverImpl_CreateHistoricalGroup(
   std::vector<WebContentsStateByteBuffer> web_contents_states =
       AllTabsWebContentsStateByteBuffer(env, jbyte_buffers,
                                         std::move(saved_state_versions));
-  CreateHistoricalGroup(TabModelList::FindNativeTabModelForJavaObject(
-                            ScopedJavaLocalRef<jobject>(env, jtab_model.obj())),
-                        tab_group_id, saved_tab_group_id, title, (int)jcolor,
-                        std::move(tabs_android),
-                        std::move(web_contents_states));
+  CreateHistoricalGroup(
+      TabModelList::FindNativeTabModelForJavaObject(jtab_model), tab_group_id,
+      saved_tab_group_id, title, (int)jcolor, std::move(tabs_android),
+      std::move(web_contents_states));
 }
 
 static void JNI_HistoricalTabSaverImpl_CreateHistoricalBulkClosure(
@@ -357,8 +353,7 @@ static void JNI_HistoricalTabSaverImpl_CreateHistoricalBulkClosure(
       AllTabsWebContentsStateByteBuffer(env, jbyte_buffers,
                                         std::move(saved_state_versions));
   CreateHistoricalBulkClosure(
-      TabModelList::FindNativeTabModelForJavaObject(
-          ScopedJavaLocalRef<jobject>(env, jtab_model.obj())),
+      TabModelList::FindNativeTabModelForJavaObject(jtab_model),
       std::move(tab_group_ids), std::move(saved_tab_group_ids),
       std::move(group_titles), std::move(group_colors),
       std::move(per_tab_optional_tab_group_ids),

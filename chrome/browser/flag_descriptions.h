@@ -155,6 +155,11 @@ extern const char kAnnotatorModeName[];
 extern const char kAnnotatorModeDescription[];
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
+#if BUILDFLAG(IS_ANDROID)
+extern const char kApproximateGeolocationPermissionName[];
+extern const char kApproximateGeolocationPermissionDescription[];
+#endif  // BUILDFLAG(IS_ANDROID)
+
 extern const char kAriaElementReflectionName[];
 extern const char kAriaElementReflectionDescription[];
 
@@ -435,9 +440,6 @@ extern const char kAutofillEnableBuyNowPayLaterForKlarnaDescription[];
 
 extern const char kAutofillEnableBuyNowPayLaterSyncingName[];
 extern const char kAutofillEnableBuyNowPayLaterSyncingDescription[];
-
-extern const char kAutofillEnableBuyNowPayLaterSyncingForKlarnaName[];
-extern const char kAutofillEnableBuyNowPayLaterSyncingForKlarnaDescription[];
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS)
 
@@ -1683,6 +1685,9 @@ extern const char kOmniboxStarterPackIPHDescription[];
 extern const char kOmniboxSearchAggregatorName[];
 extern const char kOmniboxSearchAggregatorDescription[];
 
+extern const char kOmniboxSiteSearchName[];
+extern const char kOmniboxSiteSearchDescription[];
+
 extern const char kContextualSearchBoxUsesContextualSearchProviderName[];
 extern const char kContextualSearchBoxUsesContextualSearchProviderDescription[];
 
@@ -2194,6 +2199,11 @@ extern const char kStorageAccessApiFollowsSameOriginPolicyDescription[];
 extern const char kStrictOriginIsolationName[];
 extern const char kStrictOriginIsolationDescription[];
 
+#if BUILDFLAG(IS_ANDROID)
+extern const char kSubmenusTabContextMenuLffTabStripName[];
+extern const char kSubmenusTabContextMenuLffTabStripDescription[];
+#endif  // BUILDFLAG(IS_ANDROID)
+
 extern const char kSupportToolScreenshot[];
 extern const char kSupportToolScreenshotDescription[];
 
@@ -2218,6 +2228,15 @@ extern const char kTabArchivalDragDropAndroidDescription[];
 extern const char kTabCollectionAndroidName[];
 extern const char kTabCollectionAndroidDescription[];
 
+extern const char kTabGroupEntryPointsAndroidName[];
+extern const char kTabGroupEntryPointsAndroidDescription[];
+
+extern const char kTabGroupParityBottomSheetAndroidName[];
+extern const char kTabGroupParityBottomSheetAndroidDescription[];
+
+extern const char kTabModelInitFixesName[];
+extern const char kTabModelInitFixesDescription[];
+
 extern const char kTabSwitcherDragDropName[];
 extern const char kTabSwitcherDragDropDescription[];
 
@@ -2226,12 +2245,6 @@ extern const char kTabSwitcherGroupSuggestionsAndroidDescription[];
 
 extern const char kTabSwitcherGroupSuggestionsTestModeAndroidName[];
 extern const char kTabSwitcherGroupSuggestionsTestModeAndroidDescription[];
-
-extern const char kTabGroupEntryPointsAndroidName[];
-extern const char kTabGroupEntryPointsAndroidDescription[];
-
-extern const char kTabGroupParityBottomSheetAndroidName[];
-extern const char kTabGroupParityBottomSheetAndroidDescription[];
 
 extern const char kTabletTabStripAnimationName[];
 extern const char kTabletTabStripAnimationDescription[];
@@ -2924,11 +2937,11 @@ extern const char kSegmentationPlatformEphemeralCardRankerDescription[];
 extern const char kMediaPickerAdoptionStudyName[];
 extern const char kMediaPickerAdoptionStudyDescription[];
 
+extern const char kMigrateAccountPrefsOnMobileName[];
+extern const char kMigrateAccountPrefsOnMobileDescription[];
+
 extern const char kNavBarColorAnimationName[];
 extern const char kNavBarColorAnimationDescription[];
-
-extern const char kNavBarColorMatchesTabBackgroundName[];
-extern const char kNavBarColorMatchesTabBackgroundDescription[];
 
 extern const char kNavigationCaptureRefactorAndroidName[];
 extern const char kNavigationCaptureRefactorAndroidDescription[];
@@ -3160,6 +3173,9 @@ extern const char kEnableLiveCaptionMultilangDescription[];
 
 extern const char kEnableHeadlessLiveCaptionName[];
 extern const char kEnableHeadlessLiveCaptionDescription[];
+
+extern const char kEnableMediaLinkHelpersName[];
+extern const char kEnableMediaLinkHelpersDescription[];
 
 extern const char kEnableCrOSLiveTranslateName[];
 extern const char kEnableCrOSLiveTranslateDescription[];

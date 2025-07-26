@@ -1471,6 +1471,12 @@ Chromium is unable to recover your settings.
             Open Link in Chromium Inco&amp;gnito Window
           </message>
         </if>
+
+        <!-- On Sign-in Avatar Button Label Desktop -->
+        <!-- TODO(crbug.com/417928515): Finalize the string and make it translateable. -->
+        <message translateable="false" name="IDS_AVATAR_BUTTON_MAKING_CHROME_YOURS" desc="">
+          Making Chromium Yours
+        </message>
       </if>
 
       <!-- Update Recommended dialog -->
@@ -2718,10 +2724,10 @@ Chromium is unable to recover your settings.
 
       <!-- Dice Migration strings -->
       <message name="IDS_DICE_MIGRATION_DIALOG_TITLE" desc="The title in the Dice Migration dialog advertising the sign-in benefit.">
-        Your Chromium, everywhere
+        Get more when you’re signed in to Chromium
       </message>
       <message name="IDS_DICE_MIGRATION_DIALOG_DESCRIPTION" desc="The content of the Dice Migration dialog advertising the benefits of signing in to Chrome.">
-        When you click 'Got it', you can save and use passwords and more in your Google Account whenever you're signed in to Chromium. <ph name="LEARN_MORE">$1<ex>Learn more</ex></ph>
+        You’ll save and use passwords and more in your Google Account whenever you’re signed in to Chromium. <ph name="LEARN_MORE">$1<ex>Learn more</ex></ph>
       </message>
       <message name="IDS_DICE_MIGRATION_DIALOG_OK_BUTTON" desc="The primary button label in the Dice Migration dialog, letting the user acknowledge signing in to Chrome.">
         Got it

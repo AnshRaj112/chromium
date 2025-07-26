@@ -13402,6 +13402,12 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Hub.BackButtonPressed">
+  <owner>ckitagawa@chromium.org</owner>
+  <owner>skym@chromium.org</owner>
+  <description>The user pressed the back button to close the Hub.</description>
+</action>
+
 <action name="HubSearch.KeyboardEnterPressed">
   <owner>wylieb@google.com</owner>
   <owner>bjfong@google.com</owner>
@@ -24816,6 +24822,14 @@ should be able to be added at any place in this file.
   <description>User pressed 'Help' in the app menu.</description>
 </action>
 
+<action name="MobileMenuHideReaderMode">
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <description>
+    User pressed/clicked the &quot;Hide Reading Mode&quot; item in the app menu.
+  </description>
+</action>
+
 <action name="MobileMenuHistory">
   <owner>aurimas@chromium.org</owner>
   <description>User pressed 'History' in the app menu.</description>
@@ -24850,6 +24864,13 @@ should be able to be added at any place in this file.
   <description>User opened lens overlay from the app overflow menu</description>
 </action>
 
+<action name="MobileMenuListenToFeed">
+  <owner>jianli@chromium.org</owner>
+  <description>
+    User opened 'Listen to the feed' from the app overflow menu
+  </description>
+</action>
+
 <action name="MobileMenuMoveToOtherWindow">
   <owner>jinsukkim@chromium.org</owner>
   <owner>twellington@chromium.org</owner>
@@ -24861,6 +24882,14 @@ should be able to be added at any place in this file.
 <action name="MobileMenuNewIncognitoTab">
   <owner>aurimas@chromium.org</owner>
   <description>User pressed 'New incognito tab' in the app menu.</description>
+</action>
+
+<action name="MobileMenuNewIncognitoWindow">
+  <owner>shuyng@google.com</owner>
+  <owner>clank-large-form-factors@google.com</owner>
+  <description>
+    User pressed 'New incognito window' in the app menu.
+  </description>
 </action>
 
 <action name="MobileMenuNewTab">
@@ -24952,14 +24981,6 @@ should be able to be added at any place in this file.
   <owner>basiaz@google.com</owner>
   <owner>iwells@chromium.org</owner>
   <description>User pressed 'Listen to this page' in the app menu.</description>
-</action>
-
-<action name="MobileMenuReaderMode">
-  <owner>jinsukkim@chromium.org</owner>
-  <owner>wylieb@chromium.org</owner>
-  <description>
-    User pressed/clicked the &quot;Show Reading Mode&quot; item in the app menu.
-  </description>
 </action>
 
 <action name="MobileMenuReadingList">
@@ -25068,6 +25089,14 @@ should be able to be added at any place in this file.
 <action name="MobileMenuShow.TabletEmptyModeMenu">
   <owner>ckitagawa@chromium.org</owner>
   <description>User opened the app menu in the empty tablet mode.</description>
+</action>
+
+<action name="MobileMenuShowReaderMode">
+  <owner>jinsukkim@chromium.org</owner>
+  <owner>wylieb@google.com</owner>
+  <description>
+    User pressed/clicked the &quot;Show Reading Mode&quot; item in the app menu.
+  </description>
 </action>
 
 <action name="MobileMenuSiteInformation">
@@ -26256,6 +26285,12 @@ should be able to be added at any place in this file.
   <description>Recorded when reader mode gets activated.</description>
 </action>
 
+<action name="MobileReaderModeHidden">
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <description>Recorded when reader mode gets hidden.</description>
+</action>
+
 <action name="MobileReadingListAccessibilityClose">
   <owner>myuu@google.com</owner>
   <owner>chrome-signin-mobile-team@google.com</owner>
@@ -26443,6 +26478,10 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileRecentTabManagerRecentTabOpenedSearchResult">
+  <obsolete>
+    Deprecated as of 7/2025. Recent tabs are no longer displayed in the tab
+    grid.
+  </obsolete>
   <owner>michaeldo@chromium.org</owner>
   <owner>mrefaat@chromium.org</owner>
   <description>
@@ -26483,6 +26522,10 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="MobileRecentTabManagerTabFromOtherDeviceOpenedSearchResult">
+  <obsolete>
+    Deprecated as of 7/2025. Recent tabs are no longer displayed in the tab
+    grid.
+  </obsolete>
   <owner>michaeldo@chromium.org</owner>
   <owner>mrefaat@chromium.org</owner>
   <description>
@@ -41219,6 +41262,13 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Signin_Signin_FromNtpFeaturePromo">
+  <owner>cjgrant@chromium.org</owner>
+  <description>
+    A sign-in flow is shown triggered by an NTP feature promo.
+  </description>
+</action>
+
 <action name="Signin_Signin_FromNTPFeedBottomSigninPromo">
   <owner>sczs@chromium.org</owner>
   <owner>tinazwang@chromium.org</owner>
@@ -45988,6 +46038,10 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="TabsSearch.SuggestedActions.RecentTabs">
+  <obsolete>
+    Deprecated as of 7/2025. Recent tabs are no longer displayed in the tab
+    grid.
+  </obsolete>
   <owner>michaeldo@chromium.org</owner>
   <owner>mrefaat@chromium.org</owner>
   <description>

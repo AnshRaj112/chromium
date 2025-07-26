@@ -1628,8 +1628,10 @@ fyi_ios_builder(
         additional_compile_targets = [
             "base_unittests",
             "content_shell",
+            "components_browsertests",
             "components_unittests",
             "content_unittests",
+            "media_unittests",
         ],
         mixins = [
             "expand-as-isolated-script",

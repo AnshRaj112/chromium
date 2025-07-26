@@ -96,6 +96,7 @@
 #include "third_party/blink/renderer/core/style/style_svg_resource.h"
 #include "third_party/blink/renderer/core/style/style_view_transition_group.h"
 #include "third_party/blink/renderer/core/style/superellipse.h"
+#include "third_party/blink/renderer/core/style/text_overflow_data.h"
 #include "third_party/blink/renderer/platform/fonts/font_palette.h"
 #include "third_party/blink/renderer/platform/fonts/opentype/open_type_math_support.h"
 #include "third_party/blink/renderer/platform/geometry/layout_unit.h"
@@ -2603,27 +2604,14 @@ ShapeValue* StyleBuilderConverter::ConvertShapeValue(StyleResolverState& state,
   return MakeGarbageCollected<ShapeValue>(css_box);
 }
 
-// TODO(crbug.com/327740939): Merge ConvertLetterSpacing and ConvertWordSpacing
-// if percentage for word-spacing is implemented.
-Length StyleBuilderConverter::ConvertLetterSpacing(StyleResolverState& state,
-                                                   const CSSValue& value) {
+Length StyleBuilderConverter::ConvertSpacing(StyleResolverState& state,
+                                             const CSSValue& value) {
   auto* identifier_value = DynamicTo<CSSIdentifierValue>(value);
   if (identifier_value &&
       identifier_value->GetValueID() == CSSValueID::kNormal) {
-    return ComputedStyleInitialValues::InitialLetterSpacing();
+    return Length::Fixed();
   }
   return ConvertLength(state, value);
-}
-
-float StyleBuilderConverter::ConvertWordSpacing(StyleResolverState& state,
-                                                const CSSValue& value) {
-  auto* identifier_value = DynamicTo<CSSIdentifierValue>(value);
-  if (identifier_value &&
-      identifier_value->GetValueID() == CSSValueID::kNormal) {
-    return 0;
-  }
-  return To<CSSPrimitiveValue>(value).ComputeLength<float>(
-      state.CssToLengthConversionData());
 }
 
 SVGDashArray* StyleBuilderConverter::ConvertStrokeDasharray(
@@ -4073,6 +4061,20 @@ FitText StyleBuilderConverter::ConvertFitText(StyleResolverState& state,
         To<CSSPrimitiveValue>(list.Item(next_index)), parent_size));
   }
   return FitText(target, method, size_limit);
+}
+
+TextOverflowData StyleBuilderConverter::ConvertTextOverflow(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  if (const auto* string_value = DynamicTo<CSSStringValue>(value)) {
+    return TextOverflowData(string_value->Value());
+  }
+  const auto& identifier_value = To<CSSIdentifierValue>(value);
+  if (identifier_value.GetValueID() == CSSValueID::kEllipsis) {
+    return TextOverflowData(TextOverflowData::Type::kEllipsis);
+  }
+  DCHECK(identifier_value.GetValueID() == CSSValueID::kClip);
+  return TextOverflowData(TextOverflowData::Type::kClip);
 }
 
 ScopedCSSNameList* StyleBuilderConverter::ConvertTimelineTriggerName(

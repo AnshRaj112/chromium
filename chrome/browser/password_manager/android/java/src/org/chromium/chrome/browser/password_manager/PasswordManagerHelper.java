@@ -250,26 +250,6 @@ public class PasswordManagerHelper {
     }
 
     /**
-     * Checks the availability and status of the UPM feature. All clients should check this before
-     * trying to use UPM methods. Checks for the UPM to be anabled and downstream backend to be
-     * available.
-     *
-     * <p>TODO(crbug.com/40226137): Make sure we rely on the same util in all places that need to
-     * check whether UPM can be used (for password check as well as for all other cases that share
-     * the same preconditions, e.g. launching the credential manager).
-     *
-     * @return True if Unified Password Manager can be used, false otherwise.
-     */
-    public boolean canUseUpm() {
-        SyncService syncService = SyncServiceFactory.getForProfile(mProfile);
-        PrefService prefService = UserPrefs.get(mProfile);
-        // TODO(crbug.com/40226137): Move the backend presence checks in the util.
-        return syncService != null
-                && PasswordManagerUtilBridge.shouldUseUpmWiring(syncService, prefService)
-                && PasswordManagerBackendSupportHelper.getInstance().isBackendPresent();
-    }
-
-    /**
      * Checks the ability to use an AccountSettings intent to launch the password manager. This
      * provides a fallback for users who attempt to manage passkeys when UPM is not available.
      * Passkeys cannot be managed from the Chrome password settings page.
@@ -504,19 +484,6 @@ public class PasswordManagerHelper {
         if (!syncService.getActiveDataTypes().contains(DataType.PASSWORDS)) return false;
         if (syncService.isUsingExplicitPassphrase()) return false;
         return true;
-    }
-
-    // TODO(http://crbug.com/1371422): Remove method and manage eviction from native code
-    // as this is covered by chrome://password-manager-internals page.
-    public void resetUpmUnenrollment() {
-        PrefService prefs = UserPrefs.get(mProfile);
-
-        // Exit early if the user is not unenrolled.
-        if (!prefs.getBoolean(Pref.UNENROLLED_FROM_GOOGLE_MOBILE_SERVICES_DUE_TO_ERRORS)) return;
-
-        // Re-enroll the user by resetting the enroll pref. Other state reset happens on
-        // unenroll.
-        prefs.setBoolean(Pref.UNENROLLED_FROM_GOOGLE_MOBILE_SERVICES_DUE_TO_ERRORS, false);
     }
 
     @VisibleForTesting
@@ -826,7 +793,7 @@ public class PasswordManagerHelper {
         // This checks against the account store GMSCore version if the user is syncing and against
         // the local version if the user is not syncing.
         if (PasswordManagerUtilBridge.isGmsCoreUpdateRequired(
-                UserPrefs.get(mProfile), SyncServiceFactory.getForProfile(mProfile))) {
+                SyncServiceFactory.getForProfile(mProfile))) {
             throw new CredentialManagerBackendException(
                     "Backend version is not supported.",
                     CredentialManagerError.BACKEND_VERSION_NOT_SUPPORTED);

@@ -488,15 +488,6 @@ BASE_FEATURE(kFullscreenImprovement,
              "FullscreenImprovement",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-bool IsTabGroupSyncEnabled() {
-  return true;
-}
-
-
-bool IsTabGroupIndicatorEnabled() {
-  return true;
-}
-
 BASE_FEATURE(kNewSyncOptInIllustration,
              "NewSyncOptInIllustration",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1304,4 +1295,12 @@ bool IsDiamondPrototypeEnabled() {
     return false;
   }
   return base::FeatureList::IsEnabled(kDiamondPrototype);
+}
+
+BASE_FEATURE(kIOSDefaultBrowserOffCyclePromo,
+             "IOSDefaultBrowserOffCyclePromo",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsDefaultBrowserOffCyclePromoEnabled() {
+  return base::FeatureList::IsEnabled(kIOSDefaultBrowserOffCyclePromo);
 }

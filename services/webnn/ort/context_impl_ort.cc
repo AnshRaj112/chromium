@@ -22,14 +22,13 @@ ContextImplOrt::ContextImplOrt(
     mojo::PendingReceiver<mojom::WebNNContext> receiver,
     WebNNContextProviderImpl* context_provider,
     mojom::CreateContextOptionsPtr options,
-    scoped_refptr<Environment> env,
-    scoped_refptr<SessionOptions> session_options)
+    scoped_refptr<Environment> env)
     : WebNNContextImpl(std::move(receiver),
                        context_provider,
                        GetContextProperties(),
                        std::move(options)),
       env_(std::move(env)),
-      session_options_(std::move(session_options)),
+      session_options_(SessionOptions::Create(this->options().device)),
       is_external_data_supported_(
           env_->IsExternalDataSupported(this->options().device)) {}
 
@@ -67,6 +66,14 @@ ContextProperties ContextImplOrt::GetContextProperties() {
       OperandDataType::kFloat16, OperandDataType::kFloat32,
       OperandDataType::kInt64};
 
+  static constexpr SupportedDataTypes kInts4To8Int32 = {
+      OperandDataType::kInt4, OperandDataType::kUint4, OperandDataType::kUint8,
+      OperandDataType::kInt8, OperandDataType::kInt32};
+
+  static constexpr SupportedDataTypes kFloat16To32Int32 = {
+      OperandDataType::kFloat16, OperandDataType::kFloat32,
+      OperandDataType::kInt32};
+
   return ContextProperties(
       InputOperandLayout::kNchw, Resample2DAxes::kAny,
       BatchNormalizationAxis::kChannelsFirst,
@@ -94,9 +101,9 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*conv_transpose2d_bias=*/
        {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
        /*cumulative_sum_input=*/{kFloat16To32Int32To64, kMaxNonScalarRank},
-       /*dequantize_linear_input=*/{},
-       /*dequantize_linear_scale=*/{},
-       /*dequantize_linear_zero_point=*/{},
+       /*dequantize_linear_input=*/{kInts4To8Int32, kMaxRank},
+       /*dequantize_linear_scale=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
+       /*dequantize_linear_zero_point=*/{kInts4To8Int32, kMaxRank},
        /*add_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*sub_input=*/
@@ -164,17 +171,22 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        {DataTypeConstraint::kFloat16To32Ints32To64, SupportedRanks::Exactly(2)},
        /*gemm_c=*/
        {DataTypeConstraint::kFloat16To32Ints32To64, SupportedRanks::UpTo(2)},
-       /*gru_input=*/{},
-       /*gru_bias=*/{},
-       /*gru_cell_input=*/{},
-       /*gru_cell_bias=*/{},
+       /*gru_input=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(3)},
+       /*gru_bias=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(2)},
+       /*gru_cell_input=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(2)},
+       /*gru_cell_bias=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
        /*hard_sigmoid_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*hard_swish_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*instance_normalization_input=*/
        {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(4)},
        /*instance_normalization_scale=*/
        {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
-       /*layer_normalization_input=*/{},
+       /*layer_normalization_input=*/
+       {DataTypeConstraint::kFloat16To32, kMaxRank},
        /*leaky_relu_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*linear_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*lstm_input=*/{},
@@ -188,8 +200,9 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*l2_pool2d_input=*/{DataTypeConstraint::kFloat16To32, {3, 8}},
        /*max_pool2d_input=*/{kInts8Float16To32, {3, 8}},
        /*prelu_input=*/{DataTypeConstraint::kFloat16To32Ints32To64, kMaxRank},
-       /*quantize_linear_input=*/{},
-       /*quantize_linear_zero_point=*/{},
+       /*quantize_linear_input=*/{kFloat16To32Int32, kMaxRank},
+       /*quantize_linear_zero_point=*/
+       {DataTypeConstraint::kInts4ToInts8, kMaxRank},
        /*reduce_l1_input=*/
        {kFloat16To32Int32To64, kMaxRank},
        /*reduce_l2_input=*/

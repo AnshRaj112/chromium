@@ -125,7 +125,7 @@ class TabListEditorMediator
                     @Override
                     public void didAddTab(
                             Tab tab,
-                            int type,
+                            @TabLaunchType int type,
                             @TabCreationState int creationState,
                             boolean markedForSelection) {
                         TabGroupModelFilter filter = mCurrentTabGroupModelFilterSupplier.get();
@@ -164,10 +164,8 @@ class TabListEditorMediator
                     }
                 };
 
-        mOnTabGroupModelFilterChanged.onResult(
-                assumeNonNull(
-                        mCurrentTabGroupModelFilterSupplier.addObserver(
-                                mOnTabGroupModelFilterChanged)));
+        mCurrentTabGroupModelFilterSupplier.addSyncObserverAndCallIfNonNull(
+                mOnTabGroupModelFilterChanged);
 
         mBackPressChangedSupplier.set(isEditorVisible());
         mModel.addObserver(

@@ -45,6 +45,7 @@
 #include "components/user_education/common/feature_promo/feature_promo_result.h"
 #include "components/user_education/common/feature_promo/feature_promo_specification.h"
 #include "components/user_education/common/help_bubble/help_bubble_params.h"
+#include "components/user_education/common/user_education_context.h"
 #include "components/user_education/common/user_education_data.h"
 #include "components/user_education/common/user_education_features.h"
 #include "components/user_education/common/user_education_storage_service.h"
@@ -124,7 +125,8 @@ class BrowserFeaturePromoController2xUiTestBase
     oss << "QueryIPH(" << iph_feature.name << ", " << expected_result << ")";
     return CheckResult(
         [this, &iph_feature]() {
-          return promo_controller()->CanShowPromo(iph_feature);
+          return promo_controller()->CanShowPromo(iph_feature,
+                                                  user_education_context());
         },
         expected_result, oss.str());
   }
@@ -233,6 +235,12 @@ class BrowserFeaturePromoController2xUiTestBase
         ->GetFeaturePromoControllerForTesting();
   }
 
+  const user_education::UserEducationContextPtr& user_education_context()
+      const {
+    return BrowserUserEducationInterface::From(browser())
+        ->GetUserEducationContextForTesting();
+  }
+
  protected:
   base::UserActionTester user_action_tester_;
   base::HistogramTester histogram_tester_;
@@ -263,10 +271,12 @@ class BrowserFeaturePromoController2xUiTest
             FeaturePromoSpecification::AcceleratorInfo()));
     RegisterTestFeature(
         browser(),
-        user_education::FeaturePromoSpecification::CreateForCustomAction(
-            kCustomActionTestFeature, kToolbarAppMenuButtonElementId,
-            IDS_TUTORIAL_TAB_GROUP_EDIT_BUBBLE, IDS_TUTORIAL_TAB_GROUP_COLLAPSE,
-            base::DoNothing()));
+        std::move(
+            user_education::FeaturePromoSpecification::CreateForCustomAction(
+                kCustomActionTestFeature, kToolbarAppMenuButtonElementId,
+                IDS_TUTORIAL_TAB_GROUP_EDIT_BUBBLE,
+                IDS_TUTORIAL_TAB_GROUP_COLLAPSE, custom_action_callback_.Get())
+                .SetInAnyContext(true)));
 
     RegisterTestFeature(
         browser(),
@@ -299,6 +309,9 @@ class BrowserFeaturePromoController2xUiTest
                                 weak_ptr_factory_.GetWeakPtr())));
   }
 
+  base::MockCallback<FeaturePromoSpecification::CustomActionCallback>
+      custom_action_callback_;
+
  private:
   base::WeakPtrFactory<BrowserFeaturePromoController2xUiTest> weak_ptr_factory_{
       this};
@@ -323,6 +336,7 @@ IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
 
 IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
                        LogsCustomActionMetrics) {
+  EXPECT_CALL(custom_action_callback_, Run).Times(1);
   RunTestSequence(MaybeShowPromo(kCustomActionTestFeature),
                   PressNonDefaultPromoButton(),
                   CheckMetrics(kCustomActionTestFeature,
@@ -357,6 +371,8 @@ IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
   bool called = false;
   FeaturePromoClosedReason close_reason = FeaturePromoClosedReason::kAbortPromo;
 
+  EXPECT_CALL(custom_action_callback_, Run).Times(0);
+
   user_education::FeaturePromoParams params(kCustomActionTestFeature);
   params.close_callback =
       base::BindLambdaForTesting([this, &called, &close_reason]() {
@@ -377,6 +393,8 @@ IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
                        CallbackHappensAfterConfirm) {
   bool called = false;
   FeaturePromoClosedReason close_reason = FeaturePromoClosedReason::kAbortPromo;
+
+  EXPECT_CALL(custom_action_callback_, Run).Times(0);
 
   user_education::FeaturePromoParams params(kCustomActionTestFeature);
   params.close_callback =
@@ -503,6 +521,36 @@ IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
                    ExpectedMetrics{.custom_action_count = 1}));
 }
 
+IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
+                       CustomActionCallbackInSecondWindow) {
+  // Create a second browser.
+  Browser* const other = CreateBrowser(browser()->profile());
+
+  // Hide the anchor element in the first browser.
+  auto* const app_menu_button =
+      views::ElementTrackerViews::GetInstance()->GetUniqueView(
+          kToolbarAppMenuButtonElementId,
+          browser()->window()->GetElementContext());
+  app_menu_button->SetVisible(false);
+
+  EXPECT_CALL(custom_action_callback_,
+              Run(other->window()->GetElementContext(), testing::_))
+      .Times(1);
+
+  RunTestSequence(InAnyContext(
+      // This will always try to trigger the promo from the original `browser()`
+      // because the default context is always checked first in Kombucha, and
+      // the original window is still visible.
+      //
+      // However, the bubble can only show in the `other` browser because we hid
+      // the first browser's app menu button (and the IPH specifies that it need
+      // not show in the original context).
+      MaybeShowPromo(kCustomActionTestFeature),
+      // Perform the action, and verify that the second browser's context is
+      // used when the action button is clicked.
+      PressNonDefaultPromoButton()));
+}
+
 class BrowserFeaturePromoController2xLiveTrackerUiTest
     : public InteractiveFeaturePromoTest,
       public testing::WithParamInterface<ControllerMode> {
@@ -570,10 +618,12 @@ class BrowserFeaturePromoController20CanShowPromoForElementUiTest
     return CheckElement(
         spec,
         [this](ui::TrackedElement* anchor) {
+          auto* const interface =
+              BrowserUserEducationInterface::From(browser());
           return static_cast<BrowserFeaturePromoController20*>(
-                     BrowserUserEducationInterface::From(browser())
-                         ->GetFeaturePromoControllerForTesting())
-              ->CanShowPromoForElement(anchor);
+                     interface->GetFeaturePromoControllerForTesting())
+              ->CanShowPromoForElement(
+                  anchor, interface->GetUserEducationContextForTesting());
         },
         expected);
   }

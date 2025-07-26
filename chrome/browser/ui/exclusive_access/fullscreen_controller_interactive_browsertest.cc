@@ -11,6 +11,7 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "build/build_config.h"
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
+#include "chrome/browser/preloading/scoped_prewarm_feature_list.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -936,7 +937,7 @@ class AutomaticFullscreenTest : public FullscreenControllerInteractiveTest,
     }
     ui_test_utils::FullscreenWaiter waiter(browser, {.tab_fullscreen = true});
     auto result = EvalJs(rfh, kScript, options);
-    if (result.error.empty() && result.ExtractBool()) {
+    if (result.is_ok() && result.ExtractBool()) {
       waiter.Wait();
     }
     return browser->window()->IsFullscreen();
@@ -954,7 +955,7 @@ class AutomaticFullscreenTest : public FullscreenControllerInteractiveTest,
     auto result =
         EvalJs(web_contents, script, content::EXECUTE_SCRIPT_NO_USER_GESTURE);
     waiter.Wait();
-    return result.error.empty() && !browser->window()->IsFullscreen();
+    return result.is_ok() && !browser->window()->IsFullscreen();
   }
 
   std::pair<bool, Browser*> OpenPopupAndRequestFullscreenOnLoad() {
@@ -979,7 +980,7 @@ class AutomaticFullscreenTest : public FullscreenControllerInteractiveTest,
     EXPECT_NE(popup, browser);
     ui_test_utils::WaitUntilBrowserBecomeActive(popup);
     ui_test_utils::FullscreenWaiter waiter(popup, {.tab_fullscreen = true});
-    if (result.error.empty() && result.ExtractBool()) {
+    if (result.is_ok() && result.ExtractBool()) {
       waiter.Wait();
     }
     return std::make_pair(popup->window()->IsFullscreen(), popup);
@@ -1005,6 +1006,10 @@ class AutomaticFullscreenTest : public FullscreenControllerInteractiveTest,
   raw_ptr<content::WebContents> web_contents_ = nullptr;
 
  private:
+  // TODO(https://crbug.com/423465927): Explore a better approach to make the
+  // existing tests run with the prewarm feature enabled.
+  test::ScopedPrewarmFeatureList scoped_prewarm_feature_list_{
+      test::ScopedPrewarmFeatureList::PrewarmState::kDisabled};
   base::test::ScopedFeatureList feature_list_;
   web_app::OsIntegrationTestOverrideBlockingRegistration faked_os_integration_;
 };
@@ -1171,6 +1176,12 @@ IN_PROC_BROWSER_TEST_P(AutomaticFullscreenTest, QueryPermissionWithoutGesture) {
 }
 
 IN_PROC_BROWSER_TEST_P(AutomaticFullscreenTest, CrossOriginIFrameDenied) {
+#if BUILDFLAG(IS_MAC)
+  if (GetParam()) {
+    GTEST_SKIP() << "Flaky. See https://crbug.com/404887514";
+  }
+#endif
+
   // Append a cross-origin iframe without the permission policy.
   const GURL src = embedded_https_test_server().GetURL("b.com", "/simple.html");
   content::RenderFrameHost* rfh = web_contents_->GetPrimaryMainFrame();

@@ -561,6 +561,15 @@ void PasswordsPrivateDelegateImpl::RemoveCredential(
   }
 }
 
+void PasswordsPrivateDelegateImpl::RemoveBackupPassword(int id) {
+  const CredentialUIEntry* entry = credential_id_generator_.TryGetKey(id);
+  if (!entry || !entry->backup_password) {
+    return;
+  }
+
+  saved_passwords_presenter_.RemoveBackupPassword(*entry);
+}
+
 void PasswordsPrivateDelegateImpl::RemovePasswordException(int id) {
   RemoveCredential(id,
                    api::passwords_private::PasswordStoreSet::kDeviceAndAccount);
@@ -840,7 +849,7 @@ PasswordsPrivateDelegateImpl::GetExportProgressStatus() {
 
 bool PasswordsPrivateDelegateImpl::IsAccountStorageEnabled() {
   return password_manager::features_util::IsAccountStorageEnabled(
-      profile_->GetPrefs(), SyncServiceFactory::GetForProfile(profile_));
+      SyncServiceFactory::GetForProfile(profile_));
 }
 
 void PasswordsPrivateDelegateImpl::SetAccountStorageEnabled(
@@ -859,7 +868,7 @@ void PasswordsPrivateDelegateImpl::SetAccountStorageEnabled(
 
 bool PasswordsPrivateDelegateImpl::ShouldShowAccountStorageSettingToggle() {
   return password_manager::features_util::ShouldShowAccountStorageSettingToggle(
-      profile_->GetPrefs(), SyncServiceFactory::GetForProfile(profile_));
+      SyncServiceFactory::GetForProfile(profile_));
 }
 
 std::vector<api::passwords_private::PasswordUiEntry>
@@ -1038,6 +1047,18 @@ PasswordsPrivateDelegateImpl::AsWeakPtr() {
   return weak_ptr_factory_.GetWeakPtr();
 }
 
+void PasswordsPrivateDelegateImpl::CopyPlaintextBackupPassword(
+    int id,
+    content::WebContents* web_contents,
+    base::OnceCallback<void(bool)> callback) {
+  AuthenticateUser(
+      web_contents, kPasswordManagerAuthValidity,
+      GetReauthPurpose(api::passwords_private::PlaintextReason::kCopy),
+      base::BindOnce(
+          &PasswordsPrivateDelegateImpl::OnCopyBackupPasswordAuthResult,
+          weak_ptr_factory_.GetWeakPtr(), id, std::move(callback)));
+}
+
 password_manager::InsecureCredentialsManager*
 PasswordsPrivateDelegateImpl::GetInsecureCredentialsManager() {
   return password_check_delegate_.GetInsecureCredentialsManager();
@@ -1098,6 +1119,27 @@ void PasswordsPrivateDelegateImpl::OnRequestPlaintextPasswordAuthResult(
     std::move(callback).Run(entry->password);
   }
   EmitHistogramsForCredentialAccess(*entry, reason);
+}
+
+void PasswordsPrivateDelegateImpl::OnCopyBackupPasswordAuthResult(
+    int id,
+    base::OnceCallback<void(bool)> callback,
+    bool authenticated) {
+  if (!authenticated) {
+    std::move(callback).Run(false);
+    return;
+  }
+
+  const CredentialUIEntry* entry = credential_id_generator_.TryGetKey(id);
+  if (!entry || !entry->backup_password) {
+    std::move(callback).Run(false);
+    return;
+  }
+
+  ui::ScopedClipboardWriter clipboard_writer(ui::ClipboardBuffer::kCopyPaste);
+  clipboard_writer.WriteText(entry->backup_password->value);
+  clipboard_writer.MarkAsConfidential();
+  std::move(callback).Run(true);
 }
 
 void PasswordsPrivateDelegateImpl::OnRequestCredentialDetailsAuthResult(

@@ -1939,6 +1939,9 @@ inline constexpr char kGoogleSearchSidePanelEnabled[] =
 // True when the tab search button is on the right side of the tab strip even in
 // RTL.
 inline constexpr char kTabSearchRightAligned[] = "tab_search.is_right_aligned";
+
+// Boolean determining whether vertical tabs are enabled.
+inline constexpr char kVerticalTabsEnabled[] = "vertical_tabs.enabled";
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(ENABLE_COMPOSE)
@@ -4288,6 +4291,14 @@ inline constexpr char kPrefetchWithServiceWorkerEnabled[] =
 // Boolean that specifies whether ServiceWorkerAutoPreload is enabled.
 inline constexpr char kServiceWorkerAutoPreloadEnabled[] =
     "worker.service_worker_auto_preload_enabled";
+
+#if !BUILDFLAG(IS_ANDROID)
+// Version string in MAJOR.MINOR.BUILD.PATCH format for the last shown non
+// milestone update toast version. If there's new non milestone update a toast
+// will be shown and this pref will set to the new version.
+inline constexpr char kNonMilestoneUpdateToastVersion[] =
+    "toast.non_milestone_update_toast_version";
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 }  // namespace prefs
 

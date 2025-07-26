@@ -1037,13 +1037,6 @@ NSString* GroupGridCellAccessibilityIdentifier(NSUInteger index) {
   [self.tabGridHandler showHistoryForText:self.searchText];
 }
 
-- (void)didSelectSearchRecentTabsInSuggestedActionsViewController:
-    (SuggestedActionsViewController*)viewController {
-  base::RecordAction(
-      base::UserMetricsAction("TabsSearch.SuggestedActions.RecentTabs"));
-  [self.tabGridHandler showRecentTabsForText:self.searchText];
-}
-
 - (void)didSelectSearchWebInSuggestedActionsViewController:
     (SuggestedActionsViewController*)viewController {
   base::RecordAction(
@@ -1913,20 +1906,18 @@ NSString* GroupGridCellAccessibilityIdentifier(NSUInteger index) {
 // same as the border of a selected tab.
 - (void)setHoverEffectToCell:(UICollectionViewCell*)cell {
   DCHECK(ios::provider::IsRaccoonEnabled());
-  if (@available(iOS 17.0, *)) {
-    CGFloat margin =
-        kGridCellSelectionRingTintWidth + kGridCellSelectionRingGapWidth;
-    cell.hoverStyle = [UIHoverStyle
-        styleWithShape:[UIShape
-                           fixedRectShapeWithRect:CGRectMake(
-                                                      -margin, -margin,
-                                                      cell.bounds.size.width +
-                                                          margin * 2,
-                                                      cell.bounds.size.height +
-                                                          margin * 2)
-                                     cornerRadius:kGridCellCornerRadius +
-                                                  margin]];
-  }
+  CGFloat margin =
+      kGridCellSelectionRingTintWidth + kGridCellSelectionRingGapWidth;
+  cell.hoverStyle = [UIHoverStyle
+      styleWithShape:[UIShape
+                         fixedRectShapeWithRect:CGRectMake(
+                                                    -margin, -margin,
+                                                    cell.bounds.size.width +
+                                                        margin * 2,
+                                                    cell.bounds.size.height +
+                                                        margin * 2)
+                                   cornerRadius:kGridCellCornerRadius +
+                                                margin]];
 }
 
 // Reconfigures `itemIdentifier`.

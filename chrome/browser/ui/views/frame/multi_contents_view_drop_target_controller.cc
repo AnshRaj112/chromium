@@ -81,6 +81,13 @@ void MultiContentsViewDropTargetController::OnWebContentsDragUpdate(
     const content::DropData& data,
     const gfx::PointF& point,
     bool is_in_split_view) {
+  // "Drag update" events can still be delivered even if the point is out of the
+  // contents area, particularly while the drop target is animating in and
+  // shifting them.
+  if ((point.x() < 0) || (point.x() > drop_target_parent_view_->width())) {
+    ResetDropTargetTimer();
+    return;
+  }
   if (!data.url.is_valid() || is_in_split_view) {
     ResetDropTargetTimer();
     return;
@@ -90,6 +97,11 @@ void MultiContentsViewDropTargetController::OnWebContentsDragUpdate(
 
 void MultiContentsViewDropTargetController::OnWebContentsDragExit() {
   ResetDropTargetTimer();
+}
+
+void MultiContentsViewDropTargetController::OnWebContentsDragEnded() {
+  ResetDropTargetTimer();
+  drop_target_view_->Hide();
 }
 
 bool MultiContentsViewDropTargetController::HandleDragUpdate(

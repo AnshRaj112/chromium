@@ -307,7 +307,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
 
   UIImageView* firstIconImageView = [[UIImageView alloc]
       initWithImage:CustomSymbolWithConfiguration(kPhoneSparkleSymbol, config)];
-  firstIconImageView.contentMode = UIViewContentModeScaleAspectFit;
+  firstIconImageView.contentMode = UIViewContentModeScaleAspectFill;
 
   UIView* firstBox = [self
       createHorizontalBoxWithIcon:firstIconImageView
@@ -322,19 +322,11 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
       _isAccountManaged ? IDS_IOS_BWG_CONSENT_MANAGED_SECOND_BOX_TITLE
                         : IDS_IOS_BWG_CONSENT_NON_MANAGED_SECOND_BOX_TITLE);
 
-  NSString* symbolName;
-  if (_isAccountManaged) {
-    symbolName = kBuilding2Symbol;
-  } else if (@available(iOS 18, *)) {
-    symbolName = kCounterClockWiseSymbol;
-  } else {
-    symbolName = kHistorySymbol;
-  }
+  UIImageView* secondIconImageView =
+      [[UIImageView alloc] initWithImage:DefaultSymbolWithConfiguration(
+                                             [self secondSymbolName], config)];
 
-  UIImageView* secondIconImageView = [[UIImageView alloc]
-      initWithImage:DefaultSymbolWithConfiguration(symbolName, config)];
-
-  secondIconImageView.contentMode = UIViewContentModeScaleAspectFit;
+  secondIconImageView.contentMode = UIViewContentModeScaleAspectFill;
 
   NSAttributedString* secondBodyAttributed =
       [self createSecondBoxBodyAttributedText];
@@ -382,6 +374,17 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   return horizontalStackView;
 }
 
+// Gets the second SF Symbol name.
+- (NSString*)secondSymbolName {
+  if (_isAccountManaged) {
+    return kBuilding2Symbol;
+  }
+  if (@available(iOS 18, *)) {
+    return kCounterClockWiseSymbol;
+  }
+  return kHistorySymbol;
+}
+
 // Creates the first box view containing the text and the title.
 - (UIView*)createFirstBoxWithTitle:(NSString*)titleText
                           bodyText:(NSString*)bodyText {
@@ -390,7 +393,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
 
   UIStackView* innerStackView = [[UIStackView alloc] init];
   innerStackView.axis = UILayoutConstraintAxisVertical;
-  innerStackView.alignment = UIStackViewAlignmentLeading;
+  innerStackView.alignment = UIStackViewAlignmentFill;
   innerStackView.spacing = kInnerStackViewSpacing;
 
   innerStackView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -428,7 +431,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
 
   UIStackView* innerStackView = [[UIStackView alloc] init];
   innerStackView.axis = UILayoutConstraintAxisVertical;
-  innerStackView.alignment = UIStackViewAlignmentLeading;
+  innerStackView.alignment = UIStackViewAlignmentFill;
   innerStackView.spacing = kInnerStackViewSpacing;
 
   innerStackView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -487,7 +490,8 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   [primaryButton addTarget:self
                     action:@selector(didTapPrimaryButton:)
           forControlEvents:UIControlEventTouchUpInside];
-  primaryButton.accessibilityLabel = @"Consent Primary Action";
+  primaryButton.accessibilityLabel =
+      l10n_util::GetNSString(IDS_IOS_BWG_CONSENT_PRIMARY_BUTTON);
   return primaryButton;
 }
 
@@ -499,7 +503,8 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   [secondaryButton addTarget:self
                       action:@selector(didTapSecondaryButton:)
             forControlEvents:UIControlEventTouchUpInside];
-  // TODO(crbug.com/420643840): Add a11y labels.
+  secondaryButton.accessibilityLabel =
+      l10n_util::GetNSString(IDS_IOS_BWG_CONSENT_SECONDARY_BUTTON);
   return secondaryButton;
 }
 

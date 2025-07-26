@@ -145,14 +145,14 @@ OnDeviceModelServiceController::OnDeviceModelServiceController(
     std::unique_ptr<OnDeviceModelAccessController> access_controller,
     base::WeakPtr<OnDeviceModelComponentStateManager>
         on_device_component_state_manager,
-    on_device_model::ServiceClient::LaunchFn launch_fn)
+    base::SafeRef<on_device_model::ServiceClient> service_client)
     : access_controller_(std::move(access_controller)),
       on_device_component_state_manager_(
           std::move(on_device_component_state_manager)),
-      service_client_(launch_fn),
-      safety_client_(service_client_.GetWeakPtr()) {
+      service_client_(std::move(service_client)),
+      safety_client_(service_client_->GetWeakPtr()) {
   base_model_controller_.emplace(weak_ptr_factory_.GetSafeRef(), nullptr);
-  service_client_.set_on_disconnect_fn(base::BindRepeating(
+  service_client_->set_on_disconnect_fn(base::BindRepeating(
       &OnDeviceModelServiceController::OnServiceDisconnected,
       weak_ptr_factory_.GetWeakPtr()));
 }
@@ -194,8 +194,8 @@ OnDeviceModelServiceController::CreateSession(
 
   CHECK(base_model_controller_->model_metadata());
   CHECK(features::internal::GetOptimizationTargetForCapability(feature));
-  auto* adaptation_metadata = GetFeatureMetadata(feature);
-  CHECK(adaptation_metadata);
+  MaybeAdaptationMetadata adaptation_metadata = GetFeatureMetadata(feature);
+  CHECK(adaptation_metadata.has_value());
 
   OnDeviceOptions opts;
   opts.model_client = std::make_unique<OnDeviceModelClient>(
@@ -247,21 +247,15 @@ void OnDeviceModelServiceController::UpdateModel(
 
 void OnDeviceModelServiceController::MaybeUpdateModelAdaptation(
     ModelBasedCapabilityKey feature,
-    std::unique_ptr<OnDeviceModelAdaptationMetadata> adaptation_metadata) {
-  if (!adaptation_metadata) {
-    model_adaptation_metadata_.erase(feature);
-    base_model_controller_->EraseController(feature);
-    UpdateSolutionProvider(feature);
-    return;
-  }
-  auto it = model_adaptation_metadata_.find(feature);
-  if (it != model_adaptation_metadata_.end() &&
-      it->second == *adaptation_metadata) {
+    base::expected<OnDeviceModelAdaptationMetadata, AdaptationUnavailability>
+        adaptation_metadata) {
+  MaybeAdaptationMetadata& current_metadata = GetFeatureMetadata(feature);
+  if (current_metadata == adaptation_metadata) {
     // Duplicate update (can be caused by multiple profiles).
     // Don't invalidate the existing controller.
     return;
   }
-  model_adaptation_metadata_.emplace(feature, *adaptation_metadata);
+  current_metadata = std::move(adaptation_metadata);
   base_model_controller_->EraseController(feature);
   UpdateSolutionProvider(feature);
 }
@@ -318,14 +312,14 @@ void OnDeviceModelServiceController::OnDeviceModelClient::
   }
 }
 
-OnDeviceModelAdaptationMetadata*
-OnDeviceModelServiceController::GetFeatureMetadata(
+MaybeAdaptationMetadata& OnDeviceModelServiceController::GetFeatureMetadata(
     ModelBasedCapabilityKey feature) {
-  if (auto it = model_adaptation_metadata_.find(feature);
-      it != model_adaptation_metadata_.end()) {
-    return &it->second;
-  }
-  return nullptr;
+  auto it =
+      model_adaptation_metadata_
+          .emplace(feature,
+                   base::unexpected(AdaptationUnavailability::kUpdatePending))
+          .first;
+  return it->second;
 }
 
 void OnDeviceModelServiceController::AddOnDeviceModelAvailabilityChangeObserver(
@@ -364,8 +358,12 @@ OnDeviceModelServiceController::GetSolution(ModelBasedCapabilityKey feature) {
   }
 
   // Check feature config.
-  auto* metadata = GetFeatureMetadata(feature);
-  if (!metadata) {
+  MaybeAdaptationMetadata metadata = GetFeatureMetadata(feature);
+  if (!metadata.has_value()) {
+    if (metadata.error() == AdaptationUnavailability::kNotSupported) {
+      return base::unexpected(
+          OnDeviceModelEligibilityReason::kModelAdaptationNotAvailable);
+    }
     return base::unexpected(
         OnDeviceModelEligibilityReason::kConfigNotAvailableForFeature);
   }
@@ -525,7 +523,7 @@ OnDeviceModelServiceController::BaseModelController::GetOrCreateRemote() {
   if (remote_) {
     return remote_;
   }
-  controller_->service_client_.AddPendingUsage();  // Warm up the service.
+  controller_->service_client_->AddPendingUsage();  // Warm up the service.
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock()},
       base::BindOnce(&on_device_model::LoadModelAssets, PopulateModelPaths()),
@@ -534,9 +532,9 @@ OnDeviceModelServiceController::BaseModelController::GetOrCreateRemote() {
              mojo::PendingReceiver<on_device_model::mojom::OnDeviceModel>
                  receiver,
              on_device_model::ModelAssets assets) {
-            if (!self || !self->controller_->service_client_.is_bound()) {
+            if (!self || !self->controller_->service_client_->is_bound()) {
               if (self) {
-                self->controller_->service_client_.RemovePendingUsage();
+                self->controller_->service_client_->RemovePendingUsage();
               }
               CloseFilesInBackground(std::move(assets));
               return;
@@ -607,10 +605,10 @@ void OnDeviceModelServiceController::BaseModelController::OnModelAssetsLoaded(
              proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_FASTEST_INFERENCE) {
     params->performance_hint = ml::ModelPerformanceHint::kFastestInference;
   }
-  controller_->service_client_.Get()->LoadModel(
+  controller_->service_client_->Get()->LoadModel(
       std::move(params), std::move(model),
       base::BindOnce(&RecordOnDeviceLoadModelResult));
-  controller_->service_client_.RemovePendingUsage();
+  controller_->service_client_->RemovePendingUsage();
 }
 
 void OnDeviceModelServiceController::BaseModelController::OnDisconnect(
@@ -790,6 +788,11 @@ void OnDeviceModelServiceController::Solution::ReportHealthyCompletion() {
 
 void OnDeviceModelServiceController::EnsurePerformanceClassAvailable(
     base::OnceClosure complete) {
+  if (!features::CanLaunchOnDeviceModelService()) {
+    std::move(complete).Run();
+    return;
+  }
+
   if (ListenForPerformanceClassAvailable(std::move(complete))) {
     return;
   }
@@ -799,7 +802,7 @@ void OnDeviceModelServiceController::EnsurePerformanceClassAvailable(
   }
 
   performance_class_state_ = PerformanceClassState::kComputing;
-  service_client_.Get()->GetDevicePerformanceInfo(
+  service_client_->Get()->GetDevicePerformanceInfo(
       base::BindOnce([](on_device_model::mojom::DevicePerformanceInfoPtr info) {
         return info->performance_class;
       })

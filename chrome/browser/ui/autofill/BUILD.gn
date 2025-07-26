@@ -36,7 +36,7 @@ source_set("autofill") {
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/autofill/payments",
     "//chrome/browser/ui/page_action:icon_type",
-    "//components/application_locale_storage:application_locale_storage",
+    "//components/application_locale_storage",
     "//components/autofill/content/browser",
     "//components/autofill/core/browser",
     "//components/autofill/core/common",
@@ -173,7 +173,6 @@ source_set("impl") {
       "//chrome/browser/autofill/android:jni_headers",
       "//chrome/browser/fast_checkout",
       "//chrome/browser/keyboard_accessory/android:public",
-      "//chrome/browser/password_manager/android/access_loss:public",
       "//components/android_autofill/browser:android",
       "//components/messages/android:feature_flags",
       "//components/password_manager/core/browser/features:password_features",
@@ -202,7 +201,7 @@ source_set("impl") {
       "//chrome/browser/promos:utils",
       "//chrome/browser/ui/browser_window",
       "//chrome/browser/ui/promos:utils",
-      "//chrome/browser/ui/toasts:toasts",
+      "//chrome/browser/ui/toasts",
       "//chrome/browser/ui/toasts/api:toasts",
       "//chrome/browser/ui/user_education",
       "//chrome/browser/ui/webauthn",
@@ -327,8 +326,6 @@ source_set("test_support") {
 
   if (is_android) {
     sources += [ "autofill_keyboard_accessory_controller_impl_test_api.h" ]
-    public_deps +=
-        [ "//chrome/browser/password_manager/android/access_loss:public" ]
   } else {
     sources += [
       "autofill_ai/mock_save_or_update_ai_data_controller.cc",
@@ -363,7 +360,7 @@ if (!is_android && !is_chromeos_device) {
       "//chrome/browser/sync:factories",
       "//chrome/browser/ui",
       "//chrome/browser/ui:ui_features",
-      "//chrome/browser/ui/browser_window:browser_window",
+      "//chrome/browser/ui/browser_window",
       "//chrome/browser/ui/user_education",
       "//chrome/common:constants",
       "//chrome/test:test_support",
@@ -435,10 +432,7 @@ source_set("test_support_unit") {
       "mock_autofill_keyboard_accessory_view.h",
       "test_autofill_keyboard_accessory_controller_autofill_client.h",
     ]
-    public_deps += [
-      "//chrome/browser/keyboard_accessory/test_utils/android",
-      "//chrome/browser/password_manager/android/access_loss:test_support",
-    ]
+    public_deps += [ "//chrome/browser/keyboard_accessory/test_utils/android" ]
   } else {
     sources += [ "test_autofill_popup_controller_autofill_client.h" ]
   }

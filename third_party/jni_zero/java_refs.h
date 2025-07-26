@@ -131,7 +131,7 @@ class JNI_ZERO_COMPONENT_BUILD_EXPORT JavaRef<jobject> {
 };
 
 // Forward declare the object array reader for the convenience function.
-template <typename T>
+template <typename T = jobject>
 class JavaObjectArrayReader;
 
 // Generic base class for ScopedJavaLocalRef and ScopedJavaGlobalRef. Useful
@@ -155,7 +155,7 @@ class JavaRef : public JavaRef<jobject> {
   // Only defined for JavaRef<jobjectArray>.
   // You must pass the type of the array elements (usually jobject) as the
   // template parameter.
-  template <typename ElementType,
+  template <typename ElementType = jobject,
             typename T_ = T,
             typename = std::enable_if_t<std::is_same_v<T_, jobjectArray>>>
   JavaObjectArrayReader<ElementType> ReadElements() const {
@@ -228,12 +228,6 @@ class ScopedJavaLocalRef : public JavaRef<T> {
 
   ScopedJavaLocalRef(JNIEnv* env, const JavaRef<T>& other) { Reset(other); }
 
-  // Assumes that |obj| is a local reference to a Java object and takes
-  // ownership of this local reference.
-  // TODO(torne): make legitimate uses call Adopt() instead, and make this
-  // private.
-  ScopedJavaLocalRef(JNIEnv* env, T obj) : JavaRef<T>(env, obj), env_(env) {}
-
   ~ScopedJavaLocalRef() { Reset(); }
 
   // Null assignment, for disambiguation.
@@ -297,7 +291,14 @@ class ScopedJavaLocalRef : public JavaRef<T> {
   // Alias for Release(). For use in templates when global refs are invalid.
   T ReleaseLocal() { return static_cast<T>(JavaRef<T>::ReleaseInternal()); }
 
+#if !JNI_ZERO_ENABLE_COMPAT_API
  private:
+#endif
+  ScopedJavaLocalRef(JNIEnv* env, T obj) : JavaRef<T>(env, obj), env_(env) {}
+#if JNI_ZERO_ENABLE_COMPAT_API
+ private:
+#endif
+
   // This class is only good for use on the thread it was created on so
   // it's safe to cache the non-threadsafe JNIEnv* inside this object.
   JNIEnv* env_ = nullptr;

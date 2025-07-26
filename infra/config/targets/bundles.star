@@ -5467,7 +5467,6 @@ targets.bundle(
     name = "ios_failing_eg2_tests",
     targets = [
         "ios_chrome_settings_eg2tests_module",
-        "ios_chrome_signin_eg2tests_module",
         "ios_chrome_ui_eg2tests_module",
     ],
     per_test_modifications = {
@@ -5479,11 +5478,6 @@ targets.bundle(
             ),
             "ios_parallel_simulators",
         ],
-        "ios_chrome_signin_eg2tests_module": targets.mixin(
-            swarming = targets.swarming(
-                shards = 6,
-            ),
-        ),
         "ios_chrome_ui_eg2tests_module": [
             targets.mixin(
                 swarming = targets.swarming(
@@ -5499,7 +5493,6 @@ targets.bundle(
     name = "ios_failing_screen_size_dependent_tests",
     targets = [
         "ios_web_inttests",
-        "ios_web_unittests",
     ],
 )
 
@@ -5557,6 +5550,7 @@ targets.bundle(
     name = "ios_passing_eg2_tests",
     targets = [
         "ios_chrome_bookmarks_eg2tests_module",
+        "ios_chrome_signin_eg2tests_module",
         "ios_chrome_smoke_eg2tests_module",
         "ios_chrome_web_eg2tests_module",
     ],
@@ -5564,6 +5558,11 @@ targets.bundle(
         "ios_chrome_bookmarks_eg2tests_module": targets.mixin(
             swarming = targets.swarming(
                 shards = 3,
+            ),
+        ),
+        "ios_chrome_signin_eg2tests_module": targets.mixin(
+            swarming = targets.swarming(
+                shards = 6,
             ),
         ),
         "ios_chrome_web_eg2tests_module": targets.mixin(
@@ -5581,6 +5580,7 @@ targets.bundle(
         "components_unittests",
         "gfx_unittests",
         "ios_chrome_unittests",
+        "ios_web_unittests",
         "ios_web_view_inttests",
         "ios_web_view_unittests",
         "skia_unittests",
@@ -6844,14 +6844,22 @@ targets.bundle(
     name = "tvos_tests",
     targets = [
         "base_unittests",
+        "components_browsertests",
         "components_unittests",
         "content_unittests",
+        "media_unittests",
     ],
     per_test_modifications = {
         "base_unittests": targets.mixin(
             args = [
                 "--test-launcher-bot-mode",
                 "--test-launcher-filter-file=testing/buildbot/filters/ios.base_unittests.filter",
+            ],
+        ),
+        "components_browsertests": targets.mixin(
+            args = [
+                "--test-launcher-bot-mode",
+                "--test-launcher-filter-file=testing/buildbot/filters/ios.use_blink.components_browsertests.filter;testing/buildbot/filters/tvos.components_browsertests.filter",
             ],
         ),
         "components_unittests": targets.mixin(
@@ -6864,6 +6872,12 @@ targets.bundle(
             args = [
                 "--test-launcher-bot-mode",
                 "--test-launcher-filter-file=testing/buildbot/filters/ios.content_unittests.filter",
+            ],
+        ),
+        "media_unittests": targets.mixin(
+            args = [
+                "--test-launcher-bot-mode",
+                "--test-launcher-filter-file=testing/buildbot/filters/ios.media_unittests.filter",
             ],
         ),
     },

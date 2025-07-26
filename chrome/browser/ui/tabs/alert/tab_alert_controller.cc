@@ -14,6 +14,7 @@
 #include "base/containers/to_vector.h"
 #include "base/functional/bind.h"
 #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
+#include "chrome/browser/ui/recently_audible_helper.h"
 #include "chrome/browser/ui/tabs/alert/tab_alert.h"
 #include "chrome/browser/vr/vr_tab_helper.h"
 #include "content/public/browser/web_contents.h"
@@ -76,15 +77,29 @@ TabAlertController::TabAlertController(
           .get());
   vr_tab_helper_observation_.Observe(
       vr::VrTabHelper::FromWebContents(web_contents()));
+  recently_audible_subscription_ =
+      RecentlyAudibleHelper::FromWebContents(tab.GetContents())
+          ->RegisterRecentlyAudibleChangedCallback(base::BindRepeating(
+              &TabAlertController::OnRecentlyAudibleStateChanged,
+              base::Unretained(this)));
 
 #if BUILDFLAG(ENABLE_GLIC)
   if (glic_keyed_service) {
+    callback_subscriptions_.push_back(
+        glic_keyed_service->AddContextAccessIndicatorStatusChangedCallback(
+            base::BindRepeating(
+                &TabAlertController::OnGlicContextAccessIndicatorStatusChanged,
+                base::Unretained(this))));
     glic::GlicSharingManager& glic_sharing_manager =
         glic_keyed_service->sharing_manager();
-    glic_sharing_status_changed_subscription_ =
+    callback_subscriptions_.emplace_back(
+        glic_sharing_manager.AddFocusedTabChangedCallback(base::BindRepeating(
+            &TabAlertController::OnGlicSharingFocusedTabChanged,
+            base::Unretained(this))));
+    callback_subscriptions_.emplace_back(
         glic_sharing_manager.AddTabPinningStatusChangedCallback(
             base::BindRepeating(&TabAlertController::OnGlicTabPinningChanged,
-                                base::Unretained(this)));
+                                base::Unretained(this))));
   }
 #endif  // BUILDFLAG(ENABLE_GLIC)
 }
@@ -121,6 +136,11 @@ void TabAlertController::OnDiscardContents(TabInterface* tab_interface,
   vr_tab_helper_observation_.Reset();
   vr_tab_helper_observation_.Observe(
       vr::VrTabHelper::FromWebContents(new_contents));
+  recently_audible_subscription_ =
+      RecentlyAudibleHelper::FromWebContents(new_contents)
+          ->RegisterRecentlyAudibleChangedCallback(base::BindRepeating(
+              &TabAlertController::OnRecentlyAudibleStateChanged,
+              base::Unretained(this)));
 }
 
 void TabAlertController::OnCapabilityTypesChanged(
@@ -156,10 +176,6 @@ void TabAlertController::MediaPictureInPictureChanged(
 
 void TabAlertController::DidUpdateAudioMutingState(bool muted) {
   UpdateAlertState(TabAlert::AUDIO_MUTING, muted);
-}
-
-void TabAlertController::OnAudioStateChanged(bool audible) {
-  UpdateAlertState(TabAlert::AUDIO_PLAYING, audible);
 }
 
 void TabAlertController::OnIsCapturingVideoChanged(
@@ -206,12 +222,35 @@ void TabAlertController::OnIsContentDisplayedInHeadsetChanged(bool state) {
   UpdateAlertState(TabAlert::VR_PRESENTING_IN_HEADSET, state);
 }
 
+#if BUILDFLAG(ENABLE_GLIC)
+void TabAlertController::OnGlicContextAccessIndicatorStatusChanged(
+    bool is_accessing) {
+  UpdateAlertState(TabAlert::GLIC_ACCESSING,
+                   GetGlicKeyedService(tab().GetBrowserWindowInterface())
+                       ->IsContextAccessIndicatorShown(tab().GetContents()));
+}
+
+void TabAlertController::OnGlicSharingFocusedTabChanged(
+    const glic::FocusedTabData& focused_tab_data) {
+  const bool is_alert_active =
+      focused_tab_data.focus() != &tab()
+          ? false
+          : GetGlicKeyedService(tab().GetBrowserWindowInterface())
+                ->IsContextAccessIndicatorShown(tab().GetContents());
+  UpdateAlertState(TabAlert::GLIC_ACCESSING, is_alert_active);
+}
+
 void TabAlertController::OnGlicTabPinningChanged(
     tabs::TabInterface* tab_interface,
     bool is_sharing) {
   if (tab_interface->GetContents() == web_contents()) {
     UpdateAlertState(TabAlert::GLIC_SHARING, is_sharing);
   }
+}
+#endif  // BUILDFLAG(ENABLE_GLIC)
+
+void TabAlertController::OnRecentlyAudibleStateChanged(bool was_audible) {
+  UpdateAlertState(TabAlert::AUDIO_PLAYING, was_audible);
 }
 
 void TabAlertController::UpdateAlertState(TabAlert alert, bool is_active) {

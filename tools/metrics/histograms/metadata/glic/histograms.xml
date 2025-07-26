@@ -97,7 +97,9 @@ chromium-metrics-reviews@google.com.
     <variant name="OnResponseStarted"/>
     <variant name="OnResponseStopped"/>
     <variant name="OnSessionTerminated"/>
+    <variant name="OnTurnCompleted"/>
     <variant name="OnUserInputSubmitted"/>
+    <variant name="OnViewChanged"/>
     <variant name="OpenGlicSettingsPage"/>
     <variant name="OpenOsPermissionSettingsMenu"/>
     <variant name="PauseActorTask"/>
@@ -327,6 +329,26 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Glic.Host.LoadingStageDuration.{LoadingStage}" units="ms"
+    expires_after="2026-07-21">
+  <owner>iwells@chromium.org</owner>
+  <owner>harringtond@chromium.org</owner>
+  <summary>
+    Records the amount of time a particular loading step took to complete.
+    {LoadingStage}
+  </summary>
+<!-- LINT.IfChange(LoadingStage) -->
+
+  <token key="LoadingStage">
+    <variant name="AwaitingCookieSync"/>
+    <variant name="AwaitingNotifyPanelWillOpen"/>
+    <variant name="AwaitingProfileReady"/>
+    <variant name="LoadingWebClient"/>
+  </token>
+<!-- LINT.ThenChange(//chrome/browser/resources/glic/glic_app_controller.ts:LoadingStage) -->
+
+</histogram>
+
 <histogram name="Glic.Host.WebClientState.{Event}"
     enum="GlicDetailedWebClientState" expires_after="2026-01-15">
   <owner>harringtond@chromium.org</owner>
@@ -372,6 +394,15 @@ chromium-metrics-reviews@google.com.
     Debug histogram that tracks the internal steps that lead to the granting of
     AutoPlay permissions to the renderer frame hosting Glic's embedded webview.
     Samples are recorded when their respective events take place.
+  </summary>
+</histogram>
+
+<histogram name="Glic.MaybeReplaceNavigation.Result" enum="Boolean"
+    expires_after="2026-01-15">
+  <owner>liberato@chromium.org</owner>
+  <summary>
+    Records the boolean result of calling MaybeReplaceNavigation. This is used
+    to determine if a navigation was replaced with a media viewer.
   </summary>
 </histogram>
 
@@ -453,8 +484,19 @@ chromium-metrics-reviews@google.com.
   <owner>harringtond@chromium.org</owner>
   <owner>erikchen@chromium.org</owner>
   <summary>
-    Recorded when a page context gets screenshot (post-encoding and scaling).
-    Measure the time from start.
+    Recorded when a page context successfully gets a screenshot (post-encoding
+    and scaling). Measure the time from start.
+  </summary>
+</histogram>
+
+<histogram name="Glic.PageContextFetcher.GetEncodedScreenshot.Failure"
+    units="ms" expires_after="2026-01-15">
+  <owner>carlosk@chromium.org</owner>
+  <owner>harringtond@chromium.org</owner>
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    Recorded when a page context fails to get a screenshot. This includes any
+    kind of error, including timeout. Measure the time from start.
   </summary>
 </histogram>
 
@@ -805,6 +847,20 @@ chromium-metrics-reviews@google.com.
     There is no guarantee of correlation with Response.StartTime. This exists
     for diagnostic purposes only.
   </summary>
+</histogram>
+
+<histogram name="Glic.Response.TurnDuration.{Mode}" units="ms"
+    expires_after="2026-01-15">
+  <owner>dtapuska@chromium.org</owner>
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    Recorded at the end of a turn response from the server indicating the time
+    the entire request/response sequence took.
+  </summary>
+  <token key="Mode">
+    <variant name="Actor" summary="Recorded when the actor model is used."/>
+    <variant name="Default" summary="Recorded when the default model is used."/>
+  </token>
 </histogram>
 
 <histogram name="Glic.ScrollTo.ErrorReason" enum="GlicScrollToErrorReason"
