@@ -276,6 +276,7 @@
 <translation id="1202216683470826356">在新分頁中顯示卡片</translation>
 <translation id="1203676252390737801">每個網址的 WebRTC IP 處理方式</translation>
 <translation id="1204263402976895730">啟用的企業印表機</translation>
+<translation id="120513772363332049">轉譯器程序在核心執行時，其他程序都不會安排在同一個 CPU 核心上執行。</translation>
 <translation id="1207301487141109411">禁止從本機檔案系統、相機圖庫和 Google 個人資料選取使用者顯示圖片</translation>
 <translation id="1209096923317019235">將應用程式指派為特定副檔名的預設處理常式</translation>
 <translation id="120937472976628837">回報風扇資訊</translation>
@@ -1474,6 +1475,9 @@
 <translation id="208566302163036794">封鎖已停用的功能</translation>
 <translation id="2086040449830622332">啟用 LPAC 沙箱的列印服務</translation>
 <translation id="208623333578980446">允許電源管理的螢幕 Wake Lock</translation>
+<translation id="2086505225896497574">如果設定這項政策，當網站要求安全金鑰認證憑證時，系統就會指定 WebAuthn RP ID，而不會在登入畫面顯示提示。系統也會傳送信號給安全金鑰，表明可能會使用企業認證。如果未設定這項政策，當網站要求安全金鑰的認證時，系統會向使用者顯示提示。
+
+這項裝置政策與現有的使用者政策 <ph name="SECURITY_KEY_PERMIT_ATTESTATION_POLICY_NAME" /> 相同，但適用於登入畫面上的登入設定檔。</translation>
 <translation id="2089541797660774692">啟用受管理瀏覽器的雲端報告功能</translation>
 <translation id="2090712407517297305">chrome://history/grouped 的 Chrome 歷史記錄頁面會依群組顯示內容。</translation>
 <translation id="2090939118981888335">如果將這項政策設為啟用，代表允許使用資料壓縮 Proxy。如果將這項政策設為停用，則代表禁止使用該 Proxy。
@@ -3655,6 +3659,15 @@ ServiceWorkerAutoPreload 功能會在開始執行 ServiceWorker 啟動程序時�
       如果將這項政策設為停用，就會禁止使用 Translator API。</translation>
 <translation id="366494444808132420">允許整合 Gemini。</translation>
 <translation id="3665437376055221832">只在沒有任何符合自動選取政策的憑證時提示使用者。</translation>
+<translation id="3667089394451236198">網址模式清單。若網站來自相符來源，發出的要求不會經過<ph name="LOCAL_NETWORK_ACCESS" />檢查。
+
+如果來源同時受這項政策和 LocalNetworkAccessBlockedForUrls 規範，將優先採用 LocalNetworkAccessBlockedForUrls 政策。
+
+如果來源不符合此處指定的模式，將套用使用者的個人設定。
+
+如要進一步瞭解有效的網址模式，請參閱 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。
+
+如要瞭解<ph name="LOCAL_NETWORK_ACCESS" />限制，請前往 https://wicg.github.io/local-network-access/。</translation>
 <translation id="3671773704245936868">停用鍵盤焦點醒目顯示功能</translation>
 <translation id="3674010627788940405">不支援 CORS 非萬用字元要求標頭。</translation>
 <translation id="3675303748198647471">setTimeout(…, 0) 常用來細分長時間的 JavaScript 工作。
@@ -4206,6 +4219,17 @@ ServiceWorkerAutoPreload 功能會在開始執行 ServiceWorker 啟動程序時�
       如果未設定 <ph name="DEFAULT_SEARCH_PROVIDER_KEYWORD_POLICY_NAME" /> 政策，沒有任何關鍵字會啟動搜尋引擎。</translation>
 <translation id="4090088362777472639">Ansible Playbook 的 SHA-256 雜湊值。</translation>
 <translation id="4091040199847925434">停用系統資訊及頁面內容回報功能 (系統將無法根據這類資訊改善安全瀏覽服務)</translation>
+<translation id="4092882308219320847">網址模式清單。若網站來自相符來源，將無法發出<ph name="LOCAL_NETWORK_ACCESS" />要求。
+
+如果來源同時受這項政策和 LocalNetworkAccessAllowedForUrls 規範，將優先採用這項政策。
+
+視<ph name="LOCAL_NETWORK_ACCESS" />的推出階段而定，可能也需要啟用 LocalNetworkAccessRestrictionsEnabled，這項政策才能封鎖<ph name="LOCAL_NETWORK_ACCESS" />要求。
+
+如果來源不符合此處指定的模式，將套用使用者的個人設定。
+
+如要進一步瞭解有效的網址模式，請參閱 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。
+
+如要瞭解<ph name="LOCAL_NETWORK_ACCESS" />限制，請前往 https://wicg.github.io/local-network-access/。</translation>
 <translation id="4093058072421210667">不允許使用內嵌圖片功能。</translation>
 <translation id="4098920079809952737">不論是否使用背景圖形一律允許列印</translation>
 <translation id="410061592404122032">每當網站要取得視窗管理權限時詢問我</translation>
@@ -6273,6 +6297,7 @@ ServiceWorkerAutoPreload 功能會在開始執行 ServiceWorker 啟動程序時�
 <translation id="5490462588616309068">如果將這項政策設為 true 或未設定，系統會允許使用受保護內容 ID，進而提高受保護內容的播放品質。
 
 如果將這項政策設為 False，系統就不允許使用受保護內容 ID。</translation>
+<translation id="5492713303272131731">轉譯器程序在核心執行時，其他所有程序都能安排在同一個 CPU 核心上執行。</translation>
 <translation id="5494322570831642650">指定使用者是否可在 <ph name="PRODUCT_NAME" /> 中以無痕模式開啟網頁。
 
       如果將這項政策設為「Enabled」或不予設定，使用者能夠以無痕模式開啟網頁。
@@ -6638,6 +6663,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
       注意：請以半形逗號分隔多個值。</translation>
 <translation id="5693469654327063861">允許資料遷移</translation>
 <translation id="56936613186060503">下載管理員無法將檔案儲存到 <ph name="GOOGLE_DRIVE_NAME" />。</translation>
+<translation id="569457565603183">自動允許網址/網域在登入畫面上直接進行安全金鑰認證</translation>
 <translation id="5695209488612697377">允許透過內容選單使用預設搜尋引擎。
 
           如果將這項政策設為停用，內容選單上將不會出現搭配預設搜尋引擎的搜尋項目。
@@ -7668,7 +7694,6 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="6412352702230183710">僅允許系統層級的原生訊息傳遞主機</translation>
 <translation id="6412793408912788345">在登入時顯示 Gemini 簡介畫面</translation>
 <translation id="6416506846917150119">不在使用者輸入內容時提供實體鍵盤的預測書寫建議</translation>
-<translation id="6416916931494972926">啟用 Kiosk Vision 的遙測回報功能。</translation>
 <translation id="6417265370957905582">Google 助理</translation>
 <translation id="6419001911253110938">允許在登入流程中顯示工作階段內 AI 功能的簡介畫面</translation>
 <translation id="6421254653839955267">如果將這項政策設為啟用，系統會略過 CNAME 查詢。系統產生 Kerberos SPN 時會使用先前輸入的伺服器名稱。
@@ -7816,7 +7841,6 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 
       如果不設定這項政策，系統預設會為受管理的使用者停用此機制，其他使用者則會設為啟用。</translation>
 <translation id="6508403116553969858">設定適用於 <ph name="PRODUCT_NAME" /> 生成式 AI 功能的預設政策值</translation>
-<translation id="6508882314969525299">停用 Kiosk Vision 的遙測回報功能。</translation>
 <translation id="6509376413448002446">設定鎖定畫面的使用者螢幕保護程式。
 
 如果將這項政策設為 True，<ph name="PRODUCT_OS_NAME" /> 裝置的鎖定畫面就會在閒置時顯示螢幕保護程式。
@@ -8161,6 +8185,11 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 
 如果是 <ph name="PRODUCT_NAME" />，裝置必須使用 <ph name="CLOUD_MANAGEMENT_ENROLLMENT_TOKEN" /> 註冊，這項政策才會生效。
 如果是 <ph name="PRODUCT_OS_NAME" />，這項政策一律會生效。</translation>
+<translation id="6720071484598746942">如果將這項政策設為啟用，只要<ph name="DEV_TOOLS_NAME" />因 <ph name="LOCAL_NETWORK_ACCCESS" /> 檢查失敗而應該顯示警告，系統就會改為封鎖主要要求。
+
+如果將這項政策設為停用或未設定，系統會使用預設處理方式處理<ph name="LOCAL_NETWORK_ACCESS" />要求。
+
+如要瞭解<ph name="LOCAL_NETWORK_ACCESS" />限制，請前往 https://wicg.github.io/local-network-access/。</translation>
 <translation id="6720330829631914048">一天開始後經過的小時數 (24 小時制)。</translation>
 <translation id="6721252203593581486">在 M97 中，第三方內容中的 WebSQL (例如跨網站 iframe) 預設為關閉狀態，而在 M101 中將全面移除。
           如果將這項政策設為 False 或不予設定，第三方內容中的 WebSQL 會保持關閉。
@@ -10250,6 +10279,10 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="8331479227794770304">啟用相黏鍵</translation>
 <translation id="8332822245414537447">停用 RSA 金鑰用途檢查功能</translation>
 <translation id="8334685561819743286">使用者在實體鍵盤上輸入內容時不提供自動更正</translation>
+<translation id="8336986243404088829">這項政策會將轉譯器程序隔離在 CPU 核心，並禁止其他程序共用同一個核心，藉此防範旁路跨程序記憶體攻擊。<ph name="MS_WIN_NAME" /> 11 24H2 以上版本支援這項緩解措施。如果 OS 不支援必要的排程功能，這項政策就不會生效。這項政策在某些高需求情境可能會降低效能，類似於停用超執行緒。詳情請參閱 https://learn.microsoft.com/zh-tw/windows/win32/api/winnt/ns-winnt-process_mitigation_side_channel_isolation_policy
+      如果啟用這項政策，轉譯器程序執行時，其他程序就不會安排在同一個 CPU 核心上執行。
+      如果停用這項政策，轉譯器程序在核心執行時，其他程序都能安排在同一個 CPU 核心上執行。
+      如果不設定這項政策，轉譯器程序在核心執行時，其他程序都能安排在同一個 CPU 核心上執行。具體情況可能會因 <ph name="PRODUCT_NAME" /> 版本、目前執行的實測和平台而異。</translation>
 <translation id="8337114537412769126">如果已啟用 <ph name="DEFAULT_SEARCH_PROVIDER_ENABLED_POLICY_NAME" /> 政策，你可以設定 <ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" /> 政策來指定使用 POST 提供搜尋建議時的參數。設定值由名稱和值的組合所構成 (以半形逗號分隔多個設定值)。如果值為範本參數 (例如 <ph name="SEARCH_TERM_MARKER" />)，實際的搜尋字詞資料會取代該參數。
 
       如果未設定 <ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" /> 政策，系統會使用 GET 方法傳送建議搜尋要求。</translation>
@@ -10661,9 +10694,6 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
       如果將這項政策設為 True，系統可能會凍結在背景執行 5 分鐘以上的分頁。凍結分頁可降低 CPU、電力和記憶體的使用量。<ph name="PRODUCT_NAME" /> 會根據經驗法則判斷，不會凍結在背景執行實用作業 (例如顯示通知、播放音效、串流播放影片) 的分頁。網站開發人員也可以將自己的網站設為禁止凍結 (https://chromium.googlesource.com/chromium/src/+/HEAD/chrome/browser/performance_manager/docs/freezing_opt_out_opt_in.md)。
 
       如果將這項政策設為 False，系統將不會凍結任何分頁。</translation>
-<translation id="8607613052618540095">如果將這項政策設為啟用，系統就會啟用 Kiosk Vision 的遙測回報功能。
-如此一來，Kiosk Vision 架構會隨之啟動，目標對象遙測資訊回報功能也會啟用。
-如果將這項政策設為停用或未設定，系統就會停用 Kiosk Vision 的遙測回報功能。</translation>
 <translation id="8610216287193516769">已在 M122 版中移除 - 這項政策僅適用於伺服器端，不會透過 ChromeOS 政策基礎架構推送到裝置。
 如果將這項政策設為 <ph name="POLICY_VALUE_ALL" /> 或不設定，系統將不會限制代管帳戶的使用方式。如果這樣設定，代管帳戶可能會成為次要帳戶，但該帳戶只有做為瀏覽器設定檔中的主要帳戶登入時，才能接收政策。
       在以下情況下，系統不會強制執行對該帳戶設定的政策：
@@ -11477,6 +11507,7 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 <translation id="9162444960513782569">強制不啟用背景 JavaScript 計時器的節流功能</translation>
 <translation id="9164656078867027374">定義可存取 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 的網域</translation>
 <translation id="9165128017344777105">允許這些網站上的本機字型權限</translation>
+<translation id="9165498643231979857">限制轉譯器程序共用 CPU 核心</translation>
 <translation id="9166670902476893480">這項政策用於控管當 <ph name="PRODUCT_NAME" /> 提出不安全的 DNS 要求時，是否能夠查詢其他 DNS 記錄類型。這項政策不會影響透過安全 DNS 提出的 DNS 查詢；換句話說，透過安全 DNS 依然一律可以查詢其他 DNS 類型。
 
       如未設定這項政策，或將這項政策設為「啟用」，則除了 <ph name="DNS_TYPE_A" /> (DNS 類型 1) 與 <ph name="DNS_TYPE_AAAA" /> (DNS 類型 28) 以外，還可查詢 <ph name="DNS_TYPE_HTTPS" /> (DNS 類型 65) 等其他 DNS 類型。

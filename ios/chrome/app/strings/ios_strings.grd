@@ -277,7 +277,13 @@
         Search screen
       </message>
       <message name="IDS_IOS_AI_HUB_READER_MODE_LABEL" desc="The button label for the Reader mode entry point of the AI hub.">
-        Reader mode
+        Reading mode
+      </message>
+      <message name="IDS_IOS_AI_HUB_READER_MODE_OPTIONS_BUTTON_TITLE" desc="Title of a button to customise Reader mode options from the AI hub.">
+        Open Reading mode options
+      </message>
+      <message name="IDS_IOS_AI_HUB_READER_MODE_OPTIONS_FONT_LABEL" desc="A subtitle of a button to customise Reader mode options from the AI hub. The subtitle shows a preview of the currently selected font in Reader mode.">
+        Font: <ph name="FONT">$1<ex>Serif</ex></ph>
       </message>
       <message name="IDS_IOS_AI_PROTOTYPING_CALENDAR_HEADER" translateable="false" desc="The title for the enhanced calendar page of the AI prototyping menu [Length: unlimited].">
         Enhanced Calendar
@@ -412,6 +418,9 @@
       <message name="IDS_IOS_AUTOFILL_CARD_NUMBER" desc="Title of the field representing the number (PAN) on a credit card. [Length: 10em] [iOS only]">
         Card number
       </message>
+      <message name="IDS_IOS_AUTOFILL_CARD_SAVED" desc="Title for the save local card confirmation message info bar. [iOS only]">
+        Card saved
+      </message>
       <message name="IDS_IOS_AUTOFILL_CITY" desc="Title of the field of a profile address representing the city/town of the address. [Length: 15em] [iOS only]">
         City / Town
       </message>
@@ -447,6 +456,9 @@
       </message>
       <message name="IDS_IOS_AUTOFILL_EDIT_ADDRESS" desc="Title for the view in Settings for editing an Autofill profile address. [Length: 20em] [iOS only]">
         Edit address
+      </message>
+      <message name="IDS_IOS_AUTOFILL_EDIT_ADDRESS_CELL" desc="Title for the cell row in Settings for editing an Autofill profile home and work address. [Length: 20em] [iOS only]">
+        Edit...
       </message>
       <message name="IDS_IOS_AUTOFILL_EDIT_CREDIT_CARD" desc="Title for the view in Settings for editing an Autofill profile address. [Length: 20em] [iOS only]">
         Edit credit card
@@ -499,6 +511,9 @@
       </message>
       <message name="IDS_IOS_AUTOFILL_SAVE_CARD_CLOSE" desc="Title for the save credit card modal's bar button to close the view. [iOS only]">
         Close
+      </message>
+      <message name="IDS_IOS_AUTOFILL_SAVE_CARD_GOT_IT" desc="Title for the save local card confirmation message info bar button to close the view. [iOS only]">
+        Got it
       </message>
       <message name="IDS_IOS_AUTOFILL_SAVE_ELLIPSIS" desc="Title for the button that presents the View for Saving a credit card. The ellipsis indicate that a following action (the presentation) will take place. [Length: 10em] [iOS only]">
         Save…
@@ -735,11 +750,6 @@
           {count, plural,
           =1 {Bookmark saved}
           other {{count} bookmarks saved}}
-      </message>
-      <message name="IDS_IOS_BOOKMARKS_BULK_SAVED_ACCOUNT" desc="This confirmation message is intended to help users understand that multiple bookmarks have been saved in their account. The confirmation message appears at the bottom of the page after users bulk add bookmarks, telling them how many bookmarks they've added into their account. The tone should be informative.">
-          {count, plural,
-          =1 {Bookmark saved in your Google Account, {email}}
-          other {{count} bookmarks saved in your Google Account, {email}}}
       </message>
       <message name="IDS_IOS_BOOKMARKS_FOLDER_NAME_WITH_CLOUD_SLASH_ICON_LABEL" desc="Accessibility label of the cloud.slash icon in the bookmark views on Folder. For voice over only, not in UI. [iOS only]">
         <ph name="FOLDER_NAME">$1<ex>new folder</ex></ph>. Only on this device.
@@ -1041,6 +1051,9 @@
           =1 {Item saved in your Google Account, {email}}
           other {Items saved in your Google Account, {email}}}
       </message>
+      <message name="IDS_IOS_BWG_ASK_GEMINI_ACCESSIBILITY_LABEL" desc="Accessibility label for the direct Gemini entry point button.">
+        Ask Gemini
+      </message>
       <message name="IDS_IOS_BWG_CONSENT_FIRST_BOX_TITLE" desc="First box title text for the Gemini Consent page for managed accounts.">
           Your page content is shared for more relevant answers
       </message>
@@ -1106,6 +1119,18 @@
       </message>
       <message name="IDS_IOS_BWG_PAGE_ACTION_MENU_ENTRY_POINT_ACCESSIBILITY_LABEL" desc="Accessibility label for the page action menu entry point.">
           Open on-page AI tools
+      </message>
+      <message name="IDS_IOS_BWG_PAGE_CONTENT_SHARING_ALERT_ACCEPT_BUTTON" desc="The accept button for the alert asking a user to turn on Page Content sharing.">
+          Turn on
+      </message>
+      <message name="IDS_IOS_BWG_PAGE_CONTENT_SHARING_ALERT_DECLINE_BUTTON" desc="The decline button for the alert asking a user to turn on Page Content sharing.">
+          No thanks
+      </message>
+      <message name="IDS_IOS_BWG_PAGE_CONTENT_SHARING_ALERT_MESSAGE" desc="The body/message of the alert asking a user to turn on Page Content sharing with Gemini so they can get more relevant results. This asks them if they would like to share the contents of webpages with Gemini.">
+          Share page content with Gemini to get more relevant answers
+      </message>
+      <message name="IDS_IOS_BWG_PAGE_CONTENT_SHARING_ALERT_TITLE" desc="The title of the alert asking a user to turn on Page Content sharing.">
+          Turn on page content sharing
       </message>
       <message name="IDS_IOS_BWG_PROMO_FIRST_BOX_BODY" desc="First box body text for the Gemini Promo page.">
           Get relevant answers based on the content of the page you're on
@@ -5430,6 +5455,15 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       <message name="IDS_IOS_SAFARI_IMPORT_IMPORT_ACTION_BUTTON_SELECT_YOUR_FILE" desc="Safari import screen that handles the import process - Button text to select the file to import data from Safari. [iOS only]">
         Select your file
       </message>
+      <message name="IDS_IOS_SAFARI_IMPORT_IMPORT_FAILURE_MESSAGE_DESCRIPTION" desc="Description in the alert message informing the user that the currently selected file could not be imported to Chrome. [iOS only]">
+        This file is empty or contains data in the wrong format
+      </message>
+      <message name="IDS_IOS_SAFARI_IMPORT_IMPORT_FAILURE_MESSAGE_OK_BUTTON" desc="Button at the bottom of the alert message to dismiss it. The alert informs the user that the currently selected file could not be imported to Chrome. [iOS only]">
+        OK
+      </message>
+      <message name="IDS_IOS_SAFARI_IMPORT_IMPORT_FAILURE_MESSAGE_TITLE" desc="Title of the alert message informing the user that the currently selected file could not be imported to Chrome. [iOS only]">
+        Couldn't import file
+      </message>
       <message name="IDS_IOS_SAFARI_IMPORT_IMPORT_INSTRUCTIONS_ONE" desc="Instructions view to teach users how to import data from Safari - step 1. [iOS only]">
         Tap <ph name="BEGIN_BOLD">BEGIN_BOLD</ph>Select your file<ph name="END_BOLD">END_BOLD</ph>
       </message>
@@ -6249,9 +6283,6 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       </message>
       <message name="IDS_IOS_SET_UP_LIST_NOTIFICATIONS_TITLE" desc="Title for the Set Up List item that encourages the user to enable Chrome notifications.">
         Get notifications
-      </message>
-      <message name="IDS_IOS_SET_UP_LIST_SIGN_IN_SYNC_SHORT_DESCRIPTION_NO_SYNC" desc="Same as IDS_IOS_SET_UP_LIST_SIGN_IN_SYNC_SHORT_DESCRIPTION but without mentioning sync.">
-        Get your bookmarks, passwords, and more.
       </message>
       <message name="IDS_IOS_SET_UP_LIST_TRY_BUTTON_ACCESSIBILITY_HINT" desc="Action hint for the Try button on the Set Up List view. This is spoken by VoiceOver. ">
         Double tap to try

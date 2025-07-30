@@ -32,8 +32,6 @@
 #include "chrome/browser/feedback/feedback_uploader_factory_chrome.h"
 #include "chrome/browser/glic/glic_enabling.h"
 #include "chrome/browser/glic/glic_hotkey.h"
-#include "chrome/browser/glic/glic_keyed_service.h"
-#include "chrome/browser/glic/glic_keyed_service_factory.h"
 #include "chrome/browser/glic/glic_metrics.h"
 #include "chrome/browser/glic/glic_pref_names.h"
 #include "chrome/browser/glic/glic_profile_manager.h"
@@ -48,6 +46,8 @@
 #include "chrome/browser/glic/host/glic_web_client_access.h"
 #include "chrome/browser/glic/host/host.h"
 #include "chrome/browser/glic/media/glic_media_link_helper.h"
+#include "chrome/browser/glic/public/glic_keyed_service.h"
+#include "chrome/browser/glic/public/glic_keyed_service_factory.h"
 #include "chrome/browser/glic/widget/browser_conditions.h"
 #include "chrome/browser/glic/widget/glic_window_controller.h"
 #include "chrome/browser/global_features.h"
@@ -326,7 +326,8 @@ class JournalHandler {
 
     active_journal_events_[event_async_id] =
         actor_keyed_service_->GetJournal().CreatePendingAsyncEntry(
-            /*url=*/GURL::EmptyGURL(), actor::TaskId(task_id), event, details);
+            /*url=*/GURL::EmptyGURL(), actor::TaskId(task_id),
+            actor::mojom::JournalTrack::kFrontEnd, event, details);
   }
 
   void LogEndAsyncEvent(uint64_t event_async_id, const std::string& details) {
@@ -341,7 +342,8 @@ class JournalHandler {
                        const std::string& event,
                        const std::string& details) {
     actor_keyed_service_->GetJournal().Log(
-        /*url=*/GURL::EmptyGURL(), actor::TaskId(task_id), event, details);
+        /*url=*/GURL::EmptyGURL(), actor::TaskId(task_id),
+        actor::mojom::JournalTrack::kFrontEnd, event, details);
   }
 
   void Clear() {
@@ -754,6 +756,11 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   void GetContextFromFocusedTab(
       glic::mojom::GetTabContextOptionsPtr options,
       GetContextFromFocusedTabCallback callback) override {
+    if (ShouldDoApiActivationGating()) {
+      std::move(callback).Run(mojom::GetContextResult::NewErrorReason(
+          "permission denied: window not showing"));
+      return;
+    }
     auto* tab = glic_sharing_manager_->GetFocusedTabData().focus();
     auto tab_handle = tab ? tab->GetHandle() : tabs::TabHandle::Null();
     glic_sharing_manager_->GetContextFromTab(tab_handle, *options,
@@ -763,7 +770,12 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   void GetContextFromTab(int32_t tab_id,
                          glic::mojom::GetTabContextOptionsPtr options,
                          GetContextFromTabCallback callback) override {
-    // Activation gating is handled in this function.
+    if (ShouldDoApiActivationGating()) {
+      std::move(callback).Run(mojom::GetContextResult::NewErrorReason(
+          "permission denied: window not showing"));
+      return;
+    }
+    // Extra activation gating is done in this function.
     glic_sharing_manager_->GetContextFromTab(tabs::TabHandle(tab_id), *options,
                                              std::move(callback));
   }
@@ -798,10 +810,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
 
   void UnpinTabs(const std::vector<int32_t>& tab_ids,
                  UnpinTabsCallback callback) override {
-    if (ShouldDoApiActivationGating()) {
-      std::move(callback).Run(false);
-      return;
-    }
     std::vector<tabs::TabHandle> tab_handles;
     for (auto tab_id : tab_ids) {
       tab_handles.push_back(tabs::TabHandle(tab_id));
@@ -1055,14 +1063,16 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   }
 
   void OnUserInputSubmitted(glic::mojom::WebClientMode mode) override {
-    glic_service_->OnUserInputSubmitted(mode);
+    glic_service_->metrics()->OnUserInputSubmitted(mode);
   }
 
-  void OnRequestStarted() override { glic_service_->OnRequestStarted(); }
+  void OnResponseStarted() override {
+    glic_service_->metrics()->OnResponseStarted();
+  }
 
-  void OnResponseStarted() override { glic_service_->OnResponseStarted(); }
-
-  void OnResponseStopped() override { glic_service_->OnResponseStopped(); }
+  void OnResponseStopped() override {
+    glic_service_->metrics()->OnResponseStopped();
+  }
 
   void OnSessionTerminated() override {
     glic_service_->metrics()->OnSessionTerminated();

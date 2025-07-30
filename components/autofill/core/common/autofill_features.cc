@@ -79,10 +79,45 @@ BASE_FEATURE(kAutofillAiCreateEntityDataManager,
 #endif
 );
 
+// If enabled, no account-level capabilities are checked to determine whether
+// a user is eligible for AutofillAI.
+BASE_FEATURE(kAutofillAiIgnoreCapabilityCheck,
+             "AutofillAiIgnoreCapabilityCheck",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Allows us to control which actions `kAutofillAiIgnoreCapabilityCheck` applies
+// to. If `kAutofillAiIgnoreCapabilityCheckOnlyForNonModelActions` is true, then
+// MES and MQLS interactions are still constrained by an account-level
+// capability check.
+const base::FeatureParam<bool>
+    kAutofillAiIgnoreCapabilityCheckOnlyForNonModelActions{
+        &kAutofillAiIgnoreCapabilityCheck,
+        "autofill_ai_ignore_capability_check_only_for_non_model_actions",
+        false};
+
 // If enabled, no GeoIp requirements are imposed for AutofillAi.
+// Note that this feature can be modified as follows (all assuming that
+// `kAutofillAiIgnoreGeoIp` is enabled):
+// - If both `kAutofillAiIgnoreGeoIpAllowlist` and
+//   `kAutofillAiIgnoreGeoIpBlocklist` are empty, then all geo IPs are
+//   permitted.
+// - If only `kAutofillAiIgnoreGeoIpBlocklist` is non-empty, then all geo ips
+//   but those in `kAutofillAiIgnoreGeoIpBlocklist` are permitted.
+// - If `kAutofillAiIgnoreGeoIpAllowlist` is non-empty, then only geo ips in
+//   `kAutofillAiIgnoreGeoIpAllowlist` are permitted.
+//
+// Both the allowlist and the blocklist are expected to consist of
+// comma-separated uppercase two-digit country codes (see documentation of
+// `GeoIpCountryCode`.)
 BASE_FEATURE(kAutofillAiIgnoreGeoIp,
              "AutofillAiIgnoreGeoIp",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+const base::FeatureParam<std::string> kAutofillAiIgnoreGeoIpAllowlist{
+    &kAutofillAiIgnoreGeoIp, "autofill_ai_geo_ip_allowlist", ""};
+
+const base::FeatureParam<std::string> kAutofillAiIgnoreGeoIpBlocklist{
+    &kAutofillAiIgnoreGeoIp, "autofill_ai_geo_ip_blocklist", ""};
 
 // If enabled, no locale requirements are imposed for AutofillAi.
 BASE_FEATURE(kAutofillAiIgnoreLocale,

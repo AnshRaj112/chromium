@@ -7,6 +7,7 @@
 
 #include <optional>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 #include "components/autofill/core/browser/field_types.h"
@@ -55,14 +56,13 @@ class AutofillType {
         server_predictions;
   };
 
-  AutofillType();
   explicit AutofillType(FieldType field_type);
   explicit AutofillType(HtmlFieldType field_type);
   AutofillType(const AutofillType& autofill_type) = default;
   AutofillType& operator=(const AutofillType& autofill_type) = default;
   ~AutofillType() = default;
 
-  HtmlFieldType html_type() const { return html_type_; }
+  HtmlFieldType html_type() const;
 
   FieldTypeGroup group() const;
 
@@ -77,12 +77,7 @@ class AutofillType {
   std::string_view ToStringView() const;
 
  private:
-  // The default values indicate that the respective value is not set.
-  // At most one of them must be set at any time. That is, the following
-  // invariant must hold at all times:
-  //   server_type_ == UNKNOWN_TYPE || html_type_ == HtmlFieldType::kUnspecified
-  FieldType server_type_ = UNKNOWN_TYPE;
-  HtmlFieldType html_type_ = HtmlFieldType::kUnspecified;
+  std::variant<FieldType, HtmlFieldType> type_;
 };
 
 }  // namespace autofill

@@ -62,7 +62,7 @@ omnibox::NTPComposeboxConfig GetNTPComposeboxConfig() {
   image_upload->set_mime_types_allowed("image/*");
 
   auto* attachment_upload = composebox->mutable_attachment_upload();
-  attachment_upload->set_max_size_bytes(2000000);
+  attachment_upload->set_max_size_bytes(200000000);
   attachment_upload->set_mime_types_allowed(".pdf,application/pdf");
 
   composebox->set_max_num_files(1);
@@ -148,8 +148,7 @@ bool IsNtpSearchboxComposeEntrypointEnabled(BrowserProcess* browser_process) {
     return base::FeatureList::IsEnabled(
         kNtpSearchboxComposeEntrypointEnglishUS);
   }
-  return base::FeatureList::IsEnabled(kNtpSearchboxComposeEntrypoint) ||
-         FeatureConfig::Get().enabled;
+  return base::FeatureList::IsEnabled(kNtpSearchboxComposeEntrypoint);
 }
 
 // If enabled, the Composebox will appear upon clicking the NTP Compose
@@ -165,6 +164,10 @@ const base::FeatureParam<std::string> kConfigParam(&kNtpComposebox,
 const base::FeatureParam<bool> kSendLnsSurfaceParam(&kNtpComposebox,
                                                     "SendLnsSurfaceParam",
                                                     false);
+
+const base::FeatureParam<bool> kShowComposeboxZps(&kNtpComposebox,
+                                                  "ShowComposeboxZps",
+                                                  false);
 
 FeatureConfig::FeatureConfig()
     : enabled(base::FeatureList::IsEnabled(kNtpComposebox)),

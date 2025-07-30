@@ -248,6 +248,8 @@ void PasswordChangeDelegateImpl::StartPasswordChangeFlow() {
       ChromePasswordManagerClient::FromWebContents(executor_.get()),
       logs_uploader_.get(), change_password_url_,
       base::BindOnce(&PasswordChangeDelegateImpl::OnPasswordChangeFormFound,
+                     weak_ptr_factory_.GetWeakPtr()),
+      base::BindOnce(&PasswordChangeDelegateImpl::OnLoginFormFound,
                      weak_ptr_factory_.GetWeakPtr()));
 }
 
@@ -299,10 +301,16 @@ void PasswordChangeDelegateImpl::OnPasswordChangeFormFound(
   UpdateState(State::kChangingPassword);
 }
 
+void PasswordChangeDelegateImpl::OnLoginFormFound() {
+  UpdateState(State::kLoginFormDetected);
+}
+
 void PasswordChangeDelegateImpl::OnTabWillDetach(
     tabs::TabInterface* tab_interface,
     tabs::TabInterface::DetachReason reason) {
   if (reason == tabs::TabInterface::DetachReason::kDelete) {
+    base::UmaHistogramEnumeration(
+        "PasswordManager.PasswordChange.UserClosedTab", current_state_);
     if (logs_uploader_) {
       logs_uploader_->SetFlowInterrupted();
     }

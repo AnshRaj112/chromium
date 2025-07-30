@@ -18,9 +18,11 @@
 #include "components/user_education/common/feature_promo/feature_promo_specification.h"
 #include "components/user_education/common/feature_promo/impl/feature_promo_controller_20.h"
 #include "components/user_education/common/feature_promo/impl/feature_promo_controller_25.h"
+#include "components/user_education/common/help_bubble/help_bubble_params.h"
 #include "components/user_education/test/feature_promo_controller_test_base.h"
 #include "components/user_education/test/mock_user_education_context.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/base/interaction/element_tracker.h"
 #include "ui/base/interaction/expect_call_in_scope.h"
 #include "ui/base/interaction/interaction_sequence_test_util.h"
 
@@ -39,6 +41,9 @@ BASE_FEATURE(kIPHTestActionable,
              base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHTestLegalNotice,
              "IPH_TestLegalNotice",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHTestWithArrowCallback,
+             "IPH_TestWithArrowCallback",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 const ui::ElementContext kAlternateContext(2);
@@ -72,8 +77,13 @@ class FeaturePromoControllerQueueTest
   void SetUp() override {
     FeaturePromoControllerTestBase::SetUp();
     promo_registry().RegisterFeature(
-        FeaturePromoSpecification::CreateForTesting(kIPHTestLowPriorityToast,
-                                                    kAnchorElementId, IDS_OK));
+        std::move(FeaturePromoSpecification::CreateForTesting(
+                      kIPHTestLowPriorityToast, kAnchorElementId, IDS_OK)
+                      .SetBubbleArrow(HelpBubbleArrow::kBottomLeft)));
+    promo_registry().RegisterFeature(std::move(
+        FeaturePromoSpecification::CreateForTesting(kIPHTestWithArrowCallback,
+                                                    kAnchorElementId, IDS_OK)
+            .SetBubbleArrowCallback(help_bubble_arrow_callback_.Get())));
     promo_registry().RegisterFeature(
         FeaturePromoSpecification::CreateForTesting(
             kIPHTestLowPrioritySnooze, kAnchorElementId, IDS_OK,
@@ -124,6 +134,8 @@ class FeaturePromoControllerQueueTest
 
   base::MockCallback<FeaturePromoSpecification::CustomActionCallback>
       custom_action_callback_;
+  base::MockCallback<FeaturePromoSpecification::HelpBubbleArrowCallback>
+      help_bubble_arrow_callback_;
   raw_ptr<TestPromoControllerBase> test_promo_controller_ = nullptr;
 };
 
@@ -565,6 +577,33 @@ TEST_P(FeaturePromoControllerQueueTest, DisabledFeatureShownFromDemoPage) {
                                  std::move(params), promo_context()));
 }
 
+TEST_P(FeaturePromoControllerQueueTest, HelpBubbleArrow) {
+  UNCALLED_MOCK_CALLBACK(FeaturePromoController::ShowPromoResultCallback,
+                         result);
+  FeaturePromoParams params(kIPHTestLowPriorityToast);
+  params.show_promo_result_callback = result.Get();
+  EXPECT_ASYNC_CALL_IN_SCOPE(
+      result, Run(FeaturePromoResult::Success()),
+      promo_controller().MaybeShowPromo(std::move(params), promo_context()));
+  EXPECT_EQ(HelpBubbleArrow::kBottomLeft, GetHelpBubble()->params().arrow);
+}
+
+TEST_P(FeaturePromoControllerQueueTest, HelpBubbleArrowCallback) {
+  UNCALLED_MOCK_CALLBACK(FeaturePromoController::ShowPromoResultCallback,
+                         result);
+  FeaturePromoParams params(kIPHTestWithArrowCallback);
+  params.show_promo_result_callback = result.Get();
+  EXPECT_CALL(help_bubble_arrow_callback_, Run)
+      .WillOnce([](const ui::TrackedElement* el) {
+        EXPECT_EQ(kAnchorElementId, el->identifier());
+        return HelpBubbleArrow::kBottomLeft;
+      });
+  EXPECT_ASYNC_CALL_IN_SCOPE(
+      result, Run(FeaturePromoResult::Success()),
+      promo_controller().MaybeShowPromo(std::move(params), promo_context()));
+  EXPECT_EQ(HelpBubbleArrow::kBottomLeft, GetHelpBubble()->params().arrow);
+}
+
 #if !BUILDFLAG(IS_ANDROID)
 
 TEST_P(FeaturePromoControllerQueueTest, FeatureEngagementConfig) {
@@ -626,10 +665,9 @@ TEST_P(FeaturePromoControllerQueueTest, CustomActionCallbackPassesOnContext) {
       promo_controller().MaybeShowPromo(std::move(params), promo_context()));
   auto* const help_bubble = GetHelpBubble();
   ASSERT_NE(nullptr, help_bubble);
-  EXPECT_ASYNC_CALL_IN_SCOPE(
-      custom_action_callback_,
-      Run(promo_context()->GetElementContext(), testing::_),
-      help_bubble->SimulateButtonPress(0));
+  EXPECT_ASYNC_CALL_IN_SCOPE(custom_action_callback_,
+                             Run(testing::Eq(promo_context()), testing::_),
+                             help_bubble->SimulateButtonPress(0));
 }
 
 TEST_P(FeaturePromoControllerQueueTest,
@@ -670,10 +708,9 @@ TEST_P(FeaturePromoControllerQueueTest,
       promo_controller().MaybeShowPromo(std::move(params), promo_context()));
   auto* const help_bubble = GetHelpBubble();
   ASSERT_NE(nullptr, help_bubble);
-  EXPECT_ASYNC_CALL_IN_SCOPE(
-      custom_action_callback_,
-      Run(help_bubble_context->GetElementContext(), testing::_),
-      help_bubble->SimulateButtonPress(0));
+  EXPECT_ASYNC_CALL_IN_SCOPE(custom_action_callback_,
+                             Run(testing::Eq(help_bubble_context), testing::_),
+                             help_bubble->SimulateButtonPress(0));
 }
 
 TEST_P(FeaturePromoControllerQueueTest,
@@ -697,10 +734,9 @@ TEST_P(FeaturePromoControllerQueueTest,
   ASSERT_NE(nullptr, help_bubble);
   EXPECT_CALL(*help_bubble_context, IsValid)
       .WillRepeatedly(testing::Return(false));
-  EXPECT_ASYNC_CALL_IN_SCOPE(
-      custom_action_callback_,
-      Run(promo_context()->GetElementContext(), testing::_),
-      help_bubble->SimulateButtonPress(0));
+  EXPECT_ASYNC_CALL_IN_SCOPE(custom_action_callback_,
+                             Run(testing::Eq(promo_context()), testing::_),
+                             help_bubble->SimulateButtonPress(0));
 }
 
 TEST_P(
@@ -724,10 +760,9 @@ TEST_P(
   auto* const help_bubble = GetHelpBubble();
   ASSERT_NE(nullptr, help_bubble);
   EXPECT_CALL(*promo_context(), IsValid).WillRepeatedly(testing::Return(false));
-  EXPECT_ASYNC_CALL_IN_SCOPE(
-      custom_action_callback_,
-      Run(help_bubble_context->GetElementContext(), testing::_),
-      help_bubble->SimulateButtonPress(0));
+  EXPECT_ASYNC_CALL_IN_SCOPE(custom_action_callback_,
+                             Run(testing::Eq(help_bubble_context), testing::_),
+                             help_bubble->SimulateButtonPress(0));
 }
 
 TEST_P(

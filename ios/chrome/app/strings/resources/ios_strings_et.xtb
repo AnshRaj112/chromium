@@ -140,6 +140,7 @@
 <translation id="1520027731907768768">Saate jälgitavate toodete hinnalanguse hoiatusi.</translation>
 <translation id="1521366073263497277">Avage oma vahelehtede ruudustik</translation>
 <translation id="1521774566618522728">Aktiivne täna</translation>
+<translation id="1523567067736644845">Avage, et kuvada parool</translation>
 <translation id="1524563461097350801">Ei, tänan</translation>
 <translation id="1531038290222364269">Kuva vahelehed</translation>
 <translation id="1536390784834419204">Tõlgi leht</translation>
@@ -321,7 +322,6 @@
 <translation id="2220529011494928058">Probleemist teatamine</translation>
 <translation id="2223461067862937305">Loo QR-kood</translation>
 <translation id="2225701818156393674">Toode lisati teie jälgitavate toodete loendisse.</translation>
-<translation id="2229345671837147090">Kaugseadme vahelehtede ruudustik</translation>
 <translation id="2230173723195178503">Veebileht laaditi</translation>
 <translation id="2236949375853147973">Minu tegevused</translation>
 <translation id="2240256190924001613">Seadistusprofiil on saadaval</translation>
@@ -363,6 +363,7 @@
 <translation id="236977714248711277">Saidid ei saa kasutada küpsisefaile teie sirvimiskogemuse täiustamiseks, näiteks selleks, et hoida teid sisselogituna või jätta meelde teie ostukorvis olevad esemed.
 
 Saidid ei saa küpsisefailide abil eri saitidel teie sirvimistegevust jälgida (näiteks reklaamide isikupärastamiseks).</translation>
+<translation id="2377230674627603057">Vahelehegrupi ruudustik</translation>
 <translation id="2377336083033403521">Otsige vahelehtedelt …</translation>
 <translation id="2381405137052800939">Põhiteave</translation>
 <translation id="2384692388811649784">Peida inkognito vahelehed</translation>
@@ -537,7 +538,6 @@ Vaadake oma otsingumootori juhiseid otsinguajaloo kustutamise kohta, kui see on 
 <translation id="3081338492074632642">Veenduge, et salvestatav parool ühtiks teie teenuses <ph name="WEBSITE" /> kasutatava parooliga</translation>
 <translation id="3087734570205094154">Alaserv</translation>
 <translation id="309710370695886264">Teil on 1 korduvalt kasutatud parool. Turvalisuse tagamiseks parandage see kohe.</translation>
-<translation id="3102790820790869053">Otsi hiljutistelt vahelehtedelt</translation>
 <translation id="3106258548858559536">Lülita lugemisrežiim välja</translation>
 <translation id="3106690631878101882">Peida valik Tõlgi</translation>
 <translation id="310900540163454140">Kas kustutada saidi <ph name="WEBSITE" /> parool?</translation>
@@ -648,11 +648,9 @@ Vaadake oma otsingumootori juhiseid otsinguajaloo kustutamise kohta, kui see on 
 <translation id="3581564640715911333">Paku muudes keeltes olevate lehtede tõlkimist</translation>
 <translation id="3587885837929752825">Teie organisatsioon piirab, mida saate oma Google'i kontole salvestada.</translation>
 <translation id="3588820906588687999">Ava kujutis uuel vahelehel</translation>
-<translation id="3591006724568464696">Hiljutised vahelehed pole saadaval</translation>
 <translation id="3595252146048399851">Jaotises <ph name="BEGIN_LINK" />Seaded<ph name="END_LINK" /> saate igal ajal valida, mida sünkroonida. Google võib Otsingut ja muid teenuseid teie ajaloo alusel isikupärastada.</translation>
 <translation id="3596414637720633074">Blokeeri kolmanda osapoole küpsisefailid inkognito režiimis</translation>
 <translation id="3602260545951981695">Valige „Täiustatud kaitse“</translation>
-<translation id="3608436266458100337">Lugejarežiim</translation>
 <translation id="3610041351087301930">Peida lugeja</translation>
 <translation id="3622175633937495219">Otsinguajalugu (leiti <ph name="COUNT" />)</translation>
 <translation id="3625008969091706597">Tagasiliikumiseks saate pühkida serva.</translation>
@@ -892,7 +890,6 @@ Vaadake oma otsingumootori juhiseid otsinguajaloo kustutamise kohta, kui see on 
 <translation id="4611811151908969241">Peida valik Lõpeta saidi <ph name="DOMAIN_NAME" /> jälgimine</translation>
 <translation id="461440297010471931">Otsimine Google'iga</translation>
 <translation id="4619564267100705184">Kinnitage, et see olete teie</translation>
-<translation id="4619615317237390068">Muudest seadmetest pärinevad vahelehed</translation>
 <translation id="4621768135601674446">Ava lugemisrežiimi valikud</translation>
 <translation id="4624080227980645783">Uus inkognito aken</translation>
 <translation id="4627107755957573804">Lubab saitidel ja rakendustel olemasolevad kontod pääsuvõtmetele üle viia</translation>
@@ -1234,6 +1231,7 @@ Handoff peab olema lubatud seadete jaotises General ja seadmed peavad kasutama s
 <translation id="5869522115854928033">Salvestatud paroolid</translation>
 <translation id="5873179562631407582">Puudutage pikalt mis tahes avatud vahelehte</translation>
 <translation id="5878899964490256268"><ph name="EMAIL" />. Haldab teie organisatsioon.</translation>
+<translation id="5887400589839399685">Kaart on salvestatud</translation>
 <translation id="5888889603768021126">Sisse logitud teenusega</translation>
 <translation id="5889333064153755823">Sirvimisandmete kustutamine</translation>
 <translation id="5896576662943111387">iOS-ile loodud</translation>
@@ -1334,9 +1332,11 @@ Handoff peab olema lubatud seadete jaotises General ja seadmed peavad kasutama s
 <translation id="6234310016144827337">Kontrollige ühendust ja proovige uuesti</translation>
 <translation id="6234438496206735891">Kuva allalaadimised</translation>
 <translation id="6236952928980352967">Taasta hoiatus</translation>
+<translation id="623755660902014047">Lugemisrežiim</translation>
 <translation id="6247557882553405851">Google'i paroolihaldur</translation>
 <translation id="6251835855431997163">Sisu <ph name="VALUE" /> automaatselt täitmine</translation>
 <translation id="6254066287920239840">Avage lingid brauseri asemel rakenduses.</translation>
+<translation id="6259928806013786178">Lugemisrežiimi aktiveerimine ebaõnnestus.</translation>
 <translation id="6268773951964630964">Otsi kopeeritud pilti</translation>
 <translation id="6271462272606946663">Peida valik Taotle mobiilisaiti</translation>
 <translation id="6271824294945464304">Parooli jagamine</translation>
@@ -1816,7 +1816,6 @@ Saidid saavad küpsisefailide abil eri saitidel teie sirvimistegevust jälgida, 
 <translation id="8076492880354921740">Vahelehed</translation>
 <translation id="8079530767338315840">Korda</translation>
 <translation id="8079602123447022758">See seade on hallatud, lisateabe jaoks topeltpuudutage</translation>
-<translation id="8080028325999236607">Sule kõik vahelehed</translation>
 <translation id="8084285576995584326">Oma Google'i konto andmete haldamine</translation>
 <translation id="809543534949702122">Otsinguajalugu</translation>
 <translation id="8095985449280932182">{COUNT,plural, =1{Vahekaardid teisaldatakse siia, kui te pole neid {COUNT} päev kasutanud}other{Vahekaardid teisaldatakse siia, kui te pole neid {COUNT} päeva kasutanud}}</translation>
@@ -2009,14 +2008,11 @@ Saidid saavad küpsisefailide abil eri saitidel teie sirvimistegevust jälgida, 
 <translation id="8796634520835503150">Lugemisrežiim on saadaval</translation>
 <translation id="8803526663383843427">Kui on sisse lülitatud</translation>
 <translation id="8803639129939845298">Turvaline</translation>
-<translation id="8806823403540278281">Teie organisatsioon nõuab, et sirviksite privaatselt. Vahelehti inkognito režiimis ei salvestata.
-<ph name="BEGIN_LINK" />Lisateave<ph name="END_LINK" /></translation>
 <translation id="8813277370772331957">Tuleta mulle hiljem meelde</translation>
 <translation id="8814719628147284151">Jätka</translation>
 <translation id="8819155700324279105">Lisage täiendav kaitsekiht võrguohtude eest</translation>
 <translation id="8820817407110198400">Järjehoidjad</translation>
 <translation id="8822421075653507124">Seadme ohutu kasutamise tagamiseks peab teie organisatsioon võib-olla nägema teavet operatsioonisüsteemi, brauseri, seadete ning seadmesse installitud tarkvara kohta.</translation>
-<translation id="8825562130641217944">Pääsege oma järjehoidjatele, paroolidele ja paljule muule juurde.</translation>
 <translation id="8831208860914609320">Sulge kõik inaktiivsed</translation>
 <translation id="8831944931153286232">Lisa lugemisloendisse</translation>
 <translation id="8837654851594567190">Sordi väljaandja järgi</translation>
@@ -2110,6 +2106,7 @@ Saidid saavad küpsisefailide abil eri saitidel teie sirvimistegevust jälgida, 
 <translation id="9144230693397287797">Värskenduste saamine teie seatud meeldetuletuste ja muudest seadmetest pärinevate vahelehtede kohta</translation>
 <translation id="914781932147356857">Märgi kõik …</translation>
 <translation id="9148126808321036104">Logige uuesti sisse</translation>
+<translation id="9149866541089851383">Muuda...</translation>
 <translation id="9159628751968616911">Veebilehe saatmine</translation>
 <translation id="9162432979321511934">Lülitage sisse valik Paroolide automaatne täitmine</translation>
 <translation id="9165320910061267720">Hinnaalanduse märguannete saamiseks peate märguanded iOS-i seadetes sisse lülitama.</translation>

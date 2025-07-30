@@ -178,6 +178,7 @@ import org.chromium.chrome.browser.ntp.NewTabPageUma;
 import org.chromium.chrome.browser.ntp.NewTabPageUtils;
 import org.chromium.chrome.browser.ntp_customization.NtpCustomizationCoordinator;
 import org.chromium.chrome.browser.ntp_customization.NtpCustomizationMetricsUtils;
+import org.chromium.chrome.browser.ntp_customization.edge_to_edge.TopInsetCoordinator;
 import org.chromium.chrome.browser.offlinepages.OfflinePageUtils;
 import org.chromium.chrome.browser.omnibox.OmniboxFocusReason;
 import org.chromium.chrome.browser.paint_preview.StartupPaintPreviewHelper;
@@ -463,6 +464,8 @@ public class ChromeTabbedActivity extends ChromeActivity {
     private final OneshotSupplierImpl<HubManager> mHubManagerSupplier = new OneshotSupplierImpl<>();
     private final OneshotSupplierImpl<ModuleRegistry> mModuleRegistrySupplier =
             new OneshotSupplierImpl<>();
+    private final ObservableSupplierImpl<TopInsetCoordinator> mTopInsetCoordinatorSupplier =
+            new ObservableSupplierImpl<>();
     private final IncognitoTabHost mIncognitoTabHost =
             new IncognitoTabHost() {
                 @Override
@@ -2714,12 +2717,13 @@ public class ChromeTabbedActivity extends ChromeActivity {
                 getTabContentManagerSupplier(),
                 this::getSnackbarManager,
                 mEdgeToEdgeControllerSupplier,
+                mTopInsetCoordinatorSupplier,
                 mBottomChinSupplier,
                 getActivityType(),
                 this::isInOverviewMode,
                 /* appMenuDelegate= */ this,
                 /* statusBarColorProvider= */ this,
-                new OneshotSupplierImpl<>(),
+                getEphemeralTabCoordinatorSupplier(),
                 getIntentRequestTracker(),
                 getInsetObserver(),
                 this::backShouldCloseTab,
@@ -3222,7 +3226,9 @@ public class ChromeTabbedActivity extends ChromeActivity {
                             getToolbarManager().getTabStripHeightSupplier(),
                             mModuleRegistrySupplier,
                             mEdgeToEdgeControllerSupplier,
-                            getStartupMetricsTracker());
+                            mTopInsetCoordinatorSupplier,
+                            getStartupMetricsTracker(),
+                            mRootUiCoordinator.getExclusiveAccessManager());
         }
         return mTabDelegateFactory;
     }
@@ -3491,7 +3497,10 @@ public class ChromeTabbedActivity extends ChromeActivity {
         final Tab currentTab = getActivityTab();
         boolean currentTabIsNtp = isTabNtp(currentTab);
         if (id == R.id.new_tab_menu_id) {
-            if (!mTabModelSelector.isTabStateInitialized()) return false;
+            if (!mTabModelSelector.isTabStateInitialized()) {
+                RecordUserAction.record("MobileMenuNewTab.BeforeTabRestore");
+                if (!ChromeFeatureList.sTabModelInitFixes.isEnabled()) return false;
+            }
 
             getTabModelSelector().getModel(false).commitAllTabClosures();
             RecordUserAction.record("MobileMenuNewTab");
@@ -3503,7 +3512,10 @@ public class ChromeTabbedActivity extends ChromeActivity {
 
             mLocaleManager.showSearchEnginePromoIfNeeded(this, null);
         } else if (id == R.id.new_incognito_tab_menu_id) {
-            if (!mTabModelSelector.isTabStateInitialized()) return false;
+            if (!mTabModelSelector.isTabStateInitialized()) {
+                RecordUserAction.record("MobileMenuNewIncognitoTab.BeforeTabRestore");
+                if (!ChromeFeatureList.sTabModelInitFixes.isEnabled()) return false;
+            }
 
             Profile profile = mTabModelSelector.getCurrentModel().getProfile();
             if (IncognitoUtils.isIncognitoModeEnabled(profile)) {
@@ -3521,7 +3533,10 @@ public class ChromeTabbedActivity extends ChromeActivity {
         } else if (id == R.id.add_to_group_menu_id
                 || id == R.id.add_tab_to_group_menu_id
                 || id == R.id.add_tab_to_new_group_menu_id) {
-            if (!mTabModelSelector.isTabStateInitialized()) return false;
+            if (!mTabModelSelector.isTabStateInitialized()) {
+                RecordUserAction.record("MobileMenuAddAnyGroup.BeforeTabRestore");
+                return false;
+            }
 
             Profile profile = mTabModelProfileSupplier.get();
             TabGroupModelFilter filter =

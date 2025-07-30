@@ -266,7 +266,6 @@ export declare interface HostRequestTypes {
       mode: number,
     },
   };
-  glicBrowserOnRequestStarted: {};
   glicBrowserOnResponseStarted: {};
   glicBrowserOnResponseStopped: {};
   glicBrowserOnSessionTerminated: {};
@@ -318,9 +317,14 @@ export declare interface HostRequestTypes {
   glicBrowserSubscribeToPinCandidates: {
     request: {
       options: GetPinCandidatesOptions,
+      observationId: number,
     },
   };
-  glicBrowserUnsubscribeFromPinCandidates: {};
+  glicBrowserUnsubscribeFromPinCandidates: {
+    request: {
+      observationId: number,
+    },
+  };
   glicBrowserGetZeroStateSuggestionsForFocusedTab: {
     request: {
       isFirstRun?: boolean,
@@ -438,6 +442,7 @@ export declare interface WebClientRequestTypes {
   glicWebClientPinCandidatesChanged: {
     request: {
       candidates: PinCandidatePrivate[],
+      observationId: number,
     },
   };
   glicWebClientZeroStateSuggestionsChanged: {
@@ -506,7 +511,6 @@ type HostRequestEnumNamesType = {
     JournalRecordFeedback: 0,
     OnUserInputSubmitted: 0,
     OnResponseRated: 0,
-    OnRequestStarted: 0,
     OnResponseStarted: 0,
     OnResponseStopped: 0,
     OnSessionTerminated: 0,

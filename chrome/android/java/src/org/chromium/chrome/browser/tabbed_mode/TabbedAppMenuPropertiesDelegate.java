@@ -501,7 +501,9 @@ public class TabbedAppMenuPropertiesDelegate extends AppMenuPropertiesDelegateIm
     }
 
     private boolean shouldShowAddToGroup() {
-        return ChromeFeatureList.sTabGroupParityBottomSheetAndroid.isEnabled();
+        return ChromeFeatureList.sTabGroupParityBottomSheetAndroid.isEnabled()
+                && (!ChromeFeatureList.sTabModelInitFixes.isEnabled()
+                        || mTabModelSelector.isTabStateInitialized());
     }
 
     private MVCListAdapter.ListItem buildAddToGroupItem(Tab currentTab) {
@@ -1047,7 +1049,7 @@ public class TabbedAppMenuPropertiesDelegate extends AppMenuPropertiesDelegateIm
         return footer;
     }
 
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @VisibleForTesting
     protected boolean shouldShowManagedByMenuItem(@Nullable Tab currentTab) {
         return currentTab != null && ManagedBrowserUtils.isBrowserManaged(currentTab.getProfile());
     }

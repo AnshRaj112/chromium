@@ -41,7 +41,7 @@ namespace {
 // only with SCHEME_QUIC.
 std::vector<net::ProxyChain> MakeQuicProxyList(
     const std::vector<net::ProxyChain>& proxy_list,
-    bool include_https_fallback = true) {
+    bool include_https_fallback) {
   if (proxy_list.empty()) {
     return proxy_list;
   }
@@ -53,8 +53,14 @@ std::vector<net::ProxyChain> MakeQuicProxyList(
       quic_servers.emplace_back(net::ProxyServer::Scheme::SCHEME_QUIC,
                                 proxy_server.host_port_pair());
     }
-    return net::ProxyChain::ForIpProtection(
+    auto quic_proxy_chain = net::ProxyChain::ForIpProtection(
         std::move(quic_servers), proxy_chain.ip_protection_chain_id());
+    // The proxy chains passed to this function are assumed to be valid (
+    // validated by the `IpProtectionProxyConfigFetcher()` that created them),
+    // so creating a new QUIC proxy chain from those should also result in valid
+    // proxy chains.
+    CHECK(quic_proxy_chain.IsValid());
+    return quic_proxy_chain;
   };
 
   std::vector<net::ProxyChain> quic_proxy_list;

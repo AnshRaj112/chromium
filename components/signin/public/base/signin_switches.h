@@ -156,16 +156,26 @@ BASE_DECLARE_FEATURE(kFullscreenSignInPromoUseDate);
 #endif
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
-BASE_DECLARE_FEATURE(kGrammaticalGenderCapabilities);
-
-COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kInterceptBubblesDismissibleByAvatarButton);
 
-COMPONENT_EXPORT(SIGNIN_SWITCHES)
-BASE_DECLARE_FEATURE(kNeuterGrammaticalGenderCapability);
-
+// When enabled, an implicitly signed-in user will be offered a dialog to
+// migrate to explicit browser sign-in.
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kOfferMigrationToDiceUsers);
+
+// The minimum delay after a browser startup before the dialog can be shown.
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(base::TimeDelta, kOfferMigrationToDiceUsersMinDelay);
+
+// The maximum delay after a browser startup before the dialog can be shown.
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(base::TimeDelta, kOfferMigrationToDiceUsersMaxDelay);
+
+// The minimum time from the last time the dialog was shown before it can be
+// shown again.
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(base::TimeDelta,
+                           kOfferMigrationToDiceUsersMinTimeBetweenDialogs);
 
 #if BUILDFLAG(IS_IOS)
 
@@ -240,7 +250,14 @@ COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfileMenu);
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfilePicker);
-// LINT.ThenChange(//chrome/browser/signin/signin_util.cc)
+// LINT.ThenChange(//chrome/browser/signin/signin_hats_util.cc)
+
+// Controls the duration for which the launch of an identity survey is delayed.
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+BASE_DECLARE_FEATURE(kChromeIdentitySurveyLaunchWithDelay);
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(base::TimeDelta,
+                           kChromeIdentitySurveyLaunchWithDelayDuration);
 
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 

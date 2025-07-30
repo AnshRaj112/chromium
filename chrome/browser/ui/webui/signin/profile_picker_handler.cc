@@ -53,6 +53,7 @@
 #include "chrome/common/url_constants.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/prefs/pref_service.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/tribool.h"
 #include "components/startup_metric_utils/browser/startup_metric_utils.h"
@@ -363,9 +364,7 @@ void ProfilePickerHandler::HandleLaunchSelectedProfile(
   // If a browser window cannot be opened for profile, show an error message or
   // attempt to unlock the profile in the Profile Picker.
   if (entry.IsSigninRequired()) {
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
     TryLaunchLockedProfile(entry);
-#endif
     return;
   }
 
@@ -739,7 +738,6 @@ void ProfilePickerHandler::HandleSelectNewAccount(
   AllowJavascript();
   CHECK_EQ(1U, args.size());
   std::optional<SkColor> profile_color = args[0].GetIfInt();
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
   if (signin_util::IsForceSigninEnabled()) {
     // Force sign-in policy uses a separate flow that doesn't initialize the
     // profile color. Generate a new profile color here.
@@ -754,9 +752,6 @@ void ProfilePickerHandler::HandleSelectNewAccount(
                              &ProfilePickerHandler::OnResetPickerButtons,
                              weak_factory_.GetWeakPtr())))
                          .value());
-#else
-  NOTERACHED();
-#endif
 }
 
 void ProfilePickerHandler::OnLoadSigninFinished(bool success) {

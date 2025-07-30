@@ -378,6 +378,13 @@ BASE_FEATURE(kWebContentsDiscard,
              "WebContentsDiscard",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When this feature is enabled, partial storage cleanup will be
+// disabled for the GPU disk cache. (Performance improvement)
+BASE_FEATURE(kDisablePartialStorageCleanupForGPUDiskCache,
+             "PerformStorageCleanupForGPUDiskCache",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+
 // Enable drawing under System Bars within DisplayCutout.
 BASE_FEATURE(kDrawCutoutEdgeToEdge,
              "DrawCutoutEdgeToEdge",
@@ -730,6 +737,14 @@ BASE_FEATURE(kPrefetchProxy, "PrefetchProxy", base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kPrerender2ReuseHost,
              "Prerender2ReuseHost",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, the feature parameter allows all the prerender hosts for
+// DSE search results to be reused.
+BASE_FEATURE_PARAM(bool,
+                   kPrerender2ReuseSearchResultHost,
+                   &features::kPrerender2ReuseHost,
+                   "reuse_search_host",
+                   false);
 
 // If enabled, browser-initiated prefetch is allowed.
 // Please see crbug.com/40946257 for more details.
@@ -1196,6 +1211,12 @@ constexpr base::FeatureParam<double> kSubframeProcessReuseMemoryThreshold{
     &kSubframeProcessReuseThresholds, "SubframeProcessReuseMemoryThreshold",
     512 * 1024 * 1024u};
 
+// When enabled, RenderWidgetHost in BFCache doesn't contribute to the priority
+// of the renderer process.
+BASE_FEATURE(kSubframePriorityContribution,
+             "SubframePriorityContribution",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Disallows window.{alert, prompt, confirm} if triggered inside a subframe that
 // is not same origin with the main frame.
 BASE_FEATURE(kSuppressDifferentOriginSubframeJSDialogs,
@@ -1472,7 +1493,7 @@ BASE_FEATURE(kAccessibilityPageZoomV2,
 // Enables populating the supplemental description information via the
 // Android supplemental description API.
 BASE_FEATURE(kAccessibilityPopulateSupplementalDescriptionApi,
-             "kAccessibilityPopulateSupplementalDescriptionApi",
+             "AccessibilityPopulateSupplementalDescriptionApi",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables the use of a unified code path for AXTree snapshots.
@@ -1494,11 +1515,16 @@ BASE_FEATURE(kAndroidOpenPdfInline,
 // A feature to enable launch handler and file handler api for Chrome on Android
 BASE_FEATURE(kAndroidWebAppLaunchHandler,
              "AndroidWebAppLaunchHandler",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Allows the use of "Smart Zoom", an alternative form of page zoom, and
 // enables the associated UI.
 BASE_FEATURE(kSmartZoom, "SmartZoom", base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables setting the importance for subframes in WebContents.
+BASE_FEATURE(kSubframeImportance,
+             "SubframeImportance",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Skips clearing objects on main document ready. Only has an impact
 // when gin java bridge is enabled.

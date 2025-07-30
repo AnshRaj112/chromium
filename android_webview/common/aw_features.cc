@@ -97,12 +97,6 @@ BASE_FEATURE(kWebViewMuteAudio,
              "WebViewMuteAudio",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Whether to record size of the embedding app's data directory to the UMA
-// histogram Android.WebView.AppDataDirectorySize.
-BASE_FEATURE(kWebViewRecordAppDataDirectorySize,
-             "WebViewRecordAppDataDirectorySize",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // A Feature used for WebView variations tests. Not used in production. Please
 // do not clean up this stale feature: we intentionally keep this feature flag
 // around for testing purposes.
@@ -237,6 +231,13 @@ BASE_FEATURE(kWebViewWebauthn,
 BASE_FEATURE(kWebViewRenderDocument,
              "WebViewRenderDocument",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// This enables getViewportInsetBottom which is used to resize the visual
+// viewport according to both the visible area of the WebView and any IME
+// overlap.
+BASE_FEATURE(kWebViewReportImeInsets,
+             "WebViewReportImeInsets",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, if the developer hasn't overridden shouldInterceptRequest
 // (or provided the async version), we short circuit (return no response)

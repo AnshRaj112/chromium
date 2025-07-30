@@ -538,7 +538,6 @@
 <translation id="1876399092304384674">براساس تاریخ</translation>
 <translation id="1877026089748256423">‏نسخه Chrome قدیمی است</translation>
 <translation id="187918866476621466">باز کردن صفحه‌های شروع</translation>
-<translation id="1880901968112404879">‏برای اینکه دفعه بعد پرداخت سریع‌تری داشته باشید، اطلاعات کارت، کد امنیتی رمزگذاری‌شده، و نشانی صورت‌حسابتان را در «حساب Google» خود ذخیره کنید</translation>
 <translation id="1883255238294161206">کوچک کردن فهرست</translation>
 <translation id="1884843295353628214">جاز</translation>
 <translation id="1890171020361705182">بازی داینو. دایناسوری نقطه‌ای همان‌طور که در دشتی دورافتاده می‌دود، موقع رسیدن به کاکتوس‌ها و پتروداکتیل‌ها جاخالی می‌دهد. وقتی صدای نشانه صوتی را شنیدید، برای پریدن از روی موانع تک‌ضرب بزنید.</translation>
@@ -716,7 +715,6 @@
 <translation id="2183238148268545307">نرم‌افزار ویدیو</translation>
 <translation id="2183608646556468874">شماره تلفن</translation>
 <translation id="2184405333245229118">{COUNT,plural, =1{۱ نشانی}one{# نشانی}other{# نشانی}}</translation>
-<translation id="2187317261103489799">تشخیص (پیش‌فرض)</translation>
 <translation id="2188375229972301266">چندین سوراخ در پایین</translation>
 <translation id="218940509700321686">مقادیر جداشده با کاما</translation>
 <translation id="2194856509914051091">مواردی که باید درنظر داشت</translation>
@@ -794,7 +792,6 @@
 <translation id="2303437270440428119">‏صفحه‌گسترده OpenDocument</translation>
 <translation id="2305294852062272447">گواهینامه رانندگی ذخیره شود؟</translation>
 <translation id="2306124309679506798">تجربه فراگیر مجاز شود؟</translation>
-<translation id="2307711332257985952">‏نشانی خانه و محل کارتان اکنون در Chrome دردسترس است</translation>
 <translation id="2310789833878085574">ذخیره و تکمیل خودکار</translation>
 <translation id="2312234273148520048">ادویه و سس</translation>
 <translation id="2316087952091171402">کمتر از <ph name="UPPER_ESTIMATE" />. ممکن است برخی سایت‌ها در بازدید بعدی‌تان کندتر بار شوند.</translation>
@@ -940,7 +937,6 @@
 <translation id="2535659140340599600">{COUNT,plural, =1{و ۱ مورد دیگر}one{و # مورد دیگر}other{و # مورد دیگر}}</translation>
 <translation id="2536110899380797252">افزودن نشانی</translation>
 <translation id="2537931901612099523">‏افراد دیگری که از این دستگاه استفاده می‌کنند فعالیت شما را نخواهند دید تا بتوانید مرور خصوصی‌تری داشته باشید. نحوه جمع‌آوری داده‌ها توسط وب‌سایت‌هایی که بازدید می‌کنید و سرویس‌هایی که استفاده می‌کنید (شامل Google) تغییر نخواهد کرد. بارگیری‌ها و نشانک‌ها ذخیره خواهند شد.</translation>
-<translation id="2539524384386349900">تشخیص</translation>
 <translation id="2541219929084442027">صفحه‌هایی که در «برگه‌های ناشناس» مشاهده می‌کنید، پس‌از بستن همه «برگه‌های ناشناس»، در حافظه کوکی، سابقه «جستجو»، یا سابقه مرورگرتان باقی نمی‌ماند. هر فایلی که بارگیری می‌کنید یا نشانکی که ایجاد می‌کنید حفظ می‌شود.</translation>
 <translation id="2542106216580219892">موج‌سواری</translation>
 <translation id="2543236854123609690">‫<ph name="ORIGIN" />برای خارج شدن از تمام‌صفحه، |<ph name="ACCELERATOR" />| را فشار دهید و نگه دارید</translation>
@@ -1210,6 +1206,7 @@
 <translation id="3027915437837548462">‏تصویر قالب SVG</translation>
 <translation id="3030331669969285614">این پرچم‌ها از تغییر ناگهانی جلوگیری می‌کنند یا آن را لغو می‌کنند و فقط برای مدت محدودی دردسترس خواهند بود.</translation>
 <translation id="3030542417256082866">وسیله نقلیه ذخیره شود؟</translation>
+<translation id="3033200136993730761">‏نشانی خانه می‌تواند در انجام کارها در سراسر سرویس‌های Google به شما کمک کند، مانند نتایج «جستجو» و مسیرهای مربوط‌تر در Google Maps. می‌توانید در<ph name="BEGIN_LINK" />در «حساب Google» خود (<ph name="ACCOUNT" />)<ph name="END_LINK" /> نشانی‌تان را ویرایش یا حذف کنید.</translation>
 <translation id="3034526003882782781">پیمایش و بزرگ‌نمایی مجاز است</translation>
 <translation id="3036894576201005614">لوازم تمیزکاری خانگی</translation>
 <translation id="3037177537145227281">درحال پیگیری قیمت</translation>
@@ -1332,7 +1329,6 @@
 <translation id="3229041911291329567">اطلاعات مربوط به نسخه دستگاه و مرورگر</translation>
 <translation id="3229277193950731405">کپی کردن رشته نسخه</translation>
 <translation id="323107829343500871">‏CVC کارت <ph name="CREDIT_CARD" /> را وارد کنید</translation>
-<translation id="3234666976984236645">همیشه محتوای مهم در این سایت شناسایی شود</translation>
 <translation id="323585066388831737">قرمز روشن</translation>
 <translation id="3235902901585019063">فایل‌های محلی در تاریخ <ph name="DATE_TIME" /> حذف خواهند شد حتماً همه داده‌های مهم شخصی یا کسب‌وکار را در فضای ذخیره‌سازی خارجی ذخیره کنید.</translation>
 <translation id="3236212803136366317">مزایای کارت</translation>
@@ -1892,7 +1888,6 @@
 <translation id="4147897805161313378">Google Photos</translation>
 <translation id="4148925816941278100">American Express</translation>
 <translation id="4150099059797363385">پاکت چینی شماره ۴</translation>
-<translation id="4151403195736952345">استفاده از پیش‌فرض کلی (تشخیص)</translation>
 <translation id="4152318981910038897">{COUNT,plural, =1{صفحه ۱}one{صفحه {COUNT}}other{صفحه {COUNT}}}</translation>
 <translation id="4152670763139331043">{NUM_TABS,plural, =1{‏۱ برگه}one{‏# برگه}other{‏# برگه}}</translation>
 <translation id="4153446078232988116">‏‫<ph name="SITE" /> از اتصال ایمن ازطریق HTTPS پشتیبانی نمی‌کند</translation>
@@ -2908,6 +2903,7 @@
 <translation id="5879272455334365707">مدیریت و برنامه‌ریزی مالی</translation>
 <translation id="5879989559903563723">در «حالت مهمان» مجاز نیست</translation>
 <translation id="5880050725127890683">‏رفتن به بررسی ایمنی Chrome</translation>
+<translation id="5880385758720707152">‏نشانی‌های خانه و محل کارتان را از «حساب Google» خود تکمیل کنید</translation>
 <translation id="5884465125445718607">پاکت چینی شماره ۶</translation>
 <translation id="5886961930368713749">ارسال بازخورد برای «مقایسه»</translation>
 <translation id="5887400589839399685">کارت ذخیره‌ شد</translation>
@@ -2917,6 +2913,7 @@
 <translation id="5898767305816764989">‏دکمه رأی موافق. برای ارسال بازخورد درباره دلیل پسندیدن، کلید Enter را فشار دهید، <ph name="THUMBS_UP_SUGGESTION_BUTTON_FOCUSED_FRIENDLY_MATCH_TEXT" /></translation>
 <translation id="5901630391730855834">زرد</translation>
 <translation id="5903264686717710770">عنوان:</translation>
+<translation id="5905671155741555195">‏نشانی محل کار می‌تواند در انجام کارها در سراسر سرویس‌های Google به شما کمک کند، مانند نتایج «جستجو» و مسیرهای مربوط‌تر در Google Maps. می‌توانید در<ph name="BEGIN_LINK" />در «حساب Google» خود (<ph name="ACCOUNT" />)<ph name="END_LINK" /> نشانی‌تان را ویرایش یا حذف کنید.</translation>
 <translation id="5908541034548427511"><ph name="TYPE_1" /> (همگام‌سازی‌شده)</translation>
 <translation id="5910140988253729859">واگرد تکمیل خودکار</translation>
 <translation id="5911020115933784199">رویداد و نام‌نویسی</translation>
@@ -3307,7 +3304,7 @@
 <translation id="6505072878288254563">درحال ترجمه کردن</translation>
 <translation id="6506959208958864820">پاکت</translation>
 <translation id="6507117483253822672">در هر جای وب با اطمینان بیشتری بنویسید</translation>
-<translation id="6508722015517270189">‏Chrome را راه‌اندازی مجدد کنید</translation>
+<translation id="6508722015517270189">‏بازراه‌اندازی Chrome</translation>
 <translation id="6513005815064132016">می‌تواند ردیابی موقعیت دوربین را درخواست دهد</translation>
 <translation id="6516242269547757923">‏بدون استفاده از برنامه بانک، در Chrome پرداخت کنید</translation>
 <translation id="6517596291481585650">این خط‌مشی به‌عنوان فهرستی که خط‌مشی مشخص کرده است ادغام نشد، زیرا فهرست نیست.</translation>
@@ -3814,6 +3811,7 @@
 <translation id="7403392780200267761">هم‌رسانی این برگه ازطریق هم‌رسانی پیوند، ایجاد رمزینه پاسخ‌سریع، پخش محتوا، و موارد دیگر</translation>
 <translation id="7403591733719184120">دستگاه <ph name="DEVICE_NAME" /> تحت مدیریت است</translation>
 <translation id="7405878640835614059"><ph name="ENROLLMENT_DOMAIN" /> برنامه‌هایی را برای افزودن عملکردهای بیشتر نصب کرده است. این برنامه‌ها به برخی‌از داده‌های شما دسترسی دارند.</translation>
+<translation id="740691708085211707">‏نشانی محل کار از تکمیل خودکار Chrome برداشته شود؟</translation>
 <translation id="7407424307057130981">‏&lt;p&gt;اگر در رایانه Windows نرم‌افزار Superfish داشته باشید، این خطا را می‌بینید.&lt;/p&gt;
     &lt;p&gt;برای غیرفعال کردن موقت این نرم‌افزار و دسترسی به وب، این مراحل را دنبال کنید. لازم است امتیازهای سرپرست را داشته باشید.&lt;/p&gt;
     &lt;ol&gt;
@@ -3910,6 +3908,7 @@
 <translation id="7534987659046836932">پاکت سی۷</translation>
 <translation id="7535087603100972091">مقدار</translation>
 <translation id="753556296624075801">‏قدرت‌گرفته از Google</translation>
+<translation id="753713322968419914">‏نشانی خانه از تکمیل خودکار Chrome برداشته شود؟</translation>
 <translation id="7537536606612762813">اجباری</translation>
 <translation id="7543525346216957623">از والدینتان بخواهید این کار را انجام دهد</translation>
 <translation id="7546409722674205727">درحال راه‌اندازی <ph name="APP_NAME" /></translation>

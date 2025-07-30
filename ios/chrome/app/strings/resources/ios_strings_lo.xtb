@@ -140,6 +140,7 @@
 <translation id="1520027731907768768">ຮັບການແຈ້ງເຕືອນເມື່ອລາຄາຜະລິດຕະພັນທີ່ທ່ານຕິດຕາມຕ່ຳລົງ.</translation>
 <translation id="1521366073263497277">ໄປຫາຕາໜ່າງແຖບຂອງທ່ານ</translation>
 <translation id="1521774566618522728">ເປີດນຳໃຊ້ມື້ນີ້</translation>
+<translation id="1523567067736644845">ປົດລັອກເພື່ອສະແດງລະຫັດຜ່ານ</translation>
 <translation id="1524563461097350801">ບໍ່, ຂອບໃຈ</translation>
 <translation id="1531038290222364269">ສະແດງແຖບ</translation>
 <translation id="1536390784834419204">ແປໜ້າ</translation>
@@ -321,7 +322,6 @@
 <translation id="2220529011494928058">ລາຍ​ງານ​ບັນ​ຫາ</translation>
 <translation id="2223461067862937305">ສ້າງລະຫັດ QR</translation>
 <translation id="2225701818156393674">ເພີ່ມສິນຄ້າໃສ່ລາຍການສິນຄ້າທີ່ຕິດຕາມແລ້ວ.</translation>
-<translation id="2229345671837147090">ຕາຕະລາງແຖບທາງໄກ</translation>
 <translation id="2230173723195178503">ໂຫຼດໜ້າເວັບແລ້ວ</translation>
 <translation id="2236949375853147973">ການເຄື່ອນໄຫວຂອງຂ້ອຍ</translation>
 <translation id="2240256190924001613">ມີໂປຣໄຟລ໌ການຕັ້ງຄ່າ</translation>
@@ -363,6 +363,7 @@
 <translation id="236977714248711277">ເວັບໄຊສາມາດໃຊ້ຄຸກກີ້ເພື່ອປັບປຸງປະສົບການທ່ອງເວັບຂອງທ່ານ, ຕົວຢ່າງ: ເພື່ອໃຫ້ທ່ານສືບຕໍ່ຢູ່ໃນລະບົບ ຫຼື ຈື່ລາຍການຕ່າງໆໃນກະຕ່າຊື້ເຄື່ອງຂອງທ່ານ.
 
 ເວັບໄຊບໍ່ສາມາດໃຊ້ຄຸກກີ້ເພື່ອເບິ່ງການເຄື່ອນໄຫວທ່ອງເວັບຂອງທ່ານໃນທົ່ວເວັບໄຊຕ່າງໆ, ຕົວຢ່າງ: ເພື່ອປັບແຕ່ງໂຄສະນາໃຫ້ເປັນແບບສ່ວນຕົວໄດ້.</translation>
+<translation id="2377230674627603057">ຕາຕະລາງຂອງກຸ່ມແຖບ</translation>
 <translation id="2377336083033403521">ຊອກຫາແຖບ…</translation>
 <translation id="2381405137052800939">ພື້ນ​ຖານ</translation>
 <translation id="2384692388811649784">ເຊື່ອງແຖບບໍ່ເປີດເຜີຍຕົວຕົນ</translation>
@@ -537,7 +538,6 @@
 <translation id="3081338492074632642">ກວດໃຫ້ແນ່ໃຈວ່າລະຫັດຜ່ານທີ່ທ່ານກຳລັງບັນທຶກກົງກັບລະຫັດຜ່ານຂອງທ່ານສຳລັບ <ph name="WEBSITE" /> ຫຼືບໍ່.</translation>
 <translation id="3087734570205094154">ດ້ານລຸ່ມ</translation>
 <translation id="309710370695886264">ທ່ານມີລະຫັດຜ່ານທີ່ໃຊ້ຊ້ຳ 1 ລາຍການ. ແກ້ໄຂດຽວນີ້ເພື່ອຄວາມປອດໄພ.</translation>
-<translation id="3102790820790869053">ຊອກຫາແຖບຫຼ້າສຸດ</translation>
 <translation id="3106258548858559536">ປິດໂໝດການອ່ານ</translation>
 <translation id="3106690631878101882">ເຊື່ອງ ແປພາສາ</translation>
 <translation id="310900540163454140">ລຶບລະຫັດຜ່ານສຳລັບ <ph name="WEBSITE" /> ບໍ?</translation>
@@ -648,11 +648,9 @@
 <translation id="3581564640715911333">ໃຫ້ການແປໜ້າຕ່າງໆເປັນພາສາອື່ນ</translation>
 <translation id="3587885837929752825">ອົງກອນຂອງທ່ານຈຳກັດສິ່ງທີ່ທ່ານສາມາດບັນທຶກໃນບັນຊີ Google ຂອງທ່ານ.</translation>
 <translation id="3588820906588687999">ຮູບເປີດຢູ່ໃນແຖບໃໝ່</translation>
-<translation id="3591006724568464696">ແຖບຫຼ້າສຸດບໍ່ພ້ອມໃຫ້ນຳໃຊ້</translation>
 <translation id="3595252146048399851">ທ່ານສາມາດເລືອກສິ່ງທີ່ຈະຊິ້ງຂໍ້ມູນໄດ້ໃນ <ph name="BEGIN_LINK" />ການຕັ້ງຄ່າ<ph name="END_LINK" />. Google ອາດປັບແຕ່ງການຊອກຫາ ແລະ ບໍລິການອື່ນໆຂອງ Google ໃຫ້ເປັນແບບສ່ວນຕົວໂດຍອ້າງອີງໃສ່ປະຫວັດຂອງທ່ານ.</translation>
 <translation id="3596414637720633074">ບລັອກຄຸກກີ້ພາກສ່ວນທີສາມໃນໂໝດບໍ່ເປີດເຜີຍຕົວຕົນ</translation>
 <translation id="3602260545951981695">ເລືອກ "ການປົກປ້ອງທີ່ປັບປຸງດີຂຶ້ນ"</translation>
-<translation id="3608436266458100337">ໂໝດເຄື່ອງອ່ານ</translation>
 <translation id="3610041351087301930">ເຊື່ອງໂໝດຜູ້ອື່ນ</translation>
 <translation id="3622175633937495219">ປະຫວັດການຊອກຫາ (ພົບ <ph name="COUNT" /> ລາຍການ)</translation>
 <translation id="3625008969091706597">ທ່ານສາມາດປັດຂອບເພື່ອກັບຄືນໄດ້.</translation>
@@ -892,7 +890,6 @@
 <translation id="4611811151908969241">ເຊື່ອງ ເຊົາຕິດຕາມ <ph name="DOMAIN_NAME" /></translation>
 <translation id="461440297010471931">ກຳລັງຊອກຫາດ້ວຍ Google</translation>
 <translation id="4619564267100705184">ຢັ້ງຢືນວ່າແມ່ນທ່ານແທ້</translation>
-<translation id="4619615317237390068">ແຖບຈາກອຸປະກອນອື່ນ</translation>
 <translation id="4621768135601674446">ເປີດຕົວເລືອກໂໝດການອ່ານ</translation>
 <translation id="4624080227980645783">ໜ້າຈໍທີ່ບໍ່ເປີດເຜີຍຕົວຕົນໃໝ່</translation>
 <translation id="4627107755957573804">ອະນຸຍາດໃຫ້ເວັບໄຊ ແລະ ແອັບອັບເກຣດບັນຊີທີ່ມີຢູ່ເພື່ອໃຊ້ກະແຈຜ່ານ</translation>
@@ -1234,6 +1231,7 @@ Handoff ຍັງ​ຕ້ອງ​ໄດ້​ເປີດ​ໃຊ້​ງາ
 <translation id="5869522115854928033">ລະ​ຫັດ​ຜ່ານ​ທີ່ບັນທຶກໄວ້</translation>
 <translation id="5873179562631407582">ແຕະແຖບທີ່ເປີດຢູ່ຄ່າງໄວ້</translation>
 <translation id="5878899964490256268"><ph name="EMAIL" />. ຈັດການໂດຍອົງການຂອງທ່ານ.</translation>
+<translation id="5887400589839399685">ບັນທຶກບັດໄວ້ແລ້ວ</translation>
 <translation id="5888889603768021126">ເຂົ້າສູ່ລະບົບດ້ວຍ</translation>
 <translation id="5889333064153755823">ລຶບຂໍ້ມູນການທ່ອງເວັບ</translation>
 <translation id="5896576662943111387">ສ້າງມາສຳລັບ iOS</translation>
@@ -1334,9 +1332,11 @@ Handoff ຍັງ​ຕ້ອງ​ໄດ້​ເປີດ​ໃຊ້​ງາ
 <translation id="6234310016144827337">ກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານແລ້ວລອງໃໝ່</translation>
 <translation id="6234438496206735891">ສະແດງການດາວໂຫຼດ</translation>
 <translation id="6236952928980352967">ກູ້ຄຳເຕືອນຄືນ</translation>
+<translation id="623755660902014047">ໂໝດການອ່ານ</translation>
 <translation id="6247557882553405851">ຕົວຈັດການລະຫັດຜ່ານ Google</translation>
 <translation id="6251835855431997163">ຕື່ມຂໍ້ມູນ <ph name="VALUE" /> ອັດຕະໂນມັດ</translation>
 <translation id="6254066287920239840">ເປີດລິ້ງຕ່າງໆໃນແອັບແທນໂປຣແກຣມທ່ອງເວັບ.</translation>
+<translation id="6259928806013786178">ເປີດນຳໃຊ້ໂໝດການອ່ານບໍ່ສຳເລັດ</translation>
 <translation id="6268773951964630964">ຊອກຫາຮູບພາບທີ່ສຳເນົາ</translation>
 <translation id="6271462272606946663">ເຊື່ອງ ຮ້ອງຂໍເວັບໄຊມືຖື</translation>
 <translation id="6271824294945464304">ການແບ່ງປັນລະຫັດຜ່ານ</translation>
@@ -1816,7 +1816,6 @@ Handoff ຍັງ​ຕ້ອງ​ໄດ້​ເປີດ​ໃຊ້​ງາ
 <translation id="8076492880354921740">ແຖບ</translation>
 <translation id="8079530767338315840">ຫຼິ້ນຊໍ້າ</translation>
 <translation id="8079602123447022758">ການຕັ້ງຄ່ານີ້ໄດ້ຮັບການຈັດການ, ແຕະສອງຄັ້ງສຳລັບຂໍ້ມູນເພີ່ມເຕີມ</translation>
-<translation id="8080028325999236607">ປິດ​ທຸກແຖບ</translation>
 <translation id="8084285576995584326">ຄວບຄຸມຂໍ້ມູນບັນຊີ Google ຂອງທ່ານ</translation>
 <translation id="809543534949702122">ປະຫວັດການຊອກຫາ</translation>
 <translation id="8095985449280932182">{COUNT,plural, =1{ແຖບທີ່ທ່ານບໍ່ໄດ້ໃຊ້ຈະຖືກຍ້າຍມາບ່ອນນີ້ຫຼັງຈາກ {COUNT} ມື້}other{ແຖບທີ່ທ່ານບໍ່ໄດ້ໃຊ້ຈະຖືກຍ້າຍມາບ່ອນນີ້ຫຼັງຈາກ {COUNT} ມື້}}</translation>
@@ -2009,14 +2008,11 @@ Handoff ຍັງ​ຕ້ອງ​ໄດ້​ເປີດ​ໃຊ້​ງາ
 <translation id="8796634520835503150">ສາມາດໃຊ້ໂໝດການອ່ານໄດ້</translation>
 <translation id="8803526663383843427">ເມື່ອເປີດໃຊ້</translation>
 <translation id="8803639129939845298">ປອດໄພ</translation>
-<translation id="8806823403540278281">ອົງການຂອງທ່ານກຳນົດໃຫ້ທ່ານທ່ອງເວັບແບບເປັນສ່ວນຕົວ. ຈະບໍ່ມີການບັນທຶກແຖບໄວ້ໃນໂໝດບໍ່ເປີດເຜີຍຕົວຕົນ.
-<ph name="BEGIN_LINK" />ສຶກສາເພີ່ມເຕີມ<ph name="END_LINK" /></translation>
 <translation id="8813277370772331957">ແຈ້ງເຕືອນຂ້ອຍໃນພາຍຫຼັງ</translation>
 <translation id="8814719628147284151">ສືບຕໍ່</translation>
 <translation id="8819155700324279105">ເພີ່ມການປົກປ້ອງຕໍ່ກັບໄພຂົ່ມຂູ່ທາງອອນລາຍອີກຊັ້ນໜຶ່ງ</translation>
 <translation id="8820817407110198400">ບຸກມາກ</translation>
 <translation id="8822421075653507124">ເພື່ອໃຫ້ແນ່ໃຈວ່າອຸປະກອນນີ້ສາມາດຖືກນໍາໃຊ້ຢ່າງປອດໄພ, ອົງກອນຂອງທ່ານອາດຈະຕ້ອງເບິ່ງຂໍ້ມູນກ່ຽວກັບລະບົບປະຕິບັດການ, ໂປຣແກຣມທ່ອງເວັບ ແລະ ການຕັ້ງຄ່າຂອງຕົນ ຕະຫຼອດຈົນເຖິງຊອບແວທີ່ຖືກຕິດຕັ້ງຢູ່ອຸປະກອນ.</translation>
-<translation id="8825562130641217944">ຮັບບຸກມາກ, ລະຫັດຜ່ານ ແລະ ຂໍ້ມູນອື່ນໆຂອງທ່ານ.</translation>
 <translation id="8831208860914609320">ປິດແຖບທີ່ບໍ່ມີການນຳໃຊ້ທັງໝົດ</translation>
 <translation id="8831944931153286232">ເພີ່ມໃສ່ລາຍຊື່ການອ່ານ</translation>
 <translation id="8837654851594567190">ຈັດຮຽງຕາມຜູ້ເຜີຍແຜ່</translation>
@@ -2110,6 +2106,7 @@ Handoff ຍັງ​ຕ້ອງ​ໄດ້​ເປີດ​ໃຊ້​ງາ
 <translation id="9144230693397287797">ຮັບຂໍ້ມູນອັບເດດສຳລັບການແຈ້ງເຕືອນທີ່ທ່ານໄດ້ຕັ້ງໄວ້ ແລະ ແຖບຈາກອຸປະກອນອື່ນໆ</translation>
 <translation id="914781932147356857">ໝາຍທັງໝົດ…</translation>
 <translation id="9148126808321036104">ລົງຊື່ເຂົ້າ​ໃຊ້ອີກ</translation>
+<translation id="9149866541089851383">ແກ້ໄຂ...</translation>
 <translation id="9159628751968616911">ສົ່ງໜ້າເວັບ</translation>
 <translation id="9162432979321511934">ເປີດການຕື່ມລະຫັດຜ່ານອັດຕະໂນມັດ</translation>
 <translation id="9165320910061267720">ເພື່ອຮັບການແຈ້ງເຕືອນການຫຼຸດລາຄາ, ທ່ານຈະຕ້ອງເປີດການແຈ້ງເຕືອນໃນການຕັ້ງຄ່າ iOS ຂອງທ່ານ.</translation>

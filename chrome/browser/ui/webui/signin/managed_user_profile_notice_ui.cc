@@ -146,9 +146,6 @@ ManagedUserProfileNoticeUI::ManagedUserProfileNoticeUI(content::WebUI* web_ui)
       "profileDisclosureTitle",
       IDS_ENTERPRISE_WELCOME_PROFILE_DISCLOSURE_WORK_TITLE);
   source->AddLocalizedString(
-      "profileOidcDisclosureTitle",
-      IDS_ENTERPRISE_WELCOME_PROFILE_OIDC_DISCLOSURE_TITLE);
-  source->AddLocalizedString(
       "profileDisclosureSubtitle",
       IDS_ENTERPRISE_WELCOME_PROFILE_DISCLOSURE_SUBTITLE);
 
@@ -180,7 +177,7 @@ ManagedUserProfileNoticeUI::ManagedUserProfileNoticeUI(content::WebUI* web_ui)
       "separateBrowsingDataTitle",
       IDS_ENTERPRISE_WELCOME_SEPARATE_BROWSING_WORK_TITLE);
   source->AddLocalizedString(
-      "valuePropositionTitle",
+      "valuePropTitle",
       IDS_ENTERPRISE_VALUE_PROPOSITION_PROFILE_SUGGESTED_TITLE);
   source->AddLocalizedString("valuePropSubtitle",
                              IDS_ENTERPRISE_VALUE_PROPOSITION_WORK_SUBTITLE);
@@ -199,7 +196,6 @@ ManagedUserProfileNoticeUI::ManagedUserProfileNoticeUI(content::WebUI* web_ui)
       IDS_ENTERPRISE_WELCOME_MERGE_BROWSING_DATA_CHOICE_DETAILS);
   source->AddBoolean("showLinkDataCheckbox", false);
   source->AddBoolean("isModalDialog", false);
-  source->AddBoolean("isOidcDialog", false);
   source->AddBoolean("enforcedByPolicy", false);
   source->AddInteger("initialState",
                      ManagedUserProfileNoticeHandler::State::kDisclosure);
@@ -262,10 +258,11 @@ void ManagedUserProfileNoticeUI::Initialize(
     update_data.Set("initialState",
                     ManagedUserProfileNoticeHandler::State::kDisclosure);
     update_data.Set("isModalDialog", true);
-    update_data.Set("isOidcDialog", true);
     update_data.Set(
         "enterpriseProfileWelcomeTitle",
         l10n_util::GetStringUTF16(IDS_ENTERPRISE_WELCOME_PROFILE_SETUP_TITLE));
+    update_data.Set("profileDisclosureTitle",
+                    IDS_ENTERPRISE_WELCOME_PROFILE_OIDC_DISCLOSURE_TITLE);
 
     update_data.Set("showLinkDataCheckbox", false);
   }
@@ -321,7 +318,10 @@ void ManagedUserProfileNoticeUI::Initialize(
     // Canceling when profile separation is enabled forces the user to signout.
     update_data.Set(
         "cancelLabel",
-        l10n_util::GetStringUTF16(IDS_SYNC_ERROR_USER_MENU_SIGNOUT_BUTTON));
+        l10n_util::GetStringUTF16(
+            create_param->profile_creation_required_by_policy
+                ? IDS_SYNC_ERROR_USER_MENU_SIGNOUT_BUTTON
+                : IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_DECLINE_TEXT));
   } else if (is_school_account) {
     update_data.Set("separateBrowsingDataTitle",
                     l10n_util::GetStringUTF16(

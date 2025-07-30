@@ -419,6 +419,10 @@ const char kDbdRevampDesktopDescription[] =
     "UI changes and removal of the bulk password deletion option from the "
     "dialog.";
 
+const char kDefaultSearchEnginePrewarmName[] = "Default search engine prewarm";
+const char kDefaultSearchEnginePrewarmDescription[] =
+        "Performance optimization to prewarm the default search engine used in the Omnibox";
+
 const char kDisableAutofillStrikeSystemName[] =
     "Disable the Autofill strike system";
 const char kDisableAutofillStrikeSystemDescription[] =
@@ -586,6 +590,16 @@ const char kEnableDrDcDescription[] =
     "(raster, webgl, video) "
     " continues using the gpu main thread.";
 
+#if BUILDFLAG(IS_ANDROID)
+const char kEnableFullscreenToAnyScreenAndroidName[] =
+    "Enables use of the screen parameter for requestFullscreen.";
+const char kEnableFullscreenToAnyScreenAndroidDescription[] =
+    "When enabled the user can request an HTML element to be expanded to "
+    "full screen on another screen using the Element.requestFullscreen web "
+    "API. This enables usage of the screen parameter in the "
+    "Element.requestFullscreen web API.";
+#endif
+
 const char kTextBasedAudioDescriptionName[] = "Enable audio descriptions.";
 const char kTextBasedAudioDescriptionDescription[] =
     "When enabled, HTML5 video elements with a 'descriptions' WebVTT track "
@@ -621,6 +635,15 @@ const char kIsolatedSandboxedIframesDescription[] =
     "header, even in the main frame. The affected sandboxed documents can be "
     "grouped into processes based on their URL's site or origin. The default "
     "grouping when enabled is per-site.";
+
+#if BUILDFLAG(IS_ANDROID)
+const char kAutofillAndroidDesktopSuppressAccessoryOnEmptyName[] =
+    "Enable suppressing keyboard accessory on android desktop";
+const char kAutofillAndroidDesktopSuppressAccessoryOnEmptyDescription[] =
+    "When enabled, Autofill will suppress keyboard accessory when the form "
+    "field is not a username/password field and does not have any autofill "
+    "suggestions. ";
+#endif  // BUILDFLAG(IS_ANDROID)
 
 const char kAutofillEnableAllowlistForBmoCardCategoryBenefitsName[] =
     "Enable allowlist for showing category benefits for BMO cards";
@@ -867,12 +890,6 @@ const char kAutofillEnableSeparatePixPreferenceItemDescription[] =
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
-const char kAutofillEnableShowSaveCardSecurelyMessageName[] =
-    "Enable updated credit card upload UI messaging";
-const char kAutofillEnableShowSaveCardSecurelyMessageDescription[] =
-    "When enabled, credit card upload messaging will match what is "
-    "shown on Desktop.";
-
 const char kAutofillEnableSyncingOfPixBankAccountsName[] =
     "Sync Pix bank accounts from Google Payments";
 const char kAutofillEnableSyncingOfPixBankAccountsDescription[] =
@@ -997,6 +1014,11 @@ const char kBlockCrossPartitionBlobUrlFetchingName[] =
 const char kBlockCrossPartitionBlobUrlFetchingDescription[] =
     "Blocks fetching of cross-partitioned Blob URL.";
 
+const char kBookmarkTabGroupConversionName[] =
+    "Bookmark and tab group conversion";
+const char kBookmarkTabGroupConversionDescription[] =
+    "Enable conversion between bookmark and tab group";
+
 const char kBorealisBigGlName[] = "Borealis Big GL";
 const char kBorealisBigGlDescription[] = "Enable Big GL when running Borealis.";
 
@@ -1050,6 +1072,11 @@ const char kBorealisZinkGlDriverDescription[] =
     "recommended GL apps only or for all GL apps. Defaults to recommended.";
 
 #if BUILDFLAG(IS_ANDROID)
+
+const char kAndroidSettingsContainmentName[] = "Android Settings Containment";
+const char kAndroidSettingsContainmentDescription[] =
+    "Enables the Android Settings Containment feature.";
+
 const char kCCTResetTimeoutEnabledName[] = "CCT Reset Timeout Enabled";
 const char kCCTResetTimeoutEnabledDescription[] =
     "Enables the reset timeout for CCTs. This flag allows embedder to "
@@ -1164,6 +1191,11 @@ const char kDsePreload2OnPressName[] =
     "Default Search Engine preload 2, on-press triggers";
 const char kDsePreload2OnPressDescription[] =
     "Enables on-press triggers of DsePreload2";
+
+const char kHttpCacheCustomBackendName[] =
+    "Use custom disk cache backend for HTTP Cache";
+const char kHttpCacheCustomBackendDescription[] =
+    "Enables the experimental disk cache backend for HTTP Cache";
 
 const char kHttpCacheNoVarySearchName[] = "No Vary Search in Disk Cache";
 const char kHttpCacheNoVarySearchDescription[] =
@@ -3159,14 +3191,6 @@ const char kPageImageServiceSuggestPoweredImagesName[] =
 const char kPageImageServiceSuggestPoweredImagesDescription[] =
     "Enables the PageImageService fetching images from the Suggest source.";
 
-const char kPageInfoHideSiteSettingsName[] = "Page info hide site settings";
-const char kPageInfoHideSiteSettingsDescription[] =
-    "Hides site settings row in the page info menu.";
-
-const char kPageInfoHistoryDesktopName[] = "Page info history";
-const char kPageInfoHistoryDesktopDescription[] =
-    "Enable a history section in the page info.";
-
 const char kPageVisibilityPageContentAnnotationsName[] =
     "Page visibility content annotations";
 const char kPageVisibilityPageContentAnnotationsDescription[] =
@@ -3969,6 +3993,10 @@ const char kTabSwitcherGroupSuggestionsTestModeAndroidDescription[] =
     "Helper flag for testing that shows group suggestions for the last 3 tabs "
     "in the tab switcher (if present).";
 
+const char kChromeNativeUrlOverridingName[] = "Chrome Native Url Overriding";
+const char kChromeNativeUrlOverridingDescription[] =
+    "Allows for URL overriding for chrome-native:// pages";
+
 const char kTabletTabStripAnimationName[] = "Tablet Tab Strip Animation";
 const char kTabletTabStripAnimationDescription[] =
     "Enables new tablet tab strip animations.";
@@ -4056,6 +4084,14 @@ const char kToolbarPhoneAnimationRefactorName[] =
 const char kToolbarPhoneAnimationRefactorDescription[] =
     "Enables the refactored animation code path in Android for the toolbar "
     "phone class.";
+
+const char kFormFactorUseMaxWindowMetricsName[] =
+    "Switch to Window Metrics API for form factor detection";
+const char kFormFactorUseMaxWindowMetricsDescription[] =
+    "Current form-factor check uses Configuration.smallestScreenWidthDp, which "
+    "returns window width on newer OS versions. This flag enables using the "
+    "max window metrics to determine display metrics irrespective of window "
+    "size.";
 
 const char kToolbarTabletResizeRefactorName[] =
     "Toolbar Tablet Resize Refactor";
@@ -4315,6 +4351,11 @@ const char kWebBluetoothNewPermissionsBackendDescription[] =
     "Enables the new permissions backend for Web Bluetooth. This will enable "
     "persistent storage of device permissions and Web Bluetooth features such "
     "as BluetoothDevice.watchAdvertisements() and Bluetooth.getDevices()";
+
+#if !BUILDFLAG(IS_ANDROID)
+const char kWebiumName[] = "Webium";
+const char kWebiumDescription[] = "Webium Prototype Browser.";
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 const char kWebOtpBackendName[] = "Web OTP";
 const char kWebOtpBackendDescription[] =
@@ -4608,6 +4649,16 @@ const char kAndroidDesktopWebPrefsLargeDisplaysDescription[] =
     "Enables large display specific layout/renderer settings for "
     "Android large form factor devices";
 
+const char kAndroidGrammarCheckName[] = "Enable grammar checks on text input";
+const char kAndroidGrammarCheckDescription[] =
+    "When typing, allows spellcheckers to highlight grammar errors and suggest "
+    "corrections on browser text input.";
+
+const char kAndroidSpellcheckNativeUiName[] =
+    "Enable native-like spellcheck underline UI";
+const char kAndroidSpellcheckNativeUiDescription[] =
+    "Makes the spellcheck underline style the same as native applications";
+
 const char kAndroidSurfaceControlName[] = "Android SurfaceControl";
 const char kAndroidSurfaceControlDescription[] =
     " Enables SurfaceControl to manage the buffer queue for the "
@@ -4717,6 +4768,12 @@ const char kAuxiliaryNavigationStaysInBrowserDescription[] =
     "If enabled, any new auxiliary browsing context navigation started in "
     "the browser will open in a new tab.";
 
+const char kAuxiliaryNavigationStaysInPWAName[] =
+    "Prevent app opening for auxiliary navigations that start in a PWA";
+const char kAuxiliaryNavigationStaysInPWADescription[] =
+    "If enabled, any new auxiliary browsing context navigation started in "
+    "any PWA will open a new tab in the same PWA.";
+
 const char kBackgroundNotPerceptibleBindingName[] =
     "Enable not perceptible binding without cpu priority boosting";
 const char kBackgroundNotPerceptibleBindingDescription[] =
@@ -4755,18 +4812,6 @@ const char kCCTContextualMenuItemsName[] =
 const char kCCTContextualMenuItemsDescription[] =
     "When enabled, contextual menu items passed by developers will be visible "
     "in CCTs.";
-
-const char kCCTEphemeralMediaViewerExperimentName[] =
-    "Ephemeral CCT for Media Viewer";
-const char kCCTEphemeralMediaViewerExperimentDescription[] =
-    "Enables Media Viewer launched from Downloads to open in Ephemeral "
-    "mode.";
-
-const char kCCTEphemeralModeName[] =
-    "Allow CCT embedders to open CCTs in ephemeral mode";
-const char kCCTEphemeralModeDescription[] =
-    "Enabling it would allow apps to open ephemeral mode for "
-    "Chrome Custom Tabs, on Android.";
 
 const char kCCTIncognitoAvailableToThirdPartyName[] =
     "Allow third party to open Custom Tabs Incognito mode";
@@ -4875,6 +4920,10 @@ const char kDeprecatedExternalPickerFunctionName[] =
 const char kDeprecatedExternalPickerFunctionDescription[] =
     "Use the old-style opening of an External Picker when uploading files";
 
+const char kDrawChromePagesEdgeToEdgeName[] = "Draw Chrome Pages Edge-to-Edge";
+const char kDrawChromePagesEdgeToEdgeDescription[] =
+    "Enables drawing more native pages and secondary activities edge-to-edge.";
+
 const char kDrawCutoutEdgeToEdgeName[] = "DrawCutoutEdgeToEdge";
 const char kDrawCutoutEdgeToEdgeDescription[] =
     "Enables the Android feature Edge-to-Edge Feature to coordinate with the "
@@ -4929,10 +4978,6 @@ const char kDynamicSafeAreaInsetsOnScrollDescription[] =
     "Dynamically change the safe area insets on the main thread as browser "
     "controls scrolls. "
     "Requires DynamicSafeAreaInsets to also be enabled.";
-
-const char kCSSSafeAreaMaxInsetName[] = "CSSSafeAreaMaxInset";
-const char kCSSSafeAreaMaxInsetDescription[] =
-    "Enables CSS engine support for the env(safe-area-max-inset-*) variables.";
 
 const char kEducationalTipDefaultBrowserPromoCardName[] =
     "Educational Tip Default Browser Promo Card";

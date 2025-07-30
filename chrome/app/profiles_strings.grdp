@@ -738,7 +738,7 @@
       Data that is saved only on this device will remain in the existing profile
     </message>
     <message name="IDS_ENTERPRISE_WELCOME_SEPARATE_BROWSING_DATA_CHOICE_ALREADY_SIGNED_IN_DETAILS" desc="Additional information of a radio button option that lets the user separate their existing data from a newly created managed profile, this is shown when the user was already signed into a profile.">
-      Your organization, <ph name="ACCOUNT_MANAGER">$1<ex>example.com</ex></ph>, will not be able to see or manage this data. It will remain in the existing profile.
+      Your organization, <ph name="ACCOUNT_MANAGER">$1<ex>example.com</ex></ph>, will not be able to see or manage your existing data. It will remain in the existing profile.
     </message>
     <message name="IDS_ENTERPRISE_WELCOME_MERGE_BROWSING_DATA_WORK_CHOICE" desc="Label of a radio button option that lets the user add their existing data from a newly created work profile.">
       No, continue to work in this profile
@@ -1073,6 +1073,13 @@
       =0 {Addresses}
       =1 {Addresses ({SELECTED_ITEMS})}
       other {Addresses ({SELECTED_ITEMS})}
+      }
+    </message>
+    <message name="IDS_BATCH_UPLOAD_SECTION_TITLE_EXTENSIONS" desc="Title of the Extensions section in the Batch Upload dialog. This dialog appears when the user clicks on an informational message about items saved only to their device. The title of the dialog is ‘Save items in account’. The list of items has sections for each applicable data type: Passwords, Bookmarks, and more. This section shows the number of selected items in the section of the dialog, if any.">
+      {SELECTED_ITEMS, plural,
+      =0 {Extensions}
+      =1 {Extensions ({SELECTED_ITEMS})}
+      other {Extensions ({SELECTED_ITEMS})}
       }
     </message>
     <message name="IDS_BATCH_UPLOAD_SECTION_TITLE_THEMES_WITH_DESCRIPTION" desc="Title of the Themes section in the Batch Upload dialog. It contains a fixed title in addition to its only item title description. This dialog appears when the user clicks on an informational message about items saved only to their device. The title of the dialog is ‘Save items in account’. This section title also acts as the item being selected (the section toggle dictates the state of the selection) since Themes will always have one item.">

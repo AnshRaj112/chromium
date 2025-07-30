@@ -18,28 +18,13 @@
 
 namespace gpu {
 
-namespace {
-
-// A GpuMemoryBuffer with client_id = 0 behaves like anonymous shared memory.
-const int kAnonymousClientId = 0;
-
-}  // namespace
-
 GpuMemoryBufferFactoryIOSurface::GpuMemoryBufferFactoryIOSurface() = default;
 GpuMemoryBufferFactoryIOSurface::~GpuMemoryBufferFactoryIOSurface() = default;
 
 gfx::GpuMemoryBufferHandle
-GpuMemoryBufferFactoryIOSurface::CreateGpuMemoryBuffer(
-    gfx::GpuMemoryBufferId id,
-    const gfx::Size& size,
-    const gfx::Size& framebuffer_size,
-    gfx::BufferFormat format,
-    gfx::BufferUsage usage,
-    int client_id,
-    SurfaceHandle surface_handle) {
-  DCHECK_NE(client_id, kAnonymousClientId);
-  DCHECK_EQ(framebuffer_size, size);
-
+GpuMemoryBufferFactoryIOSurface::CreateNativeGmbHandle(const gfx::Size& size,
+                                                       gfx::BufferFormat format,
+                                                       gfx::BufferUsage usage) {
   bool should_clear = true;
   base::apple::ScopedCFTypeRef<IOSurfaceRef> io_surface =
       gfx::CreateIOSurface(size, format, should_clear);
@@ -50,10 +35,6 @@ GpuMemoryBufferFactoryIOSurface::CreateGpuMemoryBuffer(
 
   return gfx::GpuMemoryBufferHandle(std::move(io_surface));
 }
-
-void GpuMemoryBufferFactoryIOSurface::DestroyGpuMemoryBuffer(
-    gfx::GpuMemoryBufferId id,
-    int client_id) {}
 
 bool GpuMemoryBufferFactoryIOSurface::FillSharedMemoryRegionWithBufferContents(
     gfx::GpuMemoryBufferHandle buffer_handle,

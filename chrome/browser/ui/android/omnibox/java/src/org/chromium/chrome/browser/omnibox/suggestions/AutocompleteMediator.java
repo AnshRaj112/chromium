@@ -846,6 +846,7 @@ class AutocompleteMediator
         mListPropertyModel.set(SuggestionListProperties.LIST_IS_FINAL, false);
 
         mAutocompleteInput.setUserText(textWithoutAutocomplete);
+
         boolean isInZeroPrefixContext = mAutocompleteInput.isInZeroPrefixContext();
         mIgnoreOmniboxItemSelection = true;
         cancelAutocompleteRequests();
@@ -882,8 +883,7 @@ class AutocompleteMediator
                                 a ->
                                         a.start(
                                                 currentUrl,
-                                                mAutocompleteInput.getPageClassification(),
-                                                textWithoutAutocomplete,
+                                                mAutocompleteInput,
                                                 cursorPosition,
                                                 preventAutocomplete));
                     },
@@ -1047,22 +1047,14 @@ class AutocompleteMediator
                         }
                     };
 
-            if (suggestion.getType() == OmniboxSuggestionType.CLIPBOARD_IMAGE) {
-                mDelegate.loadUrl(
-                        new OmniboxLoadUrlParams.Builder(url.getSpec(), transition)
-                                .setInputStartTimestamp(inputStart)
-                                .setpostDataAndType(
-                                        suggestion.getPostData(), suggestion.getPostContentType())
-                                .setAutocompleteLoadCallback(autocompleteLoadCallback)
-                                .build());
-            } else {
-                mDelegate.loadUrl(
-                        new OmniboxLoadUrlParams.Builder(url.getSpec(), transition)
-                                .setInputStartTimestamp(inputStart)
-                                .setOpenInNewTab(openInNewTab)
-                                .setAutocompleteLoadCallback(autocompleteLoadCallback)
-                                .build());
-            }
+            mDelegate.loadUrl(
+                    new OmniboxLoadUrlParams.Builder(url.getSpec(), transition)
+                            .setInputStartTimestamp(inputStart)
+                            .setPostData(suggestion.getPostData())
+                            .setOpenInNewTab(openInNewTab)
+                            .setExtraHeaders(suggestion.getExtraHeaders())
+                            .setAutocompleteLoadCallback(autocompleteLoadCallback)
+                            .build());
 
             mHandler.post(this::finishInteraction);
         }
@@ -1153,7 +1145,7 @@ class AutocompleteMediator
      *
      * @param clear Whether to clear the most recent autocomplete results.
      */
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @VisibleForTesting
     void stopAutocomplete(boolean clear) {
         mAutocomplete.ifPresent(a -> a.stop(clear));
         // All suggestions are now removed.
@@ -1164,14 +1156,10 @@ class AutocompleteMediator
     /** Trigger autocomplete for the given query. */
     void startAutocompleteForQuery(String query) {
         stopAutocomplete(false);
+        mAutocompleteInput.setPageClassification(mDataProvider.getPageClassification(false));
+        mAutocompleteInput.setUserText(query);
         mAutocomplete.ifPresent(
-                a ->
-                        a.start(
-                                mDataProvider.getCurrentGurl(),
-                                mDataProvider.getPageClassification(false),
-                                query,
-                                -1,
-                                false));
+                a -> a.start(mDataProvider.getCurrentGurl(), mAutocompleteInput, -1, false));
     }
 
     /**
@@ -1374,7 +1362,7 @@ class AutocompleteMediator
         mFirstSuggestionListModelCreatedTime = null;
     }
 
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @VisibleForTesting
     SuggestionsListAnimationDriver initializeAnimationDriver() {
         SuggestionsListAnimationDriver driver;
         if (mDelegate.isToolbarPositionCustomizationEnabled()

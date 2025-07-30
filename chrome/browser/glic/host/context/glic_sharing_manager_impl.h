@@ -75,12 +75,10 @@ class GlicSharingManagerImpl : public GlicSharingManager {
   base::CallbackListSubscription AddFocusedTabDataChangedCallback(
       FocusedTabDataChangedCallback callback);
 
-  // Registers a callback to be invoked when the collection of pinned tabs
-  // changes.
   using PinnedTabsChangedCallback =
       base::RepeatingCallback<void(const std::vector<content::WebContents*>&)>;
   base::CallbackListSubscription AddPinnedTabsChangedCallback(
-      PinnedTabsChangedCallback callback);
+      PinnedTabsChangedCallback callback) override;
 
   // Registers a callback to be invoked when the TabData for a pinned tab
   // changes.
@@ -119,9 +117,6 @@ class GlicSharingManagerImpl : public GlicSharingManager {
 
   // The profile for which to manage sharing.
   raw_ptr<Profile> profile_;
-
-  // The Glic window controller.
-  raw_ref<GlicWindowController> window_controller_;
 
   // Enables providing sharing-related-related input to metrics.
   raw_ptr<GlicMetrics> metrics_;

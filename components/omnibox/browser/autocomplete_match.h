@@ -153,6 +153,18 @@ enum class FeedbackType {
   kThumbsDown,
 };
 
+// Used with `stripped_destination_url` to dedupe matches. Matches with the same
+// URL but different types won't be deduped. This'll allow showing e.g. both a
+// "1+1" normal query and a "1+1 = 2" calculator suggestion simultaneously.
+enum class AutocompleteMatchDedupeType {
+  kNormal,
+  kCalculator,        // E.g. "1+1 = 2" matches.
+  kVerbatimProvider,  // Matches that come from the verbatim provider, which
+                      // does not include the verbatim SWYT match.
+  kHistoryEmbeddingAnswer,  // Matches with type `HISTORY_EMBEDDINGS_ANSWER`.
+  kAiMode,                  // Matches that activate to the DSE's AI Mode
+};
+
 // AutocompleteMatch ----------------------------------------------------------
 
 // A single result line with classified spans.  The autocomplete popup displays
@@ -548,6 +560,9 @@ struct AutocompleteMatch {
   // a button row.
   bool IsToolbelt() const;
 
+  // Checks if this match is a AI mode suggestion.
+  bool IsSearchAimSuggestion() const;
+
   // Returns true if this match may attach one or more `actions`.
   // This method is used to keep actions off of matches with types that don't
   // mix well with Pedals or other actions (e.g. entities).
@@ -851,9 +866,10 @@ struct AutocompleteMatch {
   // `ComputeStrippedDestinationURL()` computation.
   GURL stripped_destination_url;
 
-  // Extra headers to add to the navigation. See `NavigateParams::extra_headers`
-  // for how headers should be represented.
-  std::string extra_headers;
+  // Extra headers to add to the navigation. Keys of the map represent the
+  // header name, and values represent header value, e.g.
+  //   extra_headers["Content-Type"] = "application/json";
+  std::map<std::string, std::string> extra_headers;
 
   // Optional image information. Used for some types of suggestions, such as
   // entity suggestions, that want to display an associated image, which will be

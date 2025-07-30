@@ -284,7 +284,7 @@ class DiceWebSigninInterceptorBrowserTest : public SigninBrowserTestBase {
     // Fill in the required account capabilities for the sign in intercept.
     AccountCapabilitiesTestMutator mutator(&account_info.capabilities);
     mutator.set_is_subject_to_parental_controls(false);
-    mutator.set_is_subject_to_enterprise_policies(hosted_domain !=
+    mutator.set_is_subject_to_enterprise_features(hosted_domain !=
                                                   kNoHostedDomainFound);
 
     DCHECK(account_info.IsValid());
@@ -650,8 +650,8 @@ IN_PROC_BROWSER_TEST_F(DiceWebSigninInterceptorWithHatsSurveyBrowserTest,
   ASSERT_FALSE(IsChromeSignedIn());
 
   EXPECT_CALL(*mock_hats_service(),
-              LaunchSurvey(kHatsSurveyTriggerIdentityDiceWebSigninAccepted, _,
-                           _, _, _, _, _));
+              LaunchDelayedSurvey(
+                  kHatsSurveyTriggerIdentityDiceWebSigninAccepted, _, _, _));
   ShowAndCompleteSigninBubbleWithResult(account_info,
                                         SigninInterceptionResult::kAccepted);
   EXPECT_TRUE(IsChromeSignedIn());
@@ -669,8 +669,8 @@ IN_PROC_BROWSER_TEST_F(DiceWebSigninInterceptorWithHatsSurveyBrowserTest,
   ASSERT_FALSE(IsChromeSignedIn());
 
   EXPECT_CALL(*mock_hats_service(),
-              LaunchSurvey(kHatsSurveyTriggerIdentityDiceWebSigninDeclined, _,
-                           _, _, _, _, _));
+              LaunchDelayedSurvey(
+                  kHatsSurveyTriggerIdentityDiceWebSigninDeclined, _, _, _));
   ShowAndCompleteSigninBubbleWithResult(account_info,
                                         SigninInterceptionResult::kDeclined);
   EXPECT_FALSE(IsChromeSignedIn());

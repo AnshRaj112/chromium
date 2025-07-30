@@ -18,6 +18,7 @@
 #include "chromeos/ash/components/system/fake_statistics_provider.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/permissions/features.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -162,7 +163,7 @@ IN_PROC_BROWSER_TEST_F(WebKioskDeviceAttributesTest,
 
   // All methods should return the same error.
   for (const std::string& attribute : kAttributeNames) {
-    EXPECT_EQ(CallDeviceAttributesApi(web_contents, attribute).error,
+    EXPECT_EQ(CallDeviceAttributesApi(web_contents, attribute).ExtractError(),
               kNotAllowedOriginExpectedError);
   }
 }
@@ -236,7 +237,7 @@ IN_PROC_BROWSER_TEST_F(
   for (const std::string& attribute : kAttributeNames) {
     content::EvalJsResult result =
         CallDeviceAttributesApi(web_contents, attribute);
-    EXPECT_EQ(result.error, kNotTrustedOriginExpectedError);
+    EXPECT_EQ(result.ExtractError(), kNotTrustedOriginExpectedError);
   }
 }
 

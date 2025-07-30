@@ -355,6 +355,11 @@ public class InstanceSwitcherCoordinator {
                                 break;
                             case ModalDialogProperties.ButtonType.POSITIVE:
                                 assert mSelectedItem != null;
+                                String userAction =
+                                        mSelectedItem.taskId == INVALID_TASK_ID
+                                                ? "Android.WindowManager.OpenInactiveWindow"
+                                                : "Android.WindowManager.OpenActiveWindow";
+                                RecordUserAction.record(userAction);
                                 switchToInstance(mSelectedItem);
                         }
                     }
@@ -641,7 +646,7 @@ public class InstanceSwitcherCoordinator {
                 .readBoolean(ChromePreferenceKeys.MULTI_INSTANCE_CLOSE_WINDOW_SKIP_CONFIRM, false);
     }
 
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @VisibleForTesting
     static void setSkipCloseConfirmation() {
         ChromeSharedPreferences.getInstance()
                 .writeBoolean(ChromePreferenceKeys.MULTI_INSTANCE_CLOSE_WINDOW_SKIP_CONFIRM, true);

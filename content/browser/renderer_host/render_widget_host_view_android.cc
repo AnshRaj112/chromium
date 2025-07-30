@@ -798,15 +798,6 @@ RenderWidgetHostViewAndroid::GetVirtualKeyboardMode() {
   return frame_host->GetPage().virtual_keyboard_mode();
 }
 
-void RenderWidgetHostViewAndroid::NotifyContextMenuInsetsObservers(
-    const gfx::Rect& safe_area) {
-  host()
-      ->frame_tree()
-      ->GetMainFrame()
-      ->GetPage()
-      .NotifyContextMenuInsetsObservers(safe_area);
-}
-
 void RenderWidgetHostViewAndroid::ShowInterestInElement(int nodeID) {
   // TODO(crbug.com/326681249): This only works if the link is in the main frame
   // for this tab. Need to find a way to pass the frame back and forth to the
@@ -2559,7 +2550,7 @@ void RenderWidgetHostViewAndroid::SendMouseWheelEvent(
   blink::WebMouseWheelEvent wheel_event(event);
   bool should_route_events = ShouldRouteEvents();
   mouse_wheel_phase_handler_.AddPhaseIfNeededAndScheduleEndEvent(
-      wheel_event, should_route_events);
+      wheel_event, should_route_events, /*is_fling_capable=*/true);
 
   if (should_route_events) {
     host()->delegate()->GetInputEventRouter()->RouteMouseWheelEvent(

@@ -57,14 +57,12 @@
 #include "chrome/browser/shell_integration.h"
 #include "chrome/browser/ui/actions/chrome_action_id.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_actions.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
 #include "chrome/browser/ui/intent_picker_tab_helper.h"
-#include "chrome/browser/ui/page_action/page_action_icon_type.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/startup/web_app_startup_utils.h"
 #include "chrome/browser/ui/ui_features.h"
@@ -1358,15 +1356,7 @@ void WebAppIntegrationTestDriver::InstallOmniboxIcon(InstallableSite site) {
   ASSERT_TRUE(pwa_install_view()->GetVisible());
   WebAppTestInstallWithOsHooksObserver install_observer(profile());
   install_observer.BeginListening();
-  if (IsPageActionMigrated(PageActionIconType::kPwaInstall)) {
-    actions::ActionManager::Get()
-        .FindAction(kActionInstallPwa,
-                    browser()->GetActions()->root_action_item())
-        ->InvokeAction();
-  } else {
-    browser()->window()->ExecutePageActionIconForTesting(
-        PageActionIconType::kPwaInstall);
-  }
+  pwa_install_view()->ExecuteForTesting();
 
   WaitForAndAcceptInstallDialogForSite(InstallableSiteToSite(site));
 
@@ -3240,7 +3230,7 @@ void WebAppIntegrationTestDriver::CheckFilesLoadedInSite(
       }
 
       base::Value::List test_content_list =
-          EvalJs(web_contents, "launchFinishedPromise").ExtractList();
+          EvalJs(web_contents, "launchFinishedPromise").TakeValue().TakeList();
       for (const auto& test_content : test_content_list) {
         if (base::EndsWith(url_str, kFooHandler)) {
           found_foo_files.push_back(test_content.GetString());
@@ -3801,7 +3791,7 @@ void WebAppIntegrationTestDriver::CheckHasSubApp(Site parent_app,
   const content::EvalJsResult list_result =
       content::EvalJs(web_contents, "navigator.subApps.list()");
 
-  const base::Value::Dict list_result_dict = list_result.ExtractDict();
+  const base::Value::Dict& list_result_dict = list_result.ExtractDict();
 
   // Check that list() contained the sub_app_url key.
   EXPECT_NE(nullptr, list_result_dict.FindDict(sub_app_url));
@@ -4723,11 +4713,11 @@ std::vector<Profile*> WebAppIntegrationTestDriver::GetAllProfiles() {
   return profiles;
 }
 
-IconLabelBubbleView* WebAppIntegrationTestDriver::pwa_install_view() {
-  IconLabelBubbleView* pwa_install_view =
+PageActionIconView* WebAppIntegrationTestDriver::pwa_install_view() {
+  PageActionIconView* pwa_install_view =
       BrowserView::GetBrowserViewForBrowser(browser())
           ->toolbar_button_provider()
-          ->GetPageActionView(kActionInstallPwa);
+          ->GetPageActionIconView(PageActionIconType::kPwaInstall);
   CHECK(pwa_install_view);
   return pwa_install_view;
 }

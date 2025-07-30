@@ -19,7 +19,6 @@
 #include "build/build_config.h"
 #include "chrome/browser/web_applications/generated_icon_fix_util.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_integrity_block_data.h"
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_version.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolation_data.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom-shared.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
@@ -45,6 +44,7 @@
 #include "components/sync/base/time.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "components/webapps/common/web_app_id.h"
+#include "components/webapps/isolated_web_apps/types/iwa_version.h"
 #include "components/webapps/isolated_web_apps/types/storage_location.h"
 #include "components/webapps/isolated_web_apps/types/update_channel.h"
 #include "services/network/public/cpp/permissions_policy/origin_with_possible_wildcards.h"
@@ -1194,11 +1194,12 @@ std::unique_ptr<WebApp> ParseWebAppProto(const proto::WebApp& proto) {
   }
 
   if (proto.has_isolation_data()) {
-    auto version = ParseIwaVersion(proto.isolation_data().version());
-    if (!version.has_value()) {
+    auto iwa_version = IwaVersion::Create(proto.isolation_data().version());
+
+    if (!iwa_version.has_value()) {
       DLOG(ERROR) << "WebApp proto isolation_data.version parse error: cannot "
                      "deserialize version: "
-                  << IwaVersionParseErrorToString(version.error());
+                  << IwaVersion::GetErrorString(iwa_version.error());
       return nullptr;
     }
 
@@ -1209,8 +1210,8 @@ std::unique_ptr<WebApp> ParseWebAppProto(const proto::WebApp& proto) {
       return nullptr;
     }
 
-    auto isolation_data_builder =
-        IsolationData::Builder(std::move(*location), std::move(*version));
+    auto isolation_data_builder = IsolationData::Builder(
+        std::move(*location), std::move(*(iwa_version.value())));
 
     const google::protobuf::RepeatedPtrField<std::string>& partitions =
         proto.isolation_data().controlled_frame_partitions();
@@ -1239,13 +1240,14 @@ std::unique_ptr<WebApp> ParseWebAppProto(const proto::WebApp& proto) {
         return nullptr;
       }
 
-      auto pending_version =
-          ParseIwaVersion(pending_update_info_proto.version());
-      if (!pending_version.has_value()) {
+      auto pending_iwa_version =
+          IwaVersion::Create(pending_update_info_proto.version());
+
+      if (!pending_iwa_version.has_value()) {
         DLOG(ERROR)
             << "WebApp proto isolation_data.pending_update_info.version parse "
                "error: cannot deserialize version: "
-            << IwaVersionParseErrorToString(pending_version.error());
+            << IwaVersion::GetErrorString(pending_iwa_version.error());
         return nullptr;
       }
 
@@ -1266,7 +1268,8 @@ std::unique_ptr<WebApp> ParseWebAppProto(const proto::WebApp& proto) {
 
       isolation_data_builder.SetPendingUpdateInfo(
           IsolationData::PendingUpdateInfo(
-              std::move(*pending_location), std::move(*pending_version),
+              std::move(*pending_location),
+              std::move(*(pending_iwa_version.value())),
               std::move(pending_integrity_block_data)));
     }
 
@@ -1303,10 +1306,13 @@ std::unique_ptr<WebApp> ParseWebAppProto(const proto::WebApp& proto) {
       }
       isolation_data_builder.SetUpdateChannel(std::move(*update_channel));
     }
-
+    if (proto.isolation_data().has_opened_tabs_counter_notification_state()) {
+      isolation_data_builder.SetOpenedTabsCounterNotificationState(
+          IsolationData::OpenedTabsCounterNotificationState(
+              proto.isolation_data().opened_tabs_counter_notification_state()));
+    }
     web_app->SetIsolationData(std::move(isolation_data_builder).Build());
   }
-
   if (proto.has_user_link_capturing_preference()) {
     web_app->SetLinkCapturingUserPreference(
         proto.user_link_capturing_preference());
@@ -1844,7 +1850,6 @@ std::unique_ptr<proto::WebApp> WebAppToProto(const WebApp& web_app) {
       auto* mutable_pending_update_info =
           mutable_data->mutable_pending_update_info();
 
-      // Add this check:
       CHECK_EQ(isolation_data.location().dev_mode(),
                pending_update_info.location.dev_mode(),
                base::NotFatalUntil::M138)
@@ -1859,6 +1864,12 @@ std::unique_ptr<proto::WebApp> WebAppToProto(const WebApp& web_app) {
         *mutable_pending_update_info->mutable_integrity_block_data() =
             pending_update_info.integrity_block_data->ToProto();
       }
+    }
+
+    if (const auto& notification_state =
+            isolation_data.opened_tabs_counter_notification_state()) {
+      *mutable_data->mutable_opened_tabs_counter_notification_state() =
+          notification_state->GetState();
     }
 
     if (isolation_data.integrity_block_data()) {

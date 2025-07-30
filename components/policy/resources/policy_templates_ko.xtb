@@ -278,6 +278,7 @@
 <translation id="1202216683470826356">새 탭 페이지에 카드 표시</translation>
 <translation id="1203676252390737801">URL별 WebRTC IP 처리</translation>
 <translation id="1204263402976895730">사용 설정된 엔터프라이즈 프린터</translation>
+<translation id="120513772363332049">렌더기 프로세스가 실행 중인 경우 동일한 CPU 코어에서 다른 모든 프로세스가 예약되지 않습니다.</translation>
 <translation id="1207301487141109411">로컬 파일 시스템, 카메라, Google 프로필에서 사용자 아바타 선택을 차단합니다.</translation>
 <translation id="1209096923317019235">앱을 지정된 파일 확장자에 대한 기본 핸들러로 할당합니다.</translation>
 <translation id="120937472976628837">팬 정보 보고</translation>
@@ -1525,6 +1526,9 @@ URL로 입력된 측정항목 수집이 허용되거나 사용자가 이를 사�
 <translation id="208566302163036794">사용 중지된 기능 차단</translation>
 <translation id="2086040449830622332">인쇄 LPAC 샌드박스 사용 설정</translation>
 <translation id="208623333578980446">전원 관리를 위해 화면 wake lock 허용</translation>
+<translation id="2086505225896497574">정책을 설정하면 로그인 화면에서 보안 키의 증명 인증서가 요청될 때 메시지가 표시되지 않는 WebAuthn RP ID가 지정됩니다. 또한 엔터프라이즈 증명이 사용될 수 있음을 나타내는 신호가 보안 키로 전송됩니다. 정책을 설정하지 않으면 사이트에서 보안 키의 증명을 요청할 때 사용자에게 메시지가 표시됩니다.
+
+이 기기 정책은 기존 사용자 정책(<ph name="SECURITY_KEY_PERMIT_ATTESTATION_POLICY_NAME" />)과 동일하지만, 로그인 화면의 로그인 프로필에 대신 적용됩니다.</translation>
 <translation id="2089541797660774692">관리 브라우저 클라우드 보고 사용</translation>
 <translation id="2090712407517297305">그룹으로 구성된 Chrome 방문 기록 페이지가 chrome://history/grouped에 표시됩니다.</translation>
 <translation id="2090939118981888335">정책을 사용 설정하면 데이터 압축 프록시가 허용됩니다. 정책을 사용 중지하면 프록시가 허용되지 않습니다.
@@ -3779,6 +3783,15 @@ HTTPS용 RSA 인증서에 두 가지를 모두 포함해야 합니다.</translat
       정책을 사용 중지로 설정하면 Translator AP를 사용할 수 없습니다.</translation>
 <translation id="366494444808132420">Gemini 통합을 허용합니다.</translation>
 <translation id="3665437376055221832">자동 선택과 일치하는 인증서가 없을 때만 사용자에게 메시지 표시</translation>
+<translation id="3667089394451236198">URL 패턴 목록입니다. 일치하는 출처에 의해 게재된 웹사이트에서 시작한 요청은 <ph name="LOCAL_NETWORK_ACCESS" /> 확인 대상이 아닙니다.
+
+이 정책과 LocalNetworkAccessBlockedForUrls가 모두 적용되는 출처의 경우 LocalNetworkAccessBlockedForUrls가 우선 적용됩니다.
+
+여기 명시된 패턴에 해당하지 않는 출처에는 사용자의 개인 설정이 적용됩니다.
+
+유효한 URL 패턴을 자세히 알아보려면 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns 페이지를 참고하세요.
+
+<ph name="LOCAL_NETWORK_ACCESS" /> 제한사항에 관한 내용은 링크(https://wicg.github.io/local-network-access/)를 참고하세요.</translation>
 <translation id="3671773704245936868">키보드 포커스 강조표시 사용 중지</translation>
 <translation id="3674010627788940405">와일드카드가 아닌 CORS 요청 헤더는 지원되지 않습니다.</translation>
 <translation id="3675303748198647471">setTimeout(…, 0)은 흔히 시간이 오래 걸리는 자바스크립트 작업을 세분화하는 데 사용됩니다.
@@ -4338,6 +4351,17 @@ Chrome에서 퍼스트 파티 세트 관련 통합을 지원하는지 제어합�
       <ph name="DEFAULT_SEARCH_PROVIDER_KEYWORD_POLICY_NAME" />를 설정하지 않으면 어떤 키워드도 검색 공급자를 활성화하지 않습니다.</translation>
 <translation id="4090088362777472639">Ansible 플레이북의 SHA-256 해시입니다.</translation>
 <translation id="4091040199847925434">세이프 브라우징 개선에 사용되는 시스템 정보 및 페이지 콘텐츠 보고 사용 안함</translation>
+<translation id="4092882308219320847">URL 패턴 목록입니다. 일치하는 출처에 의해 게재된 웹사이트에서 시작한 요청은 <ph name="LOCAL_NETWORK_ACCESS" /> 요청을 발행할 수 없습니다.
+
+출처가 이 정책과 LocalNetworkAccessAllowedForUrls에 모두 적용되는 경우 이 정책이 우선합니다.
+
+<ph name="LOCAL_NETWORK_ACCESS" /> 출시 단계에 따라 이 정책이 <ph name="LOCAL_NETWORK_ACCESS" /> 요청을 차단하려면 LocalNetworkAccessRestrictionsEnabled도 사용 설정해야 할 수 있습니다.
+
+여기 명시된 패턴에 해당하지 않는 출처에는 사용자의 개인 설정이 적용됩니다.
+
+유효한 URL 패턴을 자세히 알아보려면 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns 페이지를 참고하세요.
+
+<ph name="LOCAL_NETWORK_ACCESS" /> 제한사항에 관한 내용은 링크(https://wicg.github.io/local-network-access/)를 참고하세요.</translation>
 <translation id="4093058072421210667">인라인 이미지를 허용하지 않습니다.</translation>
 <translation id="4098920079809952737">배경 그래픽이 있을 때와 없을 때 모두 인쇄를 허용합니다.</translation>
 <translation id="410061592404122032">사이트에서 창 관리 권한을 얻을 때마다 확인</translation>
@@ -6489,6 +6513,7 @@ false로 설정되면 기능에 액세스할 수 없습니다.</translation>
 <translation id="5490462588616309068">정책을 true로 설정하거나 설정하지 않으면 보호된 콘텐츠 식별자를 사용할 수 있으며, 이를 통해 보호된 콘텐츠 재생 품질을 높일 수 있습니다.
 
 정책이 false로 설정되면 보호된 콘텐츠 식별자를 사용할 수 없습니다.</translation>
+<translation id="5492713303272131731">렌더기 프로세스가 실행 중인 경우 동일한 CPU 코어에서 다른 모든 프로세스를 예약할 수 있습니다.</translation>
 <translation id="5494322570831642650">사용자가 <ph name="PRODUCT_NAME" />에서 시크릿 모드로 페이지를 열 수 있는지를 선택합니다.
 
       '사용'이 선택되거나 정책이 설정되어 있지 않으면 페이지가 시크릿 모드로 열릴 수 있습니다.
@@ -6861,6 +6886,7 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_PRIVATE_NETWORK_ACCESS_BLOCKED_FOR_URLS_P
       참고: 서로 다른 값은 쉼표로 구분합니다.</translation>
 <translation id="5693469654327063861">데이터 이전 허용</translation>
 <translation id="56936613186060503">다운로드 관리자에서 파일을 <ph name="GOOGLE_DRIVE_NAME" />에 저장할 수 없게 됩니다.</translation>
+<translation id="569457565603183">로그인 화면에서 자동으로 직접 보안 키 증명을 허용하는 URL/도메인</translation>
 <translation id="5695209488612697377">컨텍스트 메뉴에서 기본 검색 제공업체를 사용 설정합니다.
 
           정책을 사용 중지하면 기본 검색 공급업체에 의존하는 검색 컨텍스트 메뉴 항목을 사용할 수 없습니다.
@@ -7932,7 +7958,6 @@ DevTools 생성형 AI 기능에는 다음이 포함됩니다.
 <translation id="6412352702230183710">시스템 수준의 기본 메시지 호스트만 허용</translation>
 <translation id="6412793408912788345">로그인 과정에서 Gemini 소개 화면 표시</translation>
 <translation id="6416506846917150119">사용자 입력 시 실제 키보드의 예측 작성 사용 중지</translation>
-<translation id="6416916931494972926">Kiosk Vision의 텔레메트리 보고를 사용 설정합니다.</translation>
 <translation id="6417265370957905582">Google 어시스턴트</translation>
 <translation id="6419001911253110938">로그인 과정에서 세션 내 AI 기능의 소개 화면 표시 사용 설정</translation>
 <translation id="6421254653839955267">정책을 사용으로 설정하면 CNAME 조회를 건너뜁니다. 서버 이름은 Kerberos SPN 생성 시 입력한 이름으로 사용됩니다.
@@ -8084,7 +8109,6 @@ URL 패턴이 <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" />와 충돌하는 경�
 
       정책이 설정되지 않으면 관리 대상인 사용자에게는 이 동작이 사용 중지되며 다른 사용자에게는 기본적으로 사용 설정됩니다.</translation>
 <translation id="6508403116553969858"><ph name="PRODUCT_NAME" />의 적용 범위에 포함된 생성형 AI 기능에 대한 기본 정책 값 설정</translation>
-<translation id="6508882314969525299">Kiosk Vision의 텔레메트리 보고를 사용 중지합니다.</translation>
 <translation id="6509376413448002446">잠금 화면의 사용자 화면 보호기를 구성합니다.
 
 정책을 true로 설정하면 <ph name="PRODUCT_OS_NAME" /> 기기가 잠금 화면에서 유휴 상태일 때 화면 보호기를 표시합니다.
@@ -8431,6 +8455,11 @@ false로 설정되면 Crostini 컨테이너로 포트 전달이 사용 중지됩
 
 <ph name="PRODUCT_NAME" />의 경우 정책은 기기가 <ph name="CLOUD_MANAGEMENT_ENROLLMENT_TOKEN" />으로 등록되어 있을 때만 적용됩니다.
 <ph name="PRODUCT_OS_NAME" />의 경우 정책이 항상 적용됩니다.</translation>
+<translation id="6720071484598746942">정책을 사용 설정하면 <ph name="LOCAL_NETWORK_ACCCESS" /> 검사에 실패하여 <ph name="DEV_TOOLS_NAME" />에 경고가 표시되어야 하는 경우 기본 요청이 대신 차단됩니다.
+
+정책을 사용 중지하거나 설정하지 않으면 <ph name="LOCAL_NETWORK_ACCESS" /> 요청에서 이러한 요청의 기본 처리를 사용합니다.
+
+<ph name="LOCAL_NETWORK_ACCESS" /> 제한사항에 관한 내용은 링크(https://wicg.github.io/local-network-access/)를 참고하세요.</translation>
 <translation id="6720330829631914048">하루가 시작된 이후 경과한 시간(24시간 형식)입니다.</translation>
 <translation id="6721252203593581486">타사 컨텍스트에서 WebSQL(예: 크로스 사이트 iframe)은 M97부터 기본적으로 사용 중지되며 M101에서 완전히 삭제됩니다.
           정책을 False로 설정하거나 설정하지 않으면 타사 컨텍스트에서 WebSQL이 사용 중지된 상태로 유지됩니다.
@@ -10612,6 +10641,10 @@ Windows에서는 GPO를 통해 정책을 설정하는 것이 좋습니다. 하�
 <translation id="8331479227794770304">고정키 사용</translation>
 <translation id="8332822245414537447">RSA 키 사용 검사를 사용 중지합니다.</translation>
 <translation id="8334685561819743286">사용자 입력 시 실제 키보드의 자동 수정 사용 중지</translation>
+<translation id="8336986243404088829">이 정책은 CPU 코어에서 렌더기 프로세스를 격리하고 다른 프로세스가 동일한 코어를 공유하지 못하도록 하여 측면 채널 크로스 프로세스 메모리 공격을 완화합니다. 완화는 <ph name="MS_WIN_NAME" /> 11 24H2 이상에서 지원됩니다. OS에 필요한 일정 지원이 없으면 이 정책은 적용되지 않습니다. 이 정책은 하이퍼스레딩을 사용 중지하는 것과 유사한 일부 까다로운 시나리오에서 성능을 저하시킬 수 있습니다. 자세한 내용은 https://learn.microsoft.com/ko-kr/windows/win32/api/winnt/ns-winnt-process_mitigation_side_channel_isolation_policy를 참조하세요.
+      이 정책이 사용 설정되면 렌더기 프로세스가 실행 중일 때 다른 모든 프로세스가 동일한 CPU 코어에서 예약되지 않습니다.
+      이 정책이 사용 중지되면 렌더기 프로세스가 실행 중인 경우 동일한 CPU 코어에서 다른 모든 프로세스를 예약할 수 있습니다.
+      이 정책을 설정하지 않으면 렌더기 프로세스가 코어에서 실행 중인 경우 동일한 CPU 코어에서 다른 모든 프로세스를 예약할 수 있습니다. 이는 <ph name="PRODUCT_NAME" /> 버전, 현재 실행 중인 필드 체험판, 플랫폼에 따라 다를 수 있습니다.</translation>
 <translation id="8337114537412769126"><ph name="DEFAULT_SEARCH_PROVIDER_ENABLED_POLICY_NAME" />가 사용 설정되어 있으면 <ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" /> 설정은 POST로 추천 검색어를 제공할 때의 매개변수를 지정합니다. 이 매개변수는 쉼표로 구분된 이름 값의 쌍으로 구성됩니다. 값이 <ph name="SEARCH_TERM_MARKER" />와 같은 템플릿 매개변수면 실제 검색어 데이터로 교체됩니다.
 
       <ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" />를 설정하지 않으면 GET 메서드를 사용해 추천 검색어 요청이 전송됩니다.</translation>
@@ -11034,9 +11067,6 @@ URL 패턴이 <ph name="SERIAL_BLOCKED_FOR_URLS_POLICY_NAME" />와 충돌하는 
       정책이 True로 설정되어 있으면 5분 이상 백그라운드에 있는 탭이 중단될 수 있습니다. 탭이 중단되면 CPU, 배터리, 메모리 사용량이 줄어듭니다. <ph name="PRODUCT_NAME" />은(는) 휴리스틱을 사용하여 백그라운드에서 유용한 작업(예: 디스플레이 알림, 사운드 재생, 동영상 스트리밍)을 하는 탭이 중단되지 않도록 합니다. 웹 개발자는 사이트가 중단되지 않도록 선택할 수도 있습니다(https://chromium.googlesource.com/chromium/src/+/HEAD/chrome/browser/performance_manager/docs/freezing_opt_out_opt_in.md).
 
       False로 설정되어 있으면 어떠한 탭도 중단되지 않습니다.</translation>
-<translation id="8607613052618540095">정책을 사용 설정하면 Kiosk Vision의 텔레메트리 보고가 사용 설정됩니다.
-Kiosk Vision 프레임워크가 시작되고 잠재고객 텔레메트리 보고가 사용 설정됩니다.
-정책을 설정하지 않거나 사용 중지하면 Kiosk Vision의 텔레메트리 보고가 사용 중지됩니다.</translation>
 <translation id="8610216287193516769">M122에서 삭제되었습니다. 이 정책은 전파에 ChromeOS 정책 인프라를 사용한 적이 없는 서버 측 전용 정책입니다.
 정책을 <ph name="POLICY_VALUE_ALL" />로 설정하거나 설정하지 않으면 관리 계정이 어떤 계정으로든 사용될 수 있습니다. 그 결과, 관리 계정이 보조 계정이 될 수 있으며, 이때 브라우저 프로필에서 관리 계정이 기본 계정으로 로그인된 경우에만 정책을 수신할 수 있습니다.
       다음과 같은 경우에는 계정에 설정된 정책이 시행되지 않습니다.
@@ -11873,6 +11903,7 @@ URL 패턴은 <ph name="WEB_PRINTING_BLOCKED_FOR_URLS_POLICY_NAME" />와 충돌�
 <translation id="9162444960513782569">백그라운드 자바스크립트 타이머 강제 조절 안함</translation>
 <translation id="9164656078867027374"><ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" />에 액세스할 수 있는 도메인 정의</translation>
 <translation id="9165128017344777105">사이트에서 로컬 글꼴 권한 허용</translation>
+<translation id="9165498643231979857">렌더기 프로세스의 CPU 코어 공유 제한</translation>
 <translation id="9166670902476893480">이 정책은 <ph name="PRODUCT_NAME" />에서 안전하지 않은 DNS 요청을 할 때 추가적인 DNS 레코드 유형을 쿼리할지를 결정합니다. 항상 추가적인 DNS 유형을 쿼리할 수 있는 보안 DNS를 통한 DNS 쿼리에는 영향을 주지 않습니다.
 
       정책이 설정되지 않거나 사용 설정되면 <ph name="DNS_TYPE_A" />(DNS 유형 1) 및 <ph name="DNS_TYPE_AAAA" />(DNS 유형 28)뿐만 아니라 <ph name="DNS_TYPE_HTTPS" />(DNS type 65)와 같은 추가적인 유형이 쿼리될 수 있습니다.

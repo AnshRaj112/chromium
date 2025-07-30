@@ -796,6 +796,12 @@
       status: "test",
     },
     {
+      // Remove the restriction that drawElement can only draw immediate
+      // children of the canvas, and allow drawing canvas descendants.
+      name: "CanvasDrawElementInSubtree",
+      depends_on: ["CanvasDrawElement"],
+    },
+    {
       name: "CanvasFloatingPoint",
       status: "stable",
     },
@@ -2455,6 +2461,14 @@
       name: "ForceReduceMotion",
     },
     {
+      // The FormControlRange interface allows web authors to create
+      // Range-like objects of the value of <textarea> and <input>
+      // elements.
+      // crbug.com/421421332
+      // https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/FormControlRange/explainer.md
+      name: "FormControlRange",
+    },
+    {
       // TODO(crbug.com/1419161): Remove this feature after M113 has been stable
       // for a few weeks or more. This is a kill switch that, when enabled, goes
       // back to the old behavior, which was to restore the state for <input>
@@ -2622,16 +2636,6 @@
       status: "experimental",
       origin_trial_feature_name: "HTMLInterestForAttribute",
       origin_trial_allows_third_party: true,
-    },
-    // Enables the "context menu item only" behavior mode for the
-    // `interestfor` API. In this mode, the context menu is displayed in the
-    // "normal" location, but an additional line item is added to the menu which
-    // allows the user to show interest. This is enabled by default, but depends
-    // on HTMLInterestForAttribute.
-    {
-      name: "HTMLInterestForContextMenuItemOnly",
-      status: "stable",
-      depends_on: ["HTMLInterestForAttribute"],
     },
     {
       // Prevents the HTMLLinkElement processing model from being invoked when
@@ -2936,6 +2940,21 @@
       status: "stable",
     },
     {
+      // Reverse origin trial allowing Local Network Access requests on
+      // non-secure contexts (but still requiring a permission grant from the
+      // user).
+      name: "LocalNetworkAccessNonSecureContextAllowed",
+      origin_trial_feature_name: "LocalNetworkAccessNonSecureContextAllowed",
+      origin_trial_type: "deprecation",
+      origin_trial_allows_insecure: true,
+      status: "experimental",
+      base_feature: "none",
+      // No status because this blink runtime feature doesn't work by itself.
+      // It's controlled by network::features::kLocalNetworkAccessChecks which
+      // needs to be enabled to make the whole feature work (see
+      // crbug.com/394009026).
+    },
+    {
       name: "LocalNetworkAccessPermissionPolicy",
       base_feature: "none",
       // No status because this blink runtime feature doesn't work by itself.
@@ -3230,7 +3249,7 @@
     },
     {
       name: "NestedViewTransition",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "NetInfoConstantType",
@@ -3348,6 +3367,10 @@
     {
       name: "OrientationEvent",
       status: {"Android": "stable"},
+    },
+    {
+      name: "OriginAPI",
+      status: "experimental",
     },
     {
       name: "OriginIsolationHeader",
@@ -4002,6 +4025,10 @@
       status: "test",
     },
     {
+      name: "RequestMainFrameAfterFirstVideoFrame",
+      status: "experimental",
+    },
+    {
       name: "ResolveVarStylesOnCopy",
       status: "stable",
     },
@@ -4273,7 +4300,10 @@
     },
     {
       name: "SecurePaymentConfirmationBrowserBoundKeys",
-      status: "stable",
+      status: {
+        "Android": "stable",
+        "default": "test",
+      },
     },
     {
       name: "SecurePaymentConfirmationDebug",
@@ -4291,7 +4321,10 @@
       // Implements new UX for SPC including new output states, payment
       // instrument details and payment entities logos.
       name: "SecurePaymentConfirmationUxRefresh",
-      status: "test",
+      status: {
+        "Android": "stable",
+        "default": "test",
+      },
     },
     {
       // Implements improved accessibility mappings for having an <input>
@@ -4430,8 +4463,7 @@
     },
     {
       name: "ServiceWorkerStaticRouterTimingInfo",
-      origin_trial_allows_third_party: true,
-      origin_trial_feature_name: "ServiceWorkerStaticRouterTimingInfo",
+      status: "stable",
     },
     {
       name: "SetSequentialFocusStartingPoint",
@@ -4658,6 +4690,10 @@
       origin_trial_type: "deprecation",
       origin_trial_allows_insecure: true,
       origin_trial_allows_third_party: true,
+    },
+    {
+      name: "StickyUserActivationAcrossSameOriginNavigation",
+      status: "experimental",
     },
     {
       name: "StorageBuckets",
@@ -4927,7 +4963,7 @@
       // https://issues.chromium.org/issues/408018828
       // https://github.com/whatwg/html/issues/9111
       name: "ToggleEventSource",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "TopicsAPI",
@@ -5305,7 +5341,7 @@
     },
     {
       name: "WebAppLaunchQueue",
-      status: {"Android": "test", "default": "stable"},
+      status: "stable",
       base_feature: "none",
     },
     {

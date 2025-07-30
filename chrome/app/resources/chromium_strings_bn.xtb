@@ -98,7 +98,6 @@
 <translation id="2210682093923538346">বিপজ্জনক সাইট। Chromium বিজ্ঞপ্তি পাওয়ার অনুমতি সরিয়ে দিয়েছে।</translation>
 <translation id="2236949375853147973">আমার অ্যাক্টিভিটি</translation>
 <translation id="2238130810669087193">নিজের সব ডিভাইসে ঠিকানা ও আরও অনেক কিছু পেতে, Chromium-এ সাইন-ইন করুন। সাইন-ইন করার পরে, আপনার Google অ্যাকাউন্টে এই ঠিকানা সেভ করা হবে।</translation>
-<translation id="2240214816234246077">আপনি সম্প্রতি ভিজিট করেননি। Chromium <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> সম্পর্কিত অনুমতি সরিয়ে দিয়েছে</translation>
 <translation id="2241627712206172106">যদি আপনি একটি কম্পিউটার শেয়ার করেন, তাহলে বন্ধু ও পরিবারের লোকজন পৃথকভাবে ব্রাউজ করতে পারবেন এবং তাদের ইচ্ছা অনুযায়ী Chromium-এর সেট-আপ করতে পারবেন৷</translation>
 <translation id="2287771843518581140">{NUM_TABS,plural, =1{আপনার ব্রাউজারের গতি কমিয়ে দেয় এমন ট্যাব পজ করার জন্য Chromium সাজেস্ট করে}one{আপনার ব্রাউজারের গতি কমিয়ে দেয় এমন ট্যাব পজ করার জন্য Chromium সাজেস্ট করে}other{আপনার ব্রাউজারের গতি কমিয়ে দেয় এমন ট্যাবগুলি পজ করার জন্য Chromium সাজেস্ট করে}}</translation>
 <translation id="2313870531055795960">Chromium-এ স্টোর করা নিরাপদ নয় এমন সাইটের তালিকা থেকে সেগুলির URL গুলি পরীক্ষা করে দেখে। যদি কোনও সাইট আপনার পাসওয়ার্ড চুরি করার চেষ্টা করে বা আপনি কোনও ক্ষতিকারক ফাইল ডাউনলোড করলে, Safe Browsing-এ Chromium পৃষ্ঠার কিছু কন্টেন্ট সহ URL গুলিও হয়ত পাঠাতে পারে।</translation>
@@ -350,7 +349,6 @@
 <translation id="5690427481109656848">Google LLC</translation>
 <translation id="5698481217667032250">এই ভাষায় Chromium প্রদর্শন করুন</translation>
 <translation id="569897634095159764">ইন্টারনেটের সাথে কানেক্ট করা যায়নি। প্রক্সি সার্ভার যাচাই করতে হবে।</translation>
-<translation id="5761096224651992291">আপনি সম্প্রতি ভিজিট করেননি। Chromium <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" />, <ph name="PERMISSION_3" /> সম্পর্কিত অনুমতি সরিয়ে দিয়েছে</translation>
 <translation id="5768371961535086509">Chromium ইনঅ্যাক্টিভ ট্যাব থেকে মেমরি খালি করে। এর ফলে অ্যাক্টিভ থাকা ট্যাব এবং অন্যান্য অ্যাপ আরও বেশি কম্পিউটার রিসোর্স পায় এবং Chromium দ্রুত কাজ করতে পারে। আপনার ইনঅ্যাক্টিভ ট্যাব আবার ব্যবহার করা শুরু করলে অটোমেটিক সেগুলি অ্যাক্টিভ হয়ে যাবে। <ph name="BEGIN_LINK" />মেমরি সেভার সম্পর্কে আরও জানুন<ph name="END_LINK" /></translation>
 <translation id="5775198138441669627">আপনি নিজের পাসফ্রেজ ভুলে গেলে অথবা এই সেটিং পরিবর্তন করতে চাইলে, আপনার অ্যাকাউন্টে থাকা Chromium ডেটা <ph name="SETTINGS_LINK" /></translation>
 <translation id="5800158606660203929">Chromium কাস্টমাইজ ও কন্ট্রোল করুন। আপনার ডিফল্ট ব্রাউজার হিসেবে Chromium সেট করুন।</translation>
@@ -444,7 +442,6 @@
 <translation id="6717134281241384636">আপনার প্রোফাইলটি ব্যবহার করা যাবে না কারণ এটি একটি Chromium-এর নতুন ভার্সন৷ কিছু বিষয় অনুপলব্ধ হতে পারে৷ একটি ভিন্ন প্রোফাইল ডিরেক্টরি উল্লেখ করুন অথবা Chromium-এর একটি নতুন ভার্সন ব্যবহার করুন৷</translation>
 <translation id="6729124504294600478">পছন্দমতো সুবিধা ও অন্যান্য ফিচার ব্যবহার করতে ওয়েব ও অ্যাপ অ্যাক্টিভিটি ও লিঙ্ক করা Google পরিষেবায় Chromium যোগ করে নিন</translation>
 <translation id="6734291798041940871">Chromium ইতোমধ্যে আপনার কম্পিউটারের সকল ব্যবহারকারীর জন্য ইনস্টল করা হয়েছে।</translation>
-<translation id="674245979920622322">আপনি সম্প্রতি ভিজিট করেননি। Chromium <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> এবং আরও <ph name="COUNT" />টি অনুমতি সরিয়ে দিয়েছে</translation>
 <translation id="6751374565094704799">Chromium-এর ভি৮ ইঞ্জিন সাইটের স্পিড বাড়িয়ে দেয় কিন্তু Chromium-এর অ্যাটাক আটকানোর ক্ষমতা সামান্য কমে যায়। এই সেটিংসটি চালু করা আছে।</translation>
 <translation id="67706546131546258">ফাইলটি বিপজ্জনক হতে পারে বলে Chromium এটি স্ক্যান করার সাজেশন দেয়।</translation>
 <translation id="6779406956731413166">ChromeOS সম্ভবত অতিরিক্ত <ph name="BEGIN_LINK_CROS_OSS" />ওপেন সোর্স সফ্টওয়্যার<ph name="END_LINK_CROS_OSS" /> দিয়ে তৈরি।</translation>
@@ -501,12 +498,12 @@ Chromium আপনার সেটিংস পুনরুদ্ধার ক�
 <translation id="7461356015007898716">ভবিষ্যতে Chromium আপডেট পেতে হলে, আপনার কম্পিউটারে Windows 10 বা এর পরবর্তী যেকোনও ভার্সন থাকতে হবে। এই কম্পিউটারে Windows 7 ভার্সন ব্যবহার করা হচ্ছে।</translation>
 <translation id="7467949745582939695">Chromium আবার লঞ্চ করবেন?</translation>
 <translation id="7483335560992089831">একই Chromium ভার্সন যা বর্তমানে চলমান, ইনস্টল করতে পারবেন না৷ দয়া করে Chromium বন্ধ করুন এবং আবার চেষ্টা করুন৷</translation>
+<translation id="7517403744065880907">আপনি যখনই Chromium-এ সাইন-ইন করবেন তখন নিজের Google অ্যাকাউন্টে পাসওয়ার্ড সেভ ও ব্যবহার এবং আরও অনেক কিছু করতে পারবেন। <ph name="LEARN_MORE" /></translation>
 <translation id="751935028865900641">সাইটগুলি প্রত্যাশা অনুযায়ী কাজ করতে পারে। আপনি সব Chromium উইন্ডো বন্ধ করে দিলে আপনাকে বেশিরভাগ সাইট থেকে সাইন-আউট করে দেওয়া হবে, তবে আপনি Chromium-এ সাইন-ইন করে থাকলে আপনাকে Google অ্যাকাউন্ট থেকে সাইন-আউট করা হবে না।</translation>
 <translation id="753534427205733210">{0,plural, =1{Chromium ১ মিনিটের মধ্যে আবার লঞ্চ হবে}one{Chromium # মিনিটের মধ্যে আবার লঞ্চ হবে}other{Chromium # মিনিটের মধ্যে আবার লঞ্চ হবে}}</translation>
 <translation id="7565444033145385702">আপনার ডেটা সুরক্ষিত রাখতে, আপনি সম্প্রতি ভিজিট করেননি এমন সাইট থেকে Chromium-কে অনুমতি সরাতে দিন।</translation>
 <translation id="7582945390259497898">Chromium আপনার আগ্রহ অনুমান করতে পারে। পরে, আপনি যে সাইটটি দেখেন সেটি আপনার দেখা বিজ্ঞাপনগুলিকে পছন্দমতো করার জন্য Chromium-কে আপনার আগ্রহগুলি দেখতে বলতে পারে।</translation>
 <translation id="7583399374488819119"><ph name="COMPANY_NAME" /> ইনস্টলার</translation>
-<translation id="7585391435984513350">আপনি সম্প্রতি ভিজিট করেননি। Chromium <ph name="PERMISSION" /> সম্পর্কিত অনুমতি সরিয়ে দিয়েছে।</translation>
 <translation id="761356813943268536">Chromium আপনার ক্যামেরা এবং মাইক্রোফোন ব্যবহার করছে৷</translation>
 <translation id="7617377681829253106">Chromium আরও ভাল হয়ে উঠেছে</translation>
 <translation id="7622753900276619808">Chromium-এ এখন আপনার কাছে আরও ফিচার উপলভ্য আছে</translation>
@@ -626,6 +623,7 @@ Chromium আপনার সেটিংস পুনরুদ্ধার ক�
 <translation id="9158494823179993217"><ph name="TARGET_URL_HOSTNAME" /> অ্যাক্সেস করতে অন্য ব্রাউজার খোলার জন্য আপনার সিস্টেম অ্যাডমিনিস্ট্রেটর Chromium কনফিগার করেছেন।</translation>
 <translation id="9185526690718004400">&amp;Chromium আপডেট করতে আবার লঞ্চ করুন</translation>
 <translation id="9190841055450128916">Chromium (mDNS-In)</translation>
+<translation id="9206863043651638213">আপনি Chromium-এ সাইন-ইন করে থাকাকালীন আরও অনেক কিছু পান</translation>
 <translation id="924957577793602335">Chromium নিজের পছন্দমতো সাজিয়ে নিন</translation>
 <translation id="93478295209880648">Chromium সঠিকভাবে কাজ নাও করতে পারে কারণ এটি এখন আর Windows XP বা Windows Vista আর সমর্থিত নয়</translation>
 <translation id="945522503751344254">মতামত জানান</translation>

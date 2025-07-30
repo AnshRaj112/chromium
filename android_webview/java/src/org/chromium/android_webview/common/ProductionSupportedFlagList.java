@@ -433,9 +433,6 @@ public final class ProductionSupportedFlagList {
                 NetworkServiceFeatures.DEPRECATE_UNLOAD_BY_ALLOW_LIST,
                 "Unload Deprecation respects a list of allowed origins."),
         Flag.baseFeature(
-                AwFeatures.WEBVIEW_RECORD_APP_DATA_DIRECTORY_SIZE,
-                "Record the size of the embedding app's data directory"),
-        Flag.baseFeature(
                 BlinkFeatures.THREADED_PRELOAD_SCANNER,
                 "If enabled, the HTMLPreloadScanner will run on a worker thread."),
         Flag.baseFeature(
@@ -535,6 +532,9 @@ public final class ProductionSupportedFlagList {
         Flag.baseFeature(
                 NetFeatures.HTTP_CACHE_NO_VARY_SEARCH,
                 "Enables support for the No-Vary-Search response header in the HTTP disk cache"),
+        Flag.baseFeature(
+                NetFeatures.DISK_CACHE_BACKEND_EXPERIMENT,
+                "Enables the experimental disk cache backend for HTTP Cache"),
         Flag.baseFeature("MojoIpcz"),
         Flag.baseFeature(
                 "FixDataPipeTrapBug",
@@ -1075,6 +1075,34 @@ public final class ProductionSupportedFlagList {
         Flag.baseFeature(
                 VizFeatures.NO_LATE_BEGIN_FRAMES,
                 "Enables not sending BeginFrameArgs late when a client begins observing them."),
+        Flag.baseFeature(
+                BaseFeatures.BACKGROUND_NOT_PERCEPTIBLE_BINDING,
+                "Enable boosting the importance of renderers without boosting their CPU priority."),
+        Flag.baseFeature(
+                "CleanupToBeNormalTermination",
+                "Process terminated by RenderProcessHost::Cleanup() is marked as "
+                        + "normal_termination."),
+        Flag.baseFeature(
+                "KeepChildProcessAfterIPCReset",
+                "When enabled, child process will not terminate itself when IPC is reset."),
+        Flag.baseFeature(
+                "StrictHighRankProcessLRU",
+                "Enable stricter management of the Android process LRU state to ensure that"
+                        + " high-rank processes are always more recent than low-rank processes."),
+        Flag.baseFeature(
+                BaseFeatures.UPDATE_STATE_BEFORE_UNBINDING,
+                "Update child process binding state before unbinding."),
+        Flag.baseFeature(
+                ContentFeatures.GROUP_REBINDING_FOR_GROUP_IMPORTANCE,
+                "Apply consecutive service group importance changes with a single service rebind"
+                        + " call."),
+        Flag.baseFeature(
+                BaseFeatures.USE_SHARED_REBIND_SERVICE_CONNECTION,
+                "Use a shared service connection to apply service group importance changes."),
+        Flag.baseFeature(
+                "ReloadHiddenTabsWithActiveCrashedSubframes",
+                "Restricts reloading of hidden tabs with crashed subframes to only happen for "
+                        + "active subframes."),
         // Add new commandline switches and features above. The final entry should have a
         // trailing comma for cleaner diffs.
     };

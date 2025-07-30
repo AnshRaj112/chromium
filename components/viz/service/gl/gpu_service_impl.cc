@@ -697,6 +697,7 @@ void GpuServiceImpl::BindWebNNContextProvider(
     // `client_id` in order to support memory metrics.
     webnn_context_provider_ = webnn::WebNNContextProviderImpl::Create(
         std::move(shared_context_state), gpu_feature_info_, gpu_info_,
+        shared_image_manager(),
         base::BindOnce(&GpuServiceImpl::LoseAllContexts, weak_ptr_),
         main_runner(), GetGpuScheduler(), client_id);
   }
@@ -1275,18 +1276,9 @@ bool GpuServiceImpl::IsGMBNV12Supported() {
   }
   auto size = gfx::Size(2, 2);
 
-  // Note that |gmb_id| and |client_id| does not matter here as this is the
-  // first GMB which will created and immediately destroyed.
-  auto gmb_id = gfx::GpuMemoryBufferId(
-      static_cast<int>(gpu::MappableSIClientGmbId::kGpuServiceImpl));
-  auto client_id = gpu::kMappableSIClientId;
-  auto gmb_handle = gpu_memory_buffer_factory_->CreateGpuMemoryBuffer(
-      gmb_id, size, /*framebuffer_size=*/size, buffer_format, buffer_usage,
-      client_id, gpu::kNullSurfaceHandle);
-
-  // Destroy the gmb_handle since it will be no longer needed.
-  gpu_memory_buffer_factory_->DestroyGpuMemoryBuffer(gmb_id, client_id);
-  return !gmb_handle.is_null();
+  return !gpu_memory_buffer_factory_
+              ->CreateNativeGmbHandle(size, buffer_format, buffer_usage)
+              .is_null();
 }
 #endif
 

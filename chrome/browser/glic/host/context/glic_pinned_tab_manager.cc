@@ -255,7 +255,6 @@ bool GlicPinnedTabManager::PinTabs(
     // Tab might be unloaded (e.g. discarded, restored from history). We reload
     // it now (and prevent it from being discarded elsewhere), so it can have
     // its context pulled.
-    // TODO(crbug.com/422767952): prevent pinned tabs from being discarded.
     if (tab->GetContents()) {
       if (tab->GetContents()->WasDiscarded()) {
         tab->GetContents()->GetController().SetNeedsReload();
@@ -398,6 +397,9 @@ GlicPinnedTabManager::GetUnsortedPinCandidates() {
       if (!web_contents->GetController().GetLastCommittedEntry()) {
         continue;
       }
+      if (!IsValidForSharing(web_contents)) {
+        continue;
+      }
       candidates.push_back(web_contents);
     }
   }
@@ -456,6 +458,11 @@ void GlicPinnedTabManager::OnTabWillClose(tabs::TabHandle tab_handle) {
 bool GlicPinnedTabManager::IsBrowserValidForSharing(
     BrowserWindowInterface* browser_window) {
   return IsBrowserValidForSharingInProfile(browser_window, profile_);
+}
+
+bool GlicPinnedTabManager::IsValidForSharing(
+    content::WebContents* web_contents) {
+  return IsTabValidForSharing(web_contents);
 }
 
 }  // namespace glic

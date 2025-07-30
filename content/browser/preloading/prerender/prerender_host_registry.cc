@@ -337,6 +337,8 @@ PreloadingEligibility ToEligibility(PrerenderFinalStatus status) {
     case PrerenderFinalStatus::kPrerenderFailedDuringPrefetch:
     case PrerenderFinalStatus::kBrowsingDataRemoved:
       NOTREACHED();
+    case PrerenderFinalStatus::kPrerenderHostReused:
+      NOTREACHED();
   }
 
   NOTREACHED();
@@ -803,10 +805,15 @@ FrameTreeNodeId PrerenderHostRegistry::CreateAndStartHost(
     std::unique_ptr<PrerenderHost> reuse_host;
     std::unique_ptr<PrerenderHost> prerender_host;
     if (base::FeatureList::IsEnabled(features::kPrerender2ReuseHost)) {
-      reuse_host = FindPrerenderHostToReuse(attributes);
+      reuse_host = FindAndTakePrerenderHostToReuse(attributes);
     }
     base::UmaHistogramBoolean("Prerender.Experimental.FoundReusePrerenderHost",
                               reuse_host != nullptr);
+    if (!reuse_host) {
+      base::UmaHistogramCounts100(
+          "Prerender.Experimental.ReusePrerenderHost.PrerenderHostCount.Failed",
+          prerender_host_by_frame_tree_node_id_.size());
+    }
     // If we find a reusable prerender host under the same site. We will
     // take over its frame tree and initiate a new navigation to the new
     // prerender URL.
@@ -2096,7 +2103,8 @@ void PrerenderHostRegistry::RecordPotentialPrerenderProcessReuse(
   base::UmaHistogramEnumeration(kPrerenderProcessReuseUMAName, availability);
 }
 
-std::unique_ptr<PrerenderHost> PrerenderHostRegistry::FindPrerenderHostToReuse(
+std::unique_ptr<PrerenderHost>
+PrerenderHostRegistry::FindAndTakePrerenderHostToReuse(
     const PrerenderAttributes& attributes) {
   const GURL prerender_url = attributes.prerendering_url;
   auto iter = std::find_if(prerender_host_by_frame_tree_node_id_.begin(),
@@ -2107,8 +2115,8 @@ std::unique_ptr<PrerenderHost> PrerenderHostRegistry::FindPrerenderHostToReuse(
                            });
   if (iter != prerender_host_by_frame_tree_node_id_.end()) {
     std::unique_ptr<PrerenderHost> reuse_host = std::move(iter->second);
-    // TODO(crbug.com/402626324): add a new reason and notify about cancellation
     prerender_host_by_frame_tree_node_id_.erase(iter);
+    reuse_host->NotifyReused();
     return reuse_host;
   }
   return nullptr;

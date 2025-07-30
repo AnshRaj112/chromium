@@ -578,6 +578,11 @@ interface CSSCounterStyleRule : CSSRule
     setter suffix
     setter symbols
     setter system
+interface CSSCustomMediaRule : CSSRule
+    attribute @@toStringTag
+    getter name
+    getter query
+    method constructor
 interface CSSFontFaceRule : CSSRule
     attribute @@toStringTag
     getter style
@@ -1837,6 +1842,7 @@ interface DigitalCredential : Credential
     getter data
     getter protocol
     method constructor
+    method toJSON
 interface Directive
     attribute @@toStringTag
     getter type
@@ -5582,15 +5588,6 @@ interface LargestContentfulPaint : PerformanceEntry
     getter url
     method constructor
     method toJSON
-interface LaunchParams
-    attribute @@toStringTag
-    getter files
-    getter targetURL
-    method constructor
-interface LaunchQueue
-    attribute @@toStringTag
-    method constructor
-    method setConsumer
 interface LayoutShift : PerformanceEntry
     attribute @@toStringTag
     getter hadRecentInput
@@ -6823,6 +6820,15 @@ interface OrientationSensor : Sensor
     getter quaternion
     method constructor
     method populateMatrix
+interface Origin
+    static method parse
+    attribute @@toStringTag
+    getter opaque
+    method constructor
+    method isSameOrigin
+    method isSameSite
+    method toJSON
+    method toString
 interface OscillatorNode : AudioScheduledSourceNode
     attribute @@toStringTag
     getter detune
@@ -7134,6 +7140,10 @@ interface PerformanceResourceTiming : PerformanceEntry
     getter secureConnectionStart
     getter serverTiming
     getter transferSize
+    getter workerCacheLookupStart
+    getter workerFinalSourceType
+    getter workerMatchedSourceType
+    getter workerRouterEvaluationStart
     getter workerStart
     method constructor
     method toJSON
@@ -12088,7 +12098,6 @@ namespace console
     getter innerHeight
     getter innerWidth
     getter isSecureContext
-    getter launchQueue
     getter length
     getter localStorage
     getter location

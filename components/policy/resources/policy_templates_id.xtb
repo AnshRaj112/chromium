@@ -280,6 +280,7 @@ Untuk mengetahui informasi selengkapnya tentang penanganan data untuk fitur AI g
 <translation id="1202216683470826356">Tampilkan kartu di Halaman Tab Baru</translation>
 <translation id="1203676252390737801">Penanganan IP WebRTC per URL</translation>
 <translation id="1204263402976895730">Mengaktifkan printer perusahaan</translation>
+<translation id="120513772363332049">Semua proses lain tidak akan dijadwalkan pada core CPU yang sama saat proses perender berjalan pada core tersebut.</translation>
 <translation id="1207301487141109411">Cegah pemilihan avatar pengguna dari sistem file lokal, kamera, dan profil Google</translation>
 <translation id="1209096923317019235">Menetapkan aplikasi sebagai pengendali default untuk ekstensi file yang ditentukan</translation>
 <translation id="120937472976628837">Melaporkan info kipas</translation>
@@ -1581,6 +1582,9 @@ Kebijakan ini biasanya Dinonaktifkan sebagai pertahanan terhadap phishing.</tran
 <translation id="208566302163036794">Blokir fitur yang dinonaktifkan</translation>
 <translation id="2086040449830622332">Mengaktifkan Pencetakan LPAC Sandbox</translation>
 <translation id="208623333578980446">Izinkan penguncian layar saat aktif untuk pengelolaan daya</translation>
+<translation id="2086505225896497574">Menyetel kebijakan akan menentukan ID WebAuthn RP yang tidak akan dimintai pengesahan kunci keamanan saat sertifikat pengesahan kunci keamanan diminta di layar login. Sinyal juga dikirimkan ke kunci keamanan yang menunjukkan bahwa pengesahan perusahaan dapat digunakan. Jika kebijakan ini tidak disetel, pengguna akan dimintai pengesahan kunci keamanan saat situs memintanya.
+
+Kebijakan perangkat ini setara dengan kebijakan pengguna yang ada, <ph name="SECURITY_KEY_PERMIT_ATTESTATION_POLICY_NAME" />, tetapi berlaku untuk profil yang login di layar login.</translation>
 <translation id="2089541797660774692">Aktifkan pelaporan cloud browser terkelola</translation>
 <translation id="2090712407517297305">Halaman histori Chrome yang diatur ke dalam grup akan dapat dilihat di chrome://history/grouped.</translation>
 <translation id="2090939118981888335">Jika kebijakan disetel ke Aktif, proxy kompresi data akan diizinkan. Jika kebijakan disetel ke Nonaktif, proxy tidak akan diizinkan.
@@ -3918,6 +3922,15 @@ menyertakan keduanya di sertifikat RSA yang ditujukan untuk HTTPS.</translation>
       Jika kebijakan ini disetel ke Nonaktif, penggunaan Translator API tidak akan diizinkan.</translation>
 <translation id="366494444808132420">Izinkan integrasi Gemini.</translation>
 <translation id="3665437376055221832">Hanya minta pengguna saat tidak ada sertifikat yang cocok dengan pemilihan otomatis.</translation>
+<translation id="3667089394451236198">Daftar Pola URL. Permintaan yang dimulai dari situs yang disajikan dengan pencocokan origin tidak tunduk pada pemeriksaan <ph name="LOCAL_NETWORK_ACCESS" />.
+
+Jika origin dicakup oleh kebijakan ini dan LocalNetworkAccessBlockedForUrls, LocalNetworkAccessBlockedForUrls akan diprioritaskan.
+
+Untuk origin yang tidak dicakup oleh pola yang ditentukan di sini, konfigurasi pribadi pengguna akan berlaku.
+
+Untuk mengetahui informasi selengkapnya tentang pola URL yang valid, lihat https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns.
+
+Lihat https://wicg.github.io/local-network-access/ untuk melihat batasan <ph name="LOCAL_NETWORK_ACCESS" />.</translation>
 <translation id="3671773704245936868">Nonaktifkan penyorotan fokus keyboard</translation>
 <translation id="3674010627788940405">Jangan dukung header permintaan non-karakter pengganti CORS.</translation>
 <translation id="3675303748198647471">setTimeout(…, 0) biasa digunakan untuk menguraikan tugas JavaScript panjang.
@@ -4484,6 +4497,17 @@ Untuk informasi selengkapnya tentang pola <ph name="URL_LABEL" /> yang valid, li
       Jika <ph name="DEFAULT_SEARCH_PROVIDER_KEYWORD_POLICY_NAME" /> tidak disetel, tidak ada kata kunci untuk mengaktifkan penyedia penelusuran.</translation>
 <translation id="4090088362777472639">Hash SHA-256 gambar playbook Ansible.</translation>
 <translation id="4091040199847925434">Nonaktifkan pelaporan informasi sistem dan konten halaman yang digunakan untuk membantu meningkatkan Safe Browsing</translation>
+<translation id="4092882308219320847">Daftar Pola URL. Permintaan yang dimulai dari situs yang disajikan dengan pencocokan origin akan diblokir untuk mengajukan permintaan <ph name="LOCAL_NETWORK_ACCESS" />.
+
+Jika origin dicakup oleh kebijakan ini dan LocalNetworkAccessAllowedForUrls, kebijakan ini akan diprioritaskan.
+
+Bergantung pada tahap peluncuran <ph name="LOCAL_NETWORK_ACCESS" />, LocalNetworkAccessRestrictionsEnabled mungkin juga perlu diaktifkan agar kebijakan ini dapat memblokir permintaan <ph name="LOCAL_NETWORK_ACCESS" />.
+
+Untuk origin yang tidak dicakup oleh pola yang ditentukan di sini, konfigurasi pribadi pengguna akan berlaku.
+
+Untuk mengetahui informasi selengkapnya tentang pola URL yang valid, lihat https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns.
+
+Lihat https://wicg.github.io/local-network-access/ untuk melihat batasan <ph name="LOCAL_NETWORK_ACCESS" />.</translation>
 <translation id="4093058072421210667">Jangan izinkan Gambar Inline.</translation>
 <translation id="4098920079809952737">Izinkan pencetakan dengan dan tanpa grafis latar belakang</translation>
 <translation id="410061592404122032">Tanyakan setiap kali situs ingin mendapatkan izin Pengelolaan Jendela</translation>
@@ -6680,6 +6704,7 @@ Kebijakan ini tidak mencegah pengguna menyimpan file ke <ph name="GOOGLE_DRIVE_N
 <translation id="5490462588616309068">Jika kebijakan ini disetel ke benar (true) atau tidak disetel, penggunaan ID konten yang dilindungi akan diizinkan, yang dapat membantu mengaktifkan pemutaran konten yang dilindungi dengan kualitas yang lebih tinggi.
 
 Jika kebijakan ini disetel ke salah (false), ID konten yang dilindungi tidak diizinkan untuk digunakan.</translation>
+<translation id="5492713303272131731">Semua proses lain dapat dijadwalkan pada core CPU yang sama saat proses perender berjalan pada core tersebut.</translation>
 <translation id="5494322570831642650">Menentukan apakah pengguna dapat membuka halaman dalam mode Samaran di <ph name="PRODUCT_NAME" />.
 
       Jika 'Enabled' dipilih atau kebijakan tidak disetel, halaman dapat dibuka dalam mode Samaran.
@@ -7053,6 +7078,7 @@ Kebijakan ini memengaruhi alur login dan autentikasi layar kunci.</translation>
       Catatan: Pisahkan beberapa nilai dengan koma.</translation>
 <translation id="5693469654327063861">Izinkan migrasi data</translation>
 <translation id="56936613186060503">Pengelola download tidak akan memiliki opsi untuk menyimpan file ke <ph name="GOOGLE_DRIVE_NAME" />.</translation>
+<translation id="569457565603183">URL/domain otomatis mengizinkan pengesahan langsung Kunci Keamanan di layar login</translation>
 <translation id="5695209488612697377">Mengaktifkan penggunaan penyedia penelusuran default di menu konteks.
 
           Jika kebijakan ini disetel ke nonaktif, item menu konteks penelusuran yang mengandalkan penyedia penelusuran default Anda tidak akan tersedia.
@@ -8190,7 +8216,6 @@ Untuk mengetahui informasi selengkapnya tentang penanganan data untuk fitur AI g
 <translation id="6412352702230183710">Hanya izinkan host pesan native tingkat sistem</translation>
 <translation id="6412793408912788345">Tampilkan layar pengantar Gemini selama login</translation>
 <translation id="6416506846917150119">Nonaktifkan penulisan prediktif keyboard fisik saat pengguna mengetik</translation>
-<translation id="6416916931494972926">Aktifkan pelaporan telemetri Kiosk Vision.</translation>
 <translation id="6417265370957905582">Asisten Google</translation>
 <translation id="6419001911253110938">Mengaktifkan tampilan layar pengantar untuk fitur AI dalam sesi selama alur login</translation>
 <translation id="6421254653839955267">Jika kebijakan disetel ke Aktif, pencarian CNAME akan dilewati. Nama server akan digunakan sebagaimana dimasukkan saat menghasilkan SPN Kerberos.
@@ -8351,7 +8376,6 @@ hanya dapat menggunakan URL alihan standar saat menggunakan <ph name="IDENTITY_A
 
       Jika kebijakan tidak disetel, perilaku default akan dinonaktifkan bagi pengguna terkelola dan aktif bagi pengguna lainnya.</translation>
 <translation id="6508403116553969858">Menyetel nilai kebijakan default untuk fitur AI generatif yang tercakup di <ph name="PRODUCT_NAME" /></translation>
-<translation id="6508882314969525299">Nonaktifkan pelaporan telemetri Kiosk Vision.</translation>
 <translation id="6509376413448002446">Mengonfigurasi screensaver pengguna untuk layar kunci.
 
 Jika kebijakan ini disetel ke benar (true), perangkat <ph name="PRODUCT_OS_NAME" /> akan menampilkan screensaver saat tidak ada aktivitas di layar kunci.
@@ -8707,6 +8731,13 @@ Jika kebijakan ini disetel ke Aktif, data akan dikumpulkan dan diupload ke <ph n
 
 Untuk <ph name="PRODUCT_NAME" />, kebijakan ini hanya berlaku saat perangkat didaftarkan dengan <ph name="CLOUD_MANAGEMENT_ENROLLMENT_TOKEN" />.
 Untuk <ph name="PRODUCT_OS_NAME" />, kebijakan ini selalu berlaku.</translation>
+<translation id="6720071484598746942">Jika kebijakan ini disetel ke Aktif, permintaan utama akan diblokir setiap kali peringatan yang seharusnya
+ditampilkan di <ph name="DEV_TOOLS_NAME" /> muncul karena pemeriksaan <ph name="LOCAL_NETWORK_ACCCESS" /> gagal.
+
+Jika kebijakan ini disetel ke Nonaktif atau tidak disetel, permintaan <ph name="LOCAL_NETWORK_ACCESS" /> akan menggunakan
+penanganan default untuk permintaan ini.
+
+Lihat https://wicg.github.io/local-network-access/ untuk melihat batasan <ph name="LOCAL_NETWORK_ACCESS" />.</translation>
 <translation id="6720330829631914048">Jam berlalu sejak awal hari dalam format 24 jam.</translation>
 <translation id="6721252203593581486">WebSQL di konteks pihak ketiga (misalnya, iframe lintas situs) nonaktif secara default mulai dari M97 dan akan dihapus sepenuhnya di M101.
           Jika kebijakan ini disetel ke salah (false) atau tidak disetel, WebSQL di konteks pihak ketiga akan tetap nonaktif.
@@ -10945,6 +10976,10 @@ Jika kebijakan ini tidak disetel, fitur kontrol dengan wajah mula-mula akan dino
 <translation id="8331479227794770304">Aktifkan tombol lengket</translation>
 <translation id="8332822245414537447">Nonaktifkan pemeriksaan penggunaan kunci RSA</translation>
 <translation id="8334685561819743286">Nonaktifkan koreksi otomatis keyboard fisik saat pengguna mengetik</translation>
+<translation id="8336986243404088829">Kebijakan ini mengurangi serangan side channel lintas proses pada memori dengan mengisolasi proses perender di core CPU dan mencegah proses lain berbagi core yang sama. Mitigasi ini didukung di versi <ph name="MS_WIN_NAME" /> 11 24H2 dan yang lebih baru. Jika OS tidak memiliki dukungan penjadwalan yang diperlukan, kebijakan ini tidak akan berpengaruh. Kebijakan ini mungkin memperlambat performa dalam beberapa skenario yang berat, mirip seperti saat menonaktifkan hyperthreading. Untuk mengetahui informasi selengkapnya, lihat https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-process_mitigation_side_channel_isolation_policy
+      Jika kebijakan ini disetel ke aktif, semua proses lain tidak akan dijadwalkan pada core CPU yang sama saat proses perender berjalan.
+      Jika kebijakan ini disetel ke nonaktif, semua proses lain dapat dijadwalkan pada core CPU yang sama jika proses perender berjalan pada core tersebut.
+      Jika kebijakan ini tidak disetel, semua proses lain dapat dijadwalkan pada core CPU yang sama jika proses perender berjalan pada core tersebut. Konfigurasi default ini mungkin bervariasi bergantung pada rilis <ph name="PRODUCT_NAME" />, uji coba kolom yang sedang berjalan, dan platform.</translation>
 <translation id="8337114537412769126">Jika <ph name="DEFAULT_SEARCH_PROVIDER_ENABLED_POLICY_NAME" /> aktif, menyetel <ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" /> akan menentukan parameter ketika melakukan penelusuran saran dengan POST. Kebijakan terdiri dari pasangan nama kunci yang dipisahkan koma. Jika nilai adalah parameter template seperti <ph name="SEARCH_TERM_MARKER" />, data istilah penelusuran nyata akan menggantikannya.
 
       Jika <ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" /> tidak disetel, permintaan penelusuran saran dikirimkan menggunakan metode GET.</translation>
@@ -11370,9 +11405,6 @@ Jika kebijakan tidak disetel, pengguna tidak dapat memainkan game di <ph name="P
       Jika kebijakan ini ditetapkan ke true, tab yang telah berjalan di latar belakang selama setidaknya 5 menit dapat dibekukan. Pembekuan tab mengurangi penggunaan CPU, baterai, dan memori. <ph name="PRODUCT_NAME" /> menggunakan heuristik untuk menghindari pembekuan tab yang sedang aktif di latar belakang (misalnya, menampilkan notifikasi, memutar suara, streaming video). Developer web juga dapat memilih untuk tidak membekukan situsnya (https://chromium.googlesource.com/chromium/src/+/HEAD/chrome/browser/performance_manager/docs/freezing_opt_out_opt_in.md).
 
       Jika kebijakan ditetapkan ke false, tidak ada tab yang akan dibekukan.</translation>
-<translation id="8607613052618540095">Jika kebijakan disetel ke Aktif, pelaporan telemetri Kiosk Vision akan diaktifkan.
-Tindakan ini akan memulai framework Kiosk Vision dan mengaktifkan pelaporan telemetri audiens.
-Jika kebijakan ini tidak disetel atau disetel ke Nonaktif, pelaporan telemetri Kiosk Vision akan dinonaktifkan.</translation>
 <translation id="8610216287193516769">Dihapus di M122 - ini adalah kebijakan khusus sisi server yang tidak pernah menggunakan infrastruktur kebijakan ChromeOS untuk penerapannya.
 Jika kebijakan ini disetel ke <ph name="POLICY_VALUE_ALL" /> atau tidak disetel, semua penggunaan akun terkelola akan diizinkan. Tindakan ini dapat menyebabkan akun terkelola menjadi akun sekunder, yang hanya akan menerima kebijakan jika akun tersebut login sebagai akun utama di Profil browser.
       Kebijakan yang disetel untuk akun tidak akan diterapkan dalam skenario berikut:
@@ -12235,6 +12267,7 @@ Untuk mengetahui informasi selengkapnya tentang konteks aman, lihat https://www.
 <translation id="9162444960513782569">Jangan paksa throttling timer JavaScript latar belakang</translation>
 <translation id="9164656078867027374">Menentukan domain yang diizinkan untuk mengakses <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /></translation>
 <translation id="9165128017344777105">Memberikan izin Font Lokal di situs ini</translation>
+<translation id="9165498643231979857">Membatasi berbagi core CPU untuk proses perender</translation>
 <translation id="9166670902476893480">Kebijakan ini mengontrol apakah <ph name="PRODUCT_NAME" /> dapat mengkueri jenis data DNS tambahan saat membuat permintaan DNS yang tidak aman. Kebijakan ini tidak memengaruhi kueri DNS yang dibuat melalui DNS Aman, yang selalu dapat mengkueri jenis DNS tambahan.
 
       Jika kebijakan ini tidak disetel atau disetel ke Aktif, jenis tambahan seperti <ph name="DNS_TYPE_HTTPS" /> (DNS jenis 65) dapat dikueri, selain <ph name="DNS_TYPE_A" /> (DNS jenis 1) dan <ph name="DNS_TYPE_AAAA" /> (DNS jenis 28).

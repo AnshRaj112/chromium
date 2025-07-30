@@ -31,6 +31,7 @@
 #include "chromeos/ash/components/system/statistics_provider.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/policy/proto/chrome_device_policy.pb.h"
+#include "components/prefs/pref_service.h"
 #include "components/web_package/signed_web_bundles/signed_web_bundle_id.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -212,7 +213,7 @@ IN_PROC_BROWSER_TEST_F(KioskIwaDeviceAttributesApiTest,
   for (const std::string& attribute : kDeviceAttributeNames) {
     content::EvalJsResult result =
         CallDeviceAttributesApi(web_contents(), attribute);
-    EXPECT_EQ(result.error, kNotAllowedOriginExpectedError);
+    EXPECT_EQ(result.ExtractError(), kNotAllowedOriginExpectedError);
   }
 }
 

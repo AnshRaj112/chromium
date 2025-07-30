@@ -176,7 +176,9 @@
 #import "ios/chrome/browser/push_notification/ui_bundled/notifications_opt_in_coordinator_delegate.h"
 #import "ios/chrome/browser/qr_scanner/ui_bundled/qr_scanner_legacy_coordinator.h"
 #import "ios/chrome/browser/reader_mode/coordinator/reader_mode_coordinator.h"
+#import "ios/chrome/browser/reader_mode/model/features.h"
 #import "ios/chrome/browser/reader_mode/model/reader_mode_browser_agent.h"
+#import "ios/chrome/browser/reader_mode/model/reader_mode_browser_agent_delegate.h"
 #import "ios/chrome/browser/reader_mode/model/reader_mode_tab_helper.h"
 #import "ios/chrome/browser/reading_list/model/reading_list_browser_agent.h"
 #import "ios/chrome/browser/reading_list/ui_bundled/reading_list_coordinator.h"
@@ -292,6 +294,7 @@
 #import "ios/chrome/browser/supervised_user/coordinator/parent_access_coordinator.h"
 #import "ios/chrome/browser/sync/model/sync_error_browser_agent.h"
 #import "ios/chrome/browser/tab_insertion/model/tab_insertion_browser_agent.h"
+#import "ios/chrome/browser/tab_switcher/ui_bundled/tab_group_action_type.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_group_confirmation_coordinator.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_strip/coordinator/tab_strip_coordinator.h"
 #import "ios/chrome/browser/tabs/model/tab_title_util.h"
@@ -396,6 +399,7 @@ enum class ToolbarKind {
     PolicyChangeCommands,
     PreloadControllerDelegate,
     QuickDeleteCommands,
+    ReaderModeBrowserAgentDelegate,
     ReaderModeCommands,
     ReadingListCoordinatorDelegate,
     RecentTabsCoordinatorDelegate,
@@ -723,6 +727,28 @@ enum class ToolbarKind {
 
   // The coordinator for the Welcome Back promo.
   WelcomeBackCoordinator* _welcomeBackCoordinator;
+}
+
+#pragma mark - ReaderModeBrowserAgentDelegate
+
+- (void)showReaderModeContentFromBrowserAgent:
+    (ReaderModeBrowserAgent*)browserAgent {
+  if (_readerModeCoordinator) {
+    return;
+  }
+  _readerModeCoordinator = [[ReaderModeCoordinator alloc]
+      initWithBaseViewController:self.viewController
+                         browser:self.browser];
+  [_readerModeCoordinator start];
+}
+
+- (void)hideReaderModeContentFromBrowserAgent:
+    (ReaderModeBrowserAgent*)browserAgent {
+  if (!_readerModeCoordinator) {
+    return;
+  }
+  [_readerModeCoordinator stop];
+  _readerModeCoordinator = nil;
 }
 
 #pragma mark - ChromeCoordinator
@@ -2729,26 +2755,14 @@ enum class ToolbarKind {
 
 #pragma mark - ReaderModeCommands
 
-- (void)showReaderMode {
+- (void)showReaderModeFromAccessPoint:(ReaderModeAccessPoint)accessPoint {
   web::WebState* activeWebState = self.activeWebState;
   if (!activeWebState) {
     return;
   }
   ReaderModeTabHelper* readerModeTabHelper =
       ReaderModeTabHelper::FromWebState(activeWebState);
-  if (!readerModeTabHelper->IsActive()) {
-    readerModeTabHelper->SetActive(true);
-    return;
-  }
-
-  if (_readerModeCoordinator) {
-    // If the Reader mode UI is already presented then there is nothing to do.
-    return;
-  }
-  _readerModeCoordinator = [[ReaderModeCoordinator alloc]
-      initWithBaseViewController:self.browserContainerCoordinator.viewController
-                         browser:self.browser];
-  [_readerModeCoordinator start];
+  readerModeTabHelper->ActivateReader(accessPoint);
 }
 
 - (void)hideReaderMode {
@@ -2758,17 +2772,7 @@ enum class ToolbarKind {
   }
   ReaderModeTabHelper* readerModeTabHelper =
       ReaderModeTabHelper::FromWebState(activeWebState);
-  if (readerModeTabHelper->IsActive()) {
-    readerModeTabHelper->SetActive(false);
-    return;
-  }
-
-  if (!_readerModeCoordinator) {
-    // If the Reader mode UI is already dismissed then there is nothing to do.
-    return;
-  }
-  [_readerModeCoordinator stop];
-  _readerModeCoordinator = nil;
+  readerModeTabHelper->DeactivateReader();
 }
 
 #pragma mark - FindInPageCommands
@@ -3342,12 +3346,7 @@ enum class ToolbarKind {
   ReaderModeBrowserAgent* readerModeBrowserAgent =
       ReaderModeBrowserAgent::FromBrowser(self.browser);
   if (readerModeBrowserAgent) {
-    readerModeBrowserAgent->SetReaderModeHandler(HandlerForProtocol(
-        self.browser->GetCommandDispatcher(), ReaderModeCommands));
-    readerModeBrowserAgent->SetReaderModeChipHandler(HandlerForProtocol(
-        self.browser->GetCommandDispatcher(), ReaderModeChipCommands));
-    readerModeBrowserAgent->SetSnackbarHandler(
-        static_cast<id<SnackbarCommands>>(commandDispatcher));
+    readerModeBrowserAgent->SetDelegate(self);
   }
 }
 
@@ -3388,9 +3387,7 @@ enum class ToolbarKind {
   ReaderModeBrowserAgent* readerModeBrowserAgent =
       ReaderModeBrowserAgent::FromBrowser(self.browser);
   if (readerModeBrowserAgent) {
-    readerModeBrowserAgent->SetReaderModeHandler(nil);
-    readerModeBrowserAgent->SetReaderModeChipHandler(nil);
-    readerModeBrowserAgent->SetSnackbarHandler(nil);
+    readerModeBrowserAgent->SetDelegate(nil);
   }
 }
 
@@ -3621,6 +3618,15 @@ enum class ToolbarKind {
     [weakSelf runLeaveOrDeleteCompletion:command.group
                           viewController:viewController];
   };
+  if (command.actionType == TabGroupActionType::kCloseLastTabUnknownRole) {
+    // If the user's member role is unkown (i.e. sync not complete yet),
+    // cannot show option to leave/keep group when attempting to close last
+    // tab. Instead, close last tab and replace with new tab after an error
+    // alert is shown.
+    _lastTabClosingAlert.primaryAction = ^{
+      [weakSelf runKeepGroup:command.group lastTabID:command.tabID];
+    };
+  }
   _lastTabClosingAlert.secondaryAction = ^{
     if (command.closing) {
       [weakSelf runKeepGroup:command.group lastTabID:command.tabID];

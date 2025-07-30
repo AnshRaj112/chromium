@@ -521,6 +521,21 @@ BASE_FEATURE(kDownloadedPDFOpening,
              "DownloadedPDFOpening",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+const char kDownloadListUITypeParam[] = "DownloadListUIType";
+
+bool IsDownloadListEnabled() {
+  return base::FeatureList::IsEnabled(kDownloadList);
+}
+
+DownloadListUIType CurrentDownloadListUIType() {
+  CHECK(IsDownloadListEnabled());
+  return static_cast<DownloadListUIType>(base::GetFieldTrialParamByFeatureAsInt(
+      kDownloadList, kDownloadListUITypeParam, /*default_value=*/
+      (int)DownloadListUIType::kDefaultUI));
+}
+
+BASE_FEATURE(kDownloadList, "DownloadList", base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Key for NSUserDefaults containing a bool indicating whether the next run
 // should enable feed background refresh capability. This is used because
 // registering for background refreshes must happen early in app initialization
@@ -995,9 +1010,13 @@ bool IsProvisionalNotificationAlertEnabled() {
   return base::FeatureList::IsEnabled(kProvisionalNotificationAlert);
 }
 
+BASE_FEATURE(kIOSOneTimeDefaultBrowserNotification,
+             "IOSOneTimeDefaultBrowserNotification",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kDefaultBrowserBannerPromo,
              "DefaultBrowserBannerPromo",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 constexpr base::FeatureParam<int> kDefaultBrowserBannerPromoImpressionLimit{
     &kDefaultBrowserBannerPromo, "DefaultBrowserBannerPromoImpressionLimit", 5};
@@ -1031,26 +1050,19 @@ const char kFullscreenTransitionDefaultSpeed[] =
     "MediumFullscreenTransitionSpeed";
 const char kFullscreenTransitionFaster[] = "FastFullscreenTransitionSpeed";
 const char kFullscreenTransitionSpeedParam[] = "FullscreenTransitionSpeed";
-const char kMediumFullscreenTransitionOffsetParam[] =
-    "MediumFullscreenTransitionOffset";
 
-bool IsFullscreenTransitionSet() {
-  return base::FeatureList::IsEnabled(kFullscreenTransition);
+bool IsFullscreenTransitionSpeedSet() {
+  return base::FeatureList::IsEnabled(kFullscreenTransitionSpeed);
 }
 
 FullscreenTransitionSpeed FullscreenTransitionSpeedParam() {
   return static_cast<FullscreenTransitionSpeed>(
       base::GetFieldTrialParamByFeatureAsInt(
-          kFullscreenTransition, kFullscreenTransitionSpeedParam, 1));
+          kFullscreenTransitionSpeed, kFullscreenTransitionSpeedParam, 1));
 }
 
-bool IsFullscreenTransitionOffsetSet() {
-  return base::GetFieldTrialParamByFeatureAsBool(
-      kFullscreenTransition, kMediumFullscreenTransitionOffsetParam, false);
-}
-
-BASE_FEATURE(kFullscreenTransition,
-             "FullscreenTransition",
+BASE_FEATURE(kFullscreenTransitionSpeed,
+             "FullscreenTransitionSpeed",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kRefactorToolbarsSize,

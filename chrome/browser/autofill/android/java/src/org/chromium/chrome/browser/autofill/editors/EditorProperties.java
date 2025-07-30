@@ -40,14 +40,14 @@ import java.util.List;
 @NullMarked
 public class EditorProperties {
     /** Contains information needed by {@link EditorDialogView} to display fields. */
-    public static class FieldItem extends ListItem {
+    public static class EditorItem extends ListItem {
         public final boolean isFullLine;
 
-        public FieldItem(int type, PropertyModel model) {
+        public EditorItem(int type, PropertyModel model) {
             this(type, model, /* isFullLine= */ false);
         }
 
-        public FieldItem(int type, PropertyModel model, boolean isFullLine) {
+        public EditorItem(int type, PropertyModel model, boolean isFullLine) {
             super(type, model);
             this.isFullLine = isFullLine;
         }
@@ -64,7 +64,7 @@ public class EditorProperties {
     public static final ReadableObjectPropertyKey<String> DELETE_CONFIRMATION_TEXT =
             new ReadableObjectPropertyKey<>("delete_confirmation_text");
 
-    public static final WritableObjectPropertyKey<ListModel<FieldItem>> EDITOR_FIELDS =
+    public static final WritableObjectPropertyKey<ListModel<EditorItem>> EDITOR_FIELDS =
             new WritableObjectPropertyKey<>("editor_fields");
 
     public static final ReadableObjectPropertyKey<Runnable> DONE_RUNNABLE =
@@ -83,6 +83,9 @@ public class EditorProperties {
     public static final WritableBooleanPropertyKey VISIBLE =
             new WritableBooleanPropertyKey("visible");
 
+    public static final WritableBooleanPropertyKey SHOW_BUTTONS =
+            new WritableBooleanPropertyKey("show_buttons");
+
     public static final PropertyKey[] ALL_KEYS = {
         EDITOR_TITLE,
         CUSTOM_DONE_BUTTON_TEXT,
@@ -95,7 +98,8 @@ public class EditorProperties {
         ALLOW_DELETE,
         DELETE_RUNNABLE,
         VALIDATE_ON_SHOW,
-        VISIBLE
+        VISIBLE,
+        SHOW_BUTTONS
     };
 
     private EditorProperties() {}
@@ -103,13 +107,15 @@ public class EditorProperties {
     /*
      * Types of fields this editor model supports.
      */
-    @IntDef({ItemType.DROPDOWN, ItemType.TEXT_INPUT})
+    @IntDef({ItemType.DROPDOWN, ItemType.TEXT_INPUT, ItemType.NON_EDITABLE_TEXT})
     @Retention(RetentionPolicy.SOURCE)
     public @interface ItemType {
         // A fixed list of values, only 1 of which can be selected.
         int DROPDOWN = 1;
         // User can fill in a sequence of characters subject to input type restrictions.
         int TEXT_INPUT = 2;
+        // A non-editable constant string.
+        int NON_EDITABLE_TEXT = 3;
     }
 
     /** Field properties common to every field. */
@@ -170,6 +176,14 @@ public class EditorProperties {
                         FieldProperties.FIELD_ALL_KEYS, TEXT_SPECIFIC_KEYS, PropertyKey.class);
     }
 
+    /** Properties specific for the non-editable text fields. */
+    public static class NonEditableTextProperties {
+        public static final ReadableObjectPropertyKey<String> TEXT =
+                new ReadableObjectPropertyKey<>("text");
+
+        public static final PropertyKey[] NON_EDITABLE_TEXT_ALL_KEYS = {TEXT};
+    }
+
     public static boolean isDropdownField(ListItem fieldItem) {
         return fieldItem.type == ItemType.DROPDOWN;
     }
@@ -223,8 +237,8 @@ public class EditorProperties {
 
     public static void scrollToFieldWithErrorMessage(PropertyModel editorModel) {
         // Check if a field with an error is already focused.
-        ListModel<FieldItem> fields = editorModel.get(EditorProperties.EDITOR_FIELDS);
-        for (FieldItem item : fields) {
+        ListModel<EditorItem> fields = editorModel.get(EditorProperties.EDITOR_FIELDS);
+        for (EditorItem item : fields) {
             if (item.model.get(FieldProperties.FOCUSED)
                     && item.model.get(FieldProperties.ERROR_MESSAGE) != null) {
                 // Hack: Although the field is focused, it may be off screen. Toggle FOCUSED in
@@ -236,7 +250,7 @@ public class EditorProperties {
         }
 
         // Focus first field with an error.
-        for (FieldItem item : fields) {
+        for (EditorItem item : fields) {
             if (item.model.get(FieldProperties.ERROR_MESSAGE) != null) {
                 item.model.set(FieldProperties.FOCUSED, true);
                 break;

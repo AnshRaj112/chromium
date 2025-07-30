@@ -84,16 +84,10 @@ public final class AccountCapabilitiesTest {
                     .IS_SUBJECT_TO_CHROME_PRIVACY_SANDBOX_RESTRICTED_MEASUREMENT_NOTICE:
                 return capabilities.isSubjectToChromePrivacySandboxRestrictedMeasurementNotice();
             case AccountCapabilitiesConstants.IS_SUBJECT_TO_ENTERPRISE_POLICIES_CAPABILITY_NAME:
-                return capabilities.isSubjectToEnterprisePolicies();
+                return capabilities.isSubjectToEnterpriseFeatures();
             case AccountCapabilitiesConstants.IS_SUBJECT_TO_PARENTAL_CONTROLS_CAPABILITY_NAME:
                 return capabilities.isSubjectToParentalControls();
-            case AccountCapabilitiesConstants.SHOULD_BE_ADDRESSED_IN_FEMININE_GRAMMATICAL_GENDER:
-                return capabilities.shouldBeAddressedInFeminineGrammaticalGender();
-            case AccountCapabilitiesConstants.SHOULD_BE_ADDRESSED_IN_MASCULINE_GRAMMATICAL_GENDER:
-                return capabilities.shouldBeAddressedInMasculineGrammaticalGender();
-            case AccountCapabilitiesConstants.SHOULD_BE_ADDRESSED_IN_NEUTER_GRAMMATICAL_GENDER:
-                return capabilities.shouldBeAddressedInNeuterGrammaticalGender();
-                /** keep-sorted end */
+            /** keep-sorted end */
         }
         assert false : "Capability name is not known.";
         return -1;
@@ -166,7 +160,7 @@ public final class AccountCapabilitiesTest {
                                         AccountCapabilitiesConstants
                                                 .IS_ALLOWED_FOR_MACHINE_LEARNING_CAPABILITY_NAME),
                         new ParameterSet()
-                                .name("IsSubjectToEnterprisePolicies")
+                                .name("IsSubjectToEnterpriseFeatures")
                                 .value(
                                         AccountCapabilitiesConstants
                                                 .IS_SUBJECT_TO_ENTERPRISE_POLICIES_CAPABILITY_NAME),
@@ -197,22 +191,9 @@ public final class AccountCapabilitiesTest {
                                                 .CAN_USE_GENERATIVE_AI_PHOTO_EDITING),
                         new ParameterSet()
                                 .name("CanUseChromeOSGenerativeAi")
-                                .value(AccountCapabilitiesConstants.CAN_USE_CHROMEOS_GENERATIVE_AI),
-                        new ParameterSet()
-                                .name("ShouldBeAddressedInFeminineGrammaticalGender")
                                 .value(
                                         AccountCapabilitiesConstants
-                                                .SHOULD_BE_ADDRESSED_IN_FEMININE_GRAMMATICAL_GENDER),
-                        new ParameterSet()
-                                .name("ShouldBeAddressedInMasculineGrammaticalGender")
-                                .value(
-                                        AccountCapabilitiesConstants
-                                                .SHOULD_BE_ADDRESSED_IN_MASCULINE_GRAMMATICAL_GENDER),
-                        new ParameterSet()
-                                .name("ShouldBeAddressedInNeuterGrammaticalGender")
-                                .value(
-                                        AccountCapabilitiesConstants
-                                                .SHOULD_BE_ADDRESSED_IN_NEUTER_GRAMMATICAL_GENDER));
+                                                .CAN_USE_CHROMEOS_GENERATIVE_AI));
 
         // Returns String value added from Capabilities ParameterSet.
         static String getCapabilityName(ParameterSet parameterSet) {

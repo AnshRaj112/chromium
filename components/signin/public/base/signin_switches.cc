@@ -5,6 +5,7 @@
 #include "components/signin/public/base/signin_switches.h"
 
 #include "base/feature_list.h"
+#include "base/time/time.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/base/signin_pref_names.h"
 
@@ -221,26 +222,31 @@ BASE_FEATURE(kFullscreenSignInPromoUseDate,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
-// Enables access to the Grammatical Gender account capabilities. Note that the
-// Neuter gender is also behind the additional flag,
-// kNeuterGrammaticalGenderCapability.
-BASE_FEATURE(kGrammaticalGenderCapabilities,
-             "GrammaticalGenderCapabilities",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kInterceptBubblesDismissibleByAvatarButton,
              "InterceptBubblesDismissibleByAvatarButton",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables access to the Neuter grammatical gender account capability. Note that
-// this is also behind the additional flag, kGrammaticalGenderCapabilities.
-BASE_FEATURE(kNeuterGrammaticalGenderCapability,
-             "NeuterGrammaticalGenderCapability",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kOfferMigrationToDiceUsers,
              "OfferMigrationToDiceUsers",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE_PARAM(base::TimeDelta,
+                   kOfferMigrationToDiceUsersMinDelay,
+                   &kOfferMigrationToDiceUsers,
+                   "offer_migration_to_dice_users_min_delay",
+                   base::Seconds(30));
+
+BASE_FEATURE_PARAM(base::TimeDelta,
+                   kOfferMigrationToDiceUsersMaxDelay,
+                   &kOfferMigrationToDiceUsers,
+                   "offer_migration_to_dice_users_max_delay",
+                   base::Minutes(5));
+
+BASE_FEATURE_PARAM(base::TimeDelta,
+                   kOfferMigrationToDiceUsersMinTimeBetweenDialogs,
+                   &kOfferMigrationToDiceUsers,
+                   "offer_migration_to_dice_users_min_time_between_dialogs",
+                   base::Days(7));
 
 #if BUILDFLAG(IS_IOS)
 
@@ -330,6 +336,16 @@ BASE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfileMenu,
 BASE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfilePicker,
              "ChromeIdentitySurveySwitchProfileFromProfilePicker",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kChromeIdentitySurveyLaunchWithDelay,
+             "ChromeIdentitySurveyLaunchWithDelay",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE_PARAM(base::TimeDelta,
+                   kChromeIdentitySurveyLaunchWithDelayDuration,
+                   &kChromeIdentitySurveyLaunchWithDelay,
+                   "launch_delay_duration",
+                   base::Milliseconds(3000));
 
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 

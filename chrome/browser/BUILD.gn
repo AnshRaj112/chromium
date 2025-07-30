@@ -416,6 +416,8 @@ static_library("browser") {
     "data_sharing/data_sharing_navigation_utils.h",
     "data_sharing/data_sharing_service_factory.cc",
     "data_sharing/data_sharing_service_factory.h",
+    "data_sharing/personal_collaboration_data/personal_collaboration_data_service_factory.cc",
+    "data_sharing/personal_collaboration_data/personal_collaboration_data_service_factory.h",
     "defaults.cc",
     "defaults.h",
     "digital_credentials/digital_credentials_keyed_service.cc",
@@ -433,6 +435,8 @@ static_library("browser") {
     "dom_distiller/lazy_dom_distiller_service.h",
     "dom_distiller/profile_utils.cc",
     "dom_distiller/profile_utils.h",
+    "dom_distiller/tab_utils.cc",
+    "dom_distiller/tab_utils.h",
     "domain_reliability/service_factory.cc",
     "domain_reliability/service_factory.h",
     "download/background_download_service_factory.cc",
@@ -1183,10 +1187,6 @@ static_library("browser") {
     "predictors/network_hints_handler_impl.h",
     "predictors/perform_network_context_prefetch.cc",
     "predictors/perform_network_context_prefetch.h",
-    "predictors/preconnect_manager.cc",
-    "predictors/preconnect_manager.h",
-    "predictors/preconnect_manager_impl.cc",
-    "predictors/preconnect_manager_impl.h",
     "predictors/predictor_database.cc",
     "predictors/predictor_database.h",
     "predictors/predictor_database_factory.cc",
@@ -1200,10 +1200,6 @@ static_library("browser") {
     "predictors/prefetch_manager.cc",
     "predictors/prefetch_manager.h",
     "predictors/prefetch_traffic_annotation.h",
-    "predictors/proxy_lookup_client_impl.cc",
-    "predictors/proxy_lookup_client_impl.h",
-    "predictors/resolve_host_client_impl.cc",
-    "predictors/resolve_host_client_impl.h",
     "predictors/resource_prefetch_predictor.cc",
     "predictors/resource_prefetch_predictor.h",
     "predictors/resource_prefetch_predictor_tables.cc",
@@ -1480,6 +1476,8 @@ static_library("browser") {
     "signin/identity_manager_factory.cc",
     "signin/signin_error_controller_factory.cc",
     "signin/signin_error_controller_factory.h",
+    "signin/signin_hats_util.cc",
+    "signin/signin_hats_util.h",
     "signin/signin_metrics_service_factory.cc",
     "signin/signin_metrics_service_factory.h",
     "signin/signin_policy_service.cc",
@@ -1840,6 +1838,8 @@ static_library("browser") {
     # gets modularized.
     "//chrome/browser/ui/blocked_content:impl",
 
+    "//chrome/browser/ui/exclusive_access",
+
     # TODO(crbug.com/373646571): Remove this circular dependency when the following
     # directories get modularized:
     # - c/b/preloading/prefetch/no_state_prefetch/
@@ -1863,6 +1863,10 @@ static_library("browser") {
     # TODO(crbug.com/430804948): Remove this circular dependency when profiles/profile_manager.h
     # gets componentized.
     "//chrome/browser/ui/profiles:impl",
+
+    # TODO(crbug.com/369883710): Remove this circular dependency when profiles/profile_manager.h
+    # gets componentized.
+    "//chrome/browser/ui/startup/default_browser_prompt:impl",
 
     # TODO(crbug.com/432061436): Remove this circular dependency when c/b/password_manager gets
     # componentized. Particularly, the following headers are included from //c/b/ui/webauthn::impl:
@@ -2059,6 +2063,7 @@ static_library("browser") {
     "//chrome/browser/ui/color:mixers",
     "//chrome/browser/ui/cookie_controls",
     "//chrome/browser/ui/cookie_controls:impl",
+    "//chrome/browser/ui/exclusive_access",
     "//chrome/browser/ui/find_bar",
     "//chrome/browser/ui/hats",
     "//chrome/browser/ui/hats:impl",
@@ -2188,6 +2193,7 @@ static_library("browser") {
     "//components/crx_file",
     "//components/custom_handlers",
     "//components/data_sharing/internal",
+    "//components/data_sharing/internal:personal_collaboration_data_internal",
     "//components/data_sharing/public",
     "//components/device_event_log",
     "//components/device_reauth",
@@ -2249,6 +2255,7 @@ static_library("browser") {
     "//components/infobars/content",
     "//components/infobars/core",
     "//components/invalidation",
+    "//components/invalidation:legacy_topics_cleanup",
     "//components/invalidation/impl",
     "//components/ip_protection/common:ip_protection_telemetry",
     "//components/ip_protection/common:masked_domain_list",
@@ -2511,7 +2518,6 @@ static_library("browser") {
     "//components/variations/net",
     "//components/variations/proto",
     "//components/variations/service",
-    "//components/variations/service",
     "//components/vector_icons",
     "//components/version_info",
     "//components/visited_url_ranking/internal",
@@ -2524,7 +2530,6 @@ static_library("browser") {
     "//components/webapps/browser",
     "//components/webapps/common",
     "//components/webapps/common:mojo_bindings",
-    "//components/webapps/isolated_web_apps",
     "//components/webauthn/core/browser:passkey_model",
     "//components/webdata/common",
     "//components/webdata_services",
@@ -2655,6 +2660,10 @@ static_library("browser") {
     # TODO(crbug.com/430804948): Remove this dependency when profiles/profile_manager.h
     # gets componentized.
     "//chrome/browser/ui/profiles:impl",
+
+    # TODO(crbug.com/)369883710: Remove this dependency when profiles/profile_manager.h
+    # gets componentized.
+    "//chrome/browser/ui/startup/default_browser_prompt:impl",
 
     # TODO(crbug.com/432061436): Remove this dependency when c/b/password_manager gets
     # componentized.
@@ -2800,6 +2809,8 @@ static_library("browser") {
       "android/customtabs/tab_interaction_recorder_android.h",
       "android/customtabs/text_fragment_lookup_state_tracker.cc",
       "android/customtabs/text_fragment_lookup_state_tracker.h",
+      "android/data_import/data_importer_bridge.cc",
+      "android/data_import/data_importer_bridge.h",
       "android/devtools_manager_delegate_android.cc",
       "android/devtools_manager_delegate_android.h",
       "android/devtools_server.cc",
@@ -3035,8 +3046,6 @@ static_library("browser") {
       "digital_credentials/digital_identity_provider_android.h",
       "dom_distiller/dom_distiller_service_factory_android.cc",
       "dom_distiller/dom_distiller_service_factory_android.h",
-      "dom_distiller/tab_utils.cc",
-      "dom_distiller/tab_utils.h",
       "dom_distiller/tab_utils_android.cc",
       "download/android/dangerous_download_dialog_bridge.cc",
       "download/android/dangerous_download_dialog_bridge.h",
@@ -3220,8 +3229,6 @@ static_library("browser") {
       "password_manager/android/password_manager_launcher_android.cc",
       "password_manager/android/password_store_bridge.cc",
       "password_manager/android/password_store_bridge.h",
-      "password_manager/android/password_ui_view_android.cc",
-      "password_manager/android/password_ui_view_android.h",
       "password_manager/android/save_update_password_message_delegate.cc",
       "password_manager/android/save_update_password_message_delegate.h",
       "payments/android/service_worker_payment_app_bridge.cc",
@@ -3586,6 +3593,8 @@ static_library("browser") {
       "//components/translate/core/language_detection",
       "//components/ukm/android:ukm_recorder",
       "//components/ukm/content",
+      "//components/user_data_importer/common",
+      "//components/user_data_importer/content",
       "//components/user_prefs/android:jni_cc",
       "//components/visited_url_ranking/public",
       "//components/visited_url_ranking/public",
@@ -3939,8 +3948,8 @@ static_library("browser") {
       "metrics/desktop_session_duration/desktop_session_duration_tracker.cc",
       "metrics/desktop_session_duration/desktop_session_metrics_provider.cc",
       "metrics/desktop_session_duration/desktop_session_metrics_provider.h",
-      "metrics/desktop_session_duration/touch_mode_stats_tracker.cc",
-      "metrics/desktop_session_duration/touch_mode_stats_tracker.h",
+      "metrics/desktop_session_duration/touch_ui_controller_stats_tracker.cc",
+      "metrics/desktop_session_duration/touch_ui_controller_stats_tracker.h",
       "metrics/first_web_contents_profiler.cc",
       "metrics/first_web_contents_profiler.h",
       "metrics/first_web_contents_profiler_base.cc",
@@ -4615,7 +4624,6 @@ static_library("browser") {
       "//chrome/browser/ui/search:impl",
 
       "//chrome/browser/ui/browser_window/internal",
-      "//chrome/browser/ui/exclusive_access",
       "//chrome/browser/ui/views/toolbar",
       "//chrome/browser/ui/views/new_tab_footer",
       "//chrome/browser/ui/webui/searchbox",
@@ -7828,6 +7836,13 @@ static_library("browser") {
     }
   }
 
+  if (enterprise_watermark) {
+    deps += [
+      "//chrome/browser/enterprise/watermark:watermark_view_lib",
+      "//chrome/browser/ui/webui/watermark",
+    ]
+  }
+
   # TODO(https://crbug.com/356905053): Add more dependencies here and merge this
   # block with the `enable_extensions` block above.
   if (enable_desktop_android_extensions) {
@@ -8235,12 +8250,6 @@ static_library("browser") {
   }
 
   if (enable_extensions_core) {
-    sources +=
-        [ "supervised_user/supervised_user_extensions_metrics_recorder.cc" ]
-    deps += [ "//chrome/browser/supervised_user" ]
-  }
-
-  if (enable_extensions) {
     sources += [
       "supervised_user/extension_icon_loader.cc",
       "supervised_user/extension_icon_loader.h",
@@ -8248,10 +8257,18 @@ static_library("browser") {
       "supervised_user/supervised_user_extensions_delegate_impl.h",
       "supervised_user/supervised_user_extensions_manager.cc",
       "supervised_user/supervised_user_extensions_manager.h",
+      "supervised_user/supervised_user_extensions_metrics_recorder.cc",
     ]
-
     deps += [
+      "//chrome/browser/supervised_user",
       "//chrome/browser/ui/extensions",
+    ]
+  }
+
+  if (enable_extensions) {
+    deps += [
+      # TODO(crbug.com/402488726): Support supervised user UI on desktop
+      # Android.
       "//chrome/browser/ui/supervised_user",
 
       # TODO(crbug.com/420905611): Remove this circular dependency when:

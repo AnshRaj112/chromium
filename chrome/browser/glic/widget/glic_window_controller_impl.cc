@@ -19,7 +19,6 @@
 #include "chrome/browser/glic/fre/glic_fre_controller.h"
 #include "chrome/browser/glic/fre/glic_fre_dialog_view.h"
 #include "chrome/browser/glic/glic_enabling.h"
-#include "chrome/browser/glic/glic_keyed_service.h"
 #include "chrome/browser/glic/glic_metrics.h"
 #include "chrome/browser/glic/glic_pref_names.h"
 #include "chrome/browser/glic/glic_profile_manager.h"
@@ -27,6 +26,7 @@
 #include "chrome/browser/glic/host/glic.mojom.h"
 #include "chrome/browser/glic/host/host.h"
 #include "chrome/browser/glic/host/webui_contents_container.h"
+#include "chrome/browser/glic/public/glic_keyed_service.h"
 #include "chrome/browser/glic/widget/browser_conditions.h"
 #include "chrome/browser/glic/widget/glic_view.h"
 #include "chrome/browser/glic/widget/glic_widget.h"
@@ -47,6 +47,7 @@
 #include "chrome/browser/ui/views/tabs/window_finder.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/web_contents.h"
@@ -1480,9 +1481,6 @@ void GlicWindowControllerImpl::SetWindowState(State new_state) {
   state_ = new_state;
 
   // Inform UI components of glic panel open/close.
-  // TODO(crbug.com/431015299): Instead of piping events through the
-  // ActorUiStateManager, consider calling the Toast and TaskIcon code directly
-  // on state change.
   if (features::kGlicActorUiToast.Get()) {
     Browser* last_active_browser = BrowserList::GetInstance()->GetLastActive();
     actor::ActorKeyedService::Get(profile_)

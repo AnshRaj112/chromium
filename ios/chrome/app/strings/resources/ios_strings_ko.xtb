@@ -140,6 +140,7 @@
 <translation id="1520027731907768768">추적하는 제품의 가격 인하 알림을 받습니다.</translation>
 <translation id="1521366073263497277">탭 그리드로 이동합니다.</translation>
 <translation id="1521774566618522728">오늘 사용</translation>
+<translation id="1523567067736644845">비밀번호를 표시하려면 잠금 해제하세요.</translation>
 <translation id="1524563461097350801">나중에</translation>
 <translation id="1531038290222364269">탭 표시</translation>
 <translation id="1536390784834419204">페이지 번역</translation>
@@ -321,7 +322,6 @@
 <translation id="2220529011494928058">문제 신고</translation>
 <translation id="2223461067862937305">QR 코드 만들기</translation>
 <translation id="2225701818156393674">추적 중인 제품 목록에 제품이 추가되었습니다.</translation>
-<translation id="2229345671837147090">원격 탭 격자</translation>
 <translation id="2230173723195178503">웹페이지 로드됨</translation>
 <translation id="2236949375853147973">내 활동</translation>
 <translation id="2240256190924001613">구성 프로필 이용 가능</translation>
@@ -363,6 +363,7 @@
 <translation id="236977714248711277">사이트에서 사용자의 로그인 상태를 유지하거나 장바구니에 담긴 상품을 기억하는 등 탐색 환경을 개선하는 데 쿠키를 사용할 수 없습니다.
 
 사이트에서 사용자의 다양한 사이트 탐색 활동 정보를 이용해 광고 맞춤설정 등의 작업을 하는 데 쿠키를 사용할 수 없습니다.</translation>
+<translation id="2377230674627603057">탭 그룹 그리드</translation>
 <translation id="2377336083033403521">탭 검색…</translation>
 <translation id="2381405137052800939">기본설정</translation>
 <translation id="2384692388811649784">시크릿 탭 숨기기</translation>
@@ -537,7 +538,6 @@ Google이 아닌 다른 검색엔진을 사용 중이라면 해당 검색엔진�
 <translation id="3081338492074632642">저장하려는 비밀번호가 <ph name="WEBSITE" />의 비밀번호와 일치하는지 확인하세요.</translation>
 <translation id="3087734570205094154">맨 아래</translation>
 <translation id="309710370695886264">재사용된 비밀번호가 1개 있습니다. 안전을 위해 지금 문제를 해결하세요.</translation>
-<translation id="3102790820790869053">최근 탭 검색</translation>
 <translation id="3106258548858559536">읽기 모드 사용 중지</translation>
 <translation id="3106690631878101882">번역 숨기기</translation>
 <translation id="310900540163454140"><ph name="WEBSITE" />의 비밀번호를 삭제하시겠습니까?</translation>
@@ -648,11 +648,9 @@ Google이 아닌 다른 검색엔진을 사용 중이라면 해당 검색엔진�
 <translation id="3581564640715911333">다른 언어로 된 페이지에 대해 번역 옵션 제공</translation>
 <translation id="3587885837929752825">조직에서 Google 계정에 저장할 수 있는 항목을 제한합니다.</translation>
 <translation id="3588820906588687999">새 탭에서 이미지 열기</translation>
-<translation id="3591006724568464696">최근 탭을 사용할 수 없음</translation>
 <translation id="3595252146048399851">언제든지 <ph name="BEGIN_LINK" />설정<ph name="END_LINK" />에서 동기화할 항목을 선택할 수 있습니다. Google에서는 사용자의 방문 기록을 기반으로 Google 검색 및 기타 서비스를 맞춤설정할 수 있습니다.</translation>
 <translation id="3596414637720633074">시크릿 모드에서 서드 파티 쿠키 차단</translation>
 <translation id="3602260545951981695">'향상된 보호 모드'를 선택합니다</translation>
-<translation id="3608436266458100337">리더 모드</translation>
 <translation id="3610041351087301930">읽기 모드 숨기기</translation>
 <translation id="3622175633937495219">검색 기록(<ph name="COUNT" />개 찾음)</translation>
 <translation id="3625008969091706597">가장자리를 스와이프하여 뒤로 돌아갈 수 있습니다.</translation>
@@ -892,7 +890,6 @@ Google이 아닌 다른 검색엔진을 사용 중이라면 해당 검색엔진�
 <translation id="4611811151908969241"><ph name="DOMAIN_NAME" /> 팔로우 해제 숨기기</translation>
 <translation id="461440297010471931">Google에서 검색하기</translation>
 <translation id="4619564267100705184">본인 인증</translation>
-<translation id="4619615317237390068">다른 기기의 탭</translation>
 <translation id="4621768135601674446">읽기 모드 옵션 열기</translation>
 <translation id="4624080227980645783">새 시크릿 창</translation>
 <translation id="4627107755957573804">사이트 및 앱에서 기존 계정을 업그레이드하여 패스키를 사용하도록 허용합니다</translation>
@@ -1234,6 +1231,7 @@ Handoff는 설정의 일반 섹션에서도 사용 설정할 수 있으며, 이�
 <translation id="5869522115854928033">저장된 비밀번호</translation>
 <translation id="5873179562631407582">열려 있는 탭을 길게 탭합니다.</translation>
 <translation id="5878899964490256268"><ph name="EMAIL" />, 조직에서 관리합니다.</translation>
+<translation id="5887400589839399685">카드 저장됨</translation>
 <translation id="5888889603768021126">다음을 사용하여 로그인함</translation>
 <translation id="5889333064153755823">인터넷 사용 기록 삭제</translation>
 <translation id="5896576662943111387">iOS 최적화</translation>
@@ -1334,9 +1332,11 @@ Handoff는 설정의 일반 섹션에서도 사용 설정할 수 있으며, 이�
 <translation id="6234310016144827337">연결 상태를 확인한 후 다시 시도하세요.</translation>
 <translation id="6234438496206735891">다운로드 표시</translation>
 <translation id="6236952928980352967">경고 복원</translation>
+<translation id="623755660902014047">읽기 모드</translation>
 <translation id="6247557882553405851">Google 비밀번호 관리자</translation>
 <translation id="6251835855431997163"><ph name="VALUE" /> 자동 완성</translation>
 <translation id="6254066287920239840">브라우저 대신 앱에서 링크 열기</translation>
+<translation id="6259928806013786178">읽기 모드를 활성화할 수 없음</translation>
 <translation id="6268773951964630964">복사한 이미지 검색</translation>
 <translation id="6271462272606946663">모바일 사이트 요청 숨기기</translation>
 <translation id="6271824294945464304">비밀번호 공유</translation>
@@ -1816,7 +1816,6 @@ Handoff는 설정의 일반 섹션에서도 사용 설정할 수 있으며, 이�
 <translation id="8076492880354921740">탭</translation>
 <translation id="8079530767338315840">반복</translation>
 <translation id="8079602123447022758">관리자가 관리하는 설정입니다, 자세한 정보를 보려면 두 번 탭하세요</translation>
-<translation id="8080028325999236607">탭 모두 닫기</translation>
 <translation id="8084285576995584326">Google 계정 데이터 관리</translation>
 <translation id="809543534949702122">검색 기록</translation>
 <translation id="8095985449280932182">{COUNT,plural, =1{사용하지 않는 탭은 {COUNT}일 후에 여기로 이동됩니다}other{사용하지 않는 탭은 {COUNT}일 후에 여기로 이동됩니다}}</translation>
@@ -2009,14 +2008,11 @@ Handoff는 설정의 일반 섹션에서도 사용 설정할 수 있으며, 이�
 <translation id="8796634520835503150">읽기 모드 사용 가능</translation>
 <translation id="8803526663383843427">켜졌을 때</translation>
 <translation id="8803639129939845298">안전함</translation>
-<translation id="8806823403540278281">조직에서 비공개로 탐색할 것을 요구합니다. 시크릿 모드에서는 탭이 저장되지 않습니다.
-<ph name="BEGIN_LINK" />자세히 알아보기<ph name="END_LINK" /></translation>
 <translation id="8813277370772331957">나중에 알림</translation>
 <translation id="8814719628147284151">계속</translation>
 <translation id="8819155700324279105">온라인 위협에 대비한 보호 단계 추가</translation>
 <translation id="8820817407110198400">북마크</translation>
 <translation id="8822421075653507124">기기를 안전하게 사용하기 위해 조직에서 운영체제, 브라우저, 설정, 기기에 설치된 소프트웨어에 관한 정보를 확인해야 할 수 있습니다.</translation>
-<translation id="8825562130641217944">북마크, 비밀번호 등을 가져옵니다.</translation>
 <translation id="8831208860914609320">모든 비활성 탭 닫기</translation>
 <translation id="8831944931153286232">읽기 목록에 추가</translation>
 <translation id="8837654851594567190">게시자순 정렬</translation>
@@ -2110,6 +2106,7 @@ Handoff는 설정의 일반 섹션에서도 사용 설정할 수 있으며, 이�
 <translation id="9144230693397287797">설정한 리마인더 및 다른 기기의 탭 업데이트를 받습니다.</translation>
 <translation id="914781932147356857">모두 표시…</translation>
 <translation id="9148126808321036104">다시 로그인</translation>
+<translation id="9149866541089851383">수정...</translation>
 <translation id="9159628751968616911">웹페이지 보내기</translation>
 <translation id="9162432979321511934">AutoFill Passwords(비밀번호 자동 완성)를 사용 설정합니다.</translation>
 <translation id="9165320910061267720">가격 인하 알림을 받으려면 iOS 설정에서 알림을 사용 설정해야 합니다.</translation>

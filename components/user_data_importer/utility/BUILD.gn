@@ -9,6 +9,8 @@ source_set("safari_data_importer") {
   sources = [
     "bookmark_parser.cc",
     "bookmark_parser.h",
+    "bookmark_util.cc",
+    "bookmark_util.h",
     "history_callback_from_rust.h",
     "safari_data_import_client.h",
     "safari_data_importer.cc",
@@ -24,15 +26,23 @@ source_set("safari_data_importer") {
     "//components/password_manager/core/browser/import:importer",
     "//components/password_manager/core/browser/ui",
     "//components/reading_list/core",
+    "//components/strings",
     "//components/user_data_importer/common",
   ]
 }
 
 rust_static_library("zip_ffi_glue") {
   allow_unsafe = true
-  crate_root = "zip_ffi_glue.rs"
-  sources = [ "zip_ffi_glue.rs" ]
-  cxx_bindings = [ "zip_ffi_glue.rs" ]
+  crate_root = "parsing_ffi/lib.rs"
+  sources = [
+    "parsing_ffi/history.rs",
+    "parsing_ffi/json.rs",
+    "parsing_ffi/lib.rs",
+    "parsing_ffi/models.rs",
+    "parsing_ffi/utils.rs",
+    "parsing_ffi/zip_archive.rs",
+  ]
+  cxx_bindings = [ "parsing_ffi/lib.rs" ]
   visibility = [
     ":safari_data_importer",
     "//components/user_data_importer/content",
@@ -99,6 +109,7 @@ source_set("unit_tests") {
     "//components/password_manager/core/browser/ui:credential_ui_entry",
     "//components/password_manager/core/common:constants",
     "//components/reading_list/core:test_support",
+    "//components/user_data_importer/mojom",
     "//mojo/public/cpp/bindings",
     "//testing/gmock",
     "//testing/gtest",
@@ -115,6 +126,8 @@ source_set("unit_tests") {
     deps += [
       "//components/password_manager/services/csv_password:fake_password_parser_service",
       "//components/user_data_importer/content",
+      "//components/user_data_importer/content:test_support",
+      "//content/test:test_support",
     ]
   }
 

@@ -1666,8 +1666,12 @@ bool WebGLRenderingContextBase::PushFrameWithCopy() {
   // Note: we push a frame only if (a) there is fresh content to produce and
   // (b) we successfully produced that content.
   bool resource_provider_was_updated = false;
+
+  // CanvasResourceProviderBitmap returns null from ProduceCanvasResource(), so
+  // there is no point in using one here.
   auto* resource_provider = PaintRenderingResultsToResourceProvider(
-      kBackBuffer, &resource_provider_was_updated);
+      kBackBuffer, /*use_bitmap_provider=*/false,
+      &resource_provider_was_updated);
   if (resource_provider && resource_provider_was_updated) {
     const int width = GetDrawingBuffer()->Size().width();
     const int height = GetDrawingBuffer()->Size().height();
@@ -1833,11 +1837,6 @@ void WebGLRenderingContextBase::MarkLayerComposited() {
     GetDrawingBuffer()->SetBufferClearNeeded(true);
 }
 
-bool WebGLRenderingContextBase::IsAccelerated() const {
-  // This method is not supported for WebGL and should not be called.
-  NOTREACHED();
-}
-
 bool WebGLRenderingContextBase::
     CanUseDrawingBufferSIWithoutCopyForLowLatency() {
   if (!SharedGpuContext::IsGpuCompositingEnabled()) {
@@ -1859,7 +1858,9 @@ bool WebGLRenderingContextBase::
       SharedGpuContext::MaySupportImageChromium() &&
       (RuntimeEnabledFeatures::WebGLImageChromiumEnabled() ||
        base::FeatureList::IsEnabled(features::kLowLatencyWebGLImageChromium));
-  if (!UsingSwapChain() && !using_webgl_image_chromium) {
+  bool using_swap_chain =
+      GetDrawingBuffer() && GetDrawingBuffer()->UsingSwapChain();
+  if (!using_swap_chain && !using_webgl_image_chromium) {
     return false;
   }
 
@@ -1894,10 +1895,6 @@ bool WebGLRenderingContextBase::
   }
 
   return true;
-}
-
-bool WebGLRenderingContextBase::UsingSwapChain() const {
-  return GetDrawingBuffer() && GetDrawingBuffer()->UsingSwapChain();
 }
 
 void WebGLRenderingContextBase::PageVisibilityChanged() {
@@ -1941,16 +1938,14 @@ WebGLRenderingContextBase::PaintRenderingResultsToSnapshot(
     return resource ? resource->Bitmap() : nullptr;
   }
 
-  CanvasResourceProvider* provider =
-      PaintRenderingResultsToResourceProvider(source_buffer);
+  CanvasResourceProvider* provider = PaintRenderingResultsToResourceProvider(
+      source_buffer, /*use_bitmap_provider=*/true);
 
   return provider ? provider->Snapshot(reason) : nullptr;
 }
 
 scoped_refptr<CanvasResource>
 WebGLRenderingContextBase::PaintRenderingResultsToResource(
-    bool was_dirty,
-    bool has_dispatcher,
     SourceDrawingBuffer source_buffer,
     FlushReason reason) {
   if (CanUseDrawingBufferSIWithoutCopyForLowLatency()) {
@@ -1958,16 +1953,19 @@ WebGLRenderingContextBase::PaintRenderingResultsToResource(
                                           /*export_only_if_update=*/false);
   }
 
-  auto* resource_provider =
-      PaintRenderingResultsToResourceProvider(source_buffer);
-  if (has_dispatcher && was_dirty && resource_provider) {
+  // CanvasResourceProviderBitmap returns null from ProduceCanvasResource(), so
+  // there is no point in using one here.
+  auto* resource_provider = PaintRenderingResultsToResourceProvider(
+      source_buffer, /*use_bitmap_provider=*/false);
+  if (resource_provider) {
     return resource_provider->ProduceCanvasResource(reason);
   }
   return nullptr;
 }
 
 std::unique_ptr<CanvasResourceProvider>
-WebGLRenderingContextBase::CreateCanvasResourceProvider() {
+WebGLRenderingContextBase::CreateCanvasResourceProvider(
+    bool use_bitmap_provider) {
   base::WeakPtr<CanvasResourceDispatcher> dispatcher =
       Host()->GetOrCreateResourceDispatcher()
           ? Host()->GetOrCreateResourceDispatcher()->GetWeakPtr()
@@ -2021,7 +2019,7 @@ WebGLRenderingContextBase::CreateCanvasResourceProvider() {
             Host()->Size(), format, alpha_type, color_space, kShouldInitialize,
             SharedGpuContext::SharedImageInterfaceProvider(), Host());
   }
-  if (!provider) {
+  if (!provider && use_bitmap_provider) {
     provider = CanvasResourceProvider::CreateBitmapProvider(
         Host()->Size(), format, alpha_type, color_space, kShouldInitialize,
         Host());
@@ -2031,11 +2029,12 @@ WebGLRenderingContextBase::CreateCanvasResourceProvider() {
 }
 
 CanvasResourceProvider*
-WebGLRenderingContextBase::GetOrCreateCanvasResourceProvider() {
+WebGLRenderingContextBase::GetOrCreateCanvasResourceProvider(
+    bool use_bitmap_provider) {
   auto* provider = resource_provider_.get();
   if (!provider && !did_fail_to_create_resource_provider_) {
     if (Host()->IsValidImageSize()) {
-      resource_provider_ = CreateCanvasResourceProvider();
+      resource_provider_ = CreateCanvasResourceProvider(use_bitmap_provider);
       Host()->UpdateMemoryUsage();
       provider = resource_provider_.get();
     }
@@ -2048,12 +2047,23 @@ WebGLRenderingContextBase::GetOrCreateCanvasResourceProvider() {
                                     provider->GetType());
     }
   }
+  if (provider &&
+      provider->GetType() ==
+          CanvasResourceProvider::ResourceProviderType::kBitmap &&
+      !use_bitmap_provider) {
+    // In addition to not *creating* a CRPBitmap if `use_bitmap_provider` is
+    // false, ensure that we don't return a cached CRPBitmap that was created
+    // previously in a call from a callsite that still uses CRPBitmap.
+    return nullptr;
+  }
+
   return provider;
 }
 
 CanvasResourceProvider*
 WebGLRenderingContextBase::PaintRenderingResultsToResourceProvider(
     SourceDrawingBuffer source_buffer,
+    bool use_bitmap_provider,
     bool* resource_provider_was_updated /*=nullptr*/) {
   CHECK(!CanUseDrawingBufferSIWithoutCopyForLowLatency());
 
@@ -2086,7 +2096,7 @@ WebGLRenderingContextBase::PaintRenderingResultsToResourceProvider(
   must_paint_to_canvas_ = false;
 
   CanvasResourceProvider* resource_provider =
-      GetOrCreateCanvasResourceProvider();
+      GetOrCreateCanvasResourceProvider(use_bitmap_provider);
   if (!resource_provider)
     return nullptr;
 
@@ -2162,7 +2172,9 @@ bool WebGLRenderingContextBase::CopyRenderingResultsFromDrawingBuffer(
   // As the resource provider is not accelerated, we don't need an accelerated
   // image.
   scoped_refptr<StaticBitmapImage> image =
-      GetDrawingBuffer()->GetUnacceleratedStaticBitmapImage();
+      GetDrawingBuffer()->GetUnacceleratedStaticBitmapImage(
+          kBackBuffer, viz::SharedImageFormat::N32Format(), kPremul_SkAlphaType,
+          kBottomLeft_GrSurfaceOrigin);
 
   if (!image || !image->PaintImageForCurrentFrame())
     return false;

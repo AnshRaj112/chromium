@@ -104,11 +104,11 @@
 #include "third_party/blink/renderer/platform/geometry/stroke_data.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_deferred_paint_record.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_hibernation_handler.h"
+#include "third_party/blink/renderer/platform/graphics/canvas_resource.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_resource_provider.h"
 #include "third_party/blink/renderer/platform/graphics/gpu/shared_context_rate_limiter.h"
 #include "third_party/blink/renderer/platform/graphics/gpu/shared_gpu_context.h"
 #include "third_party/blink/renderer/platform/graphics/image_orientation.h"
-#include "third_party/blink/renderer/platform/graphics/memory_managed_paint_canvas.h"  // IWYU pragma: keep (https://github.com/clangd/clangd/issues/2044)
 #include "third_party/blink/renderer/platform/graphics/memory_managed_paint_recorder.h"
 #include "third_party/blink/renderer/platform/graphics/paint/paint_filter.h"
 #include "third_party/blink/renderer/platform/graphics/paint/paint_record_builder.h"
@@ -148,6 +148,7 @@ class FontSelector;
 class ImageData;
 class ImageDataSettings;
 class LayoutObject;
+class MemoryManagedPaintCanvas;
 class SVGResource;
 
 static mojom::blink::ColorScheme GetColorSchemeFromCanvas(
@@ -389,7 +390,7 @@ sk_sp<PaintFilter> CanvasRenderingContext2D::StateGetFilter() {
   return GetState().GetFilter(element, element->Size(), this);
 }
 
-cc::PaintCanvas* CanvasRenderingContext2D::GetOrCreatePaintCanvas() {
+MemoryManagedPaintCanvas* CanvasRenderingContext2D::GetOrCreatePaintCanvas() {
   if (isContextLost()) [[unlikely]] {
     return nullptr;
   }
@@ -413,7 +414,8 @@ cc::PaintCanvas* CanvasRenderingContext2D::GetOrCreatePaintCanvas() {
   return &provider->Recorder().getRecordingCanvas();
 }
 
-const cc::PaintCanvas* CanvasRenderingContext2D::GetPaintCanvas() const {
+const MemoryManagedPaintCanvas* CanvasRenderingContext2D::GetPaintCanvas()
+    const {
   if (isContextLost()) [[unlikely]] {
     return nullptr;
   }
@@ -647,6 +649,16 @@ int CanvasRenderingContext2D::Height() const {
   return Host()->Size().height();
 }
 
+scoped_refptr<CanvasResource>
+CanvasRenderingContext2D::PaintRenderingResultsToResource(
+    SourceDrawingBuffer source_buffer,
+    FlushReason reason) {
+  if (!IsCanvas2DResourceProviderValid()) {
+    return nullptr;
+  }
+  return resource_provider_->ProduceCanvasResource(reason);
+}
+
 bool CanvasRenderingContext2D::IsCanvas2DResourceProviderValid() {
   return resource_provider_ && resource_provider_->IsValid();
 }
@@ -808,8 +820,9 @@ void CanvasRenderingContext2D::DrawElementInternal(
   // should behave like a non-opaque image here, but the element may not be
   // opaque so going with that for now.
   Draw<OverdrawOp::kNone>(
+      /*draw_func=*/
       [paint_record, x, y, dwidth, dheight, box_rect](
-          cc::PaintCanvas* c, const cc::PaintFlags* flags) {
+          MemoryManagedPaintCanvas* c, const cc::PaintFlags* flags) {
         cc::RecordPaintCanvas::DisableFlushCheckScope disable_flush_check_scope(
             static_cast<cc::RecordPaintCanvas*>(c));
         int initial_save_count = c->getSaveCount();
@@ -868,8 +881,7 @@ void CanvasRenderingContext2D::DrawElementInternal(
 
         c->restoreToCount(initial_save_count);
       },
-      [](const SkIRect& rect) { return false; },  // overdraw test lambda
-      gfx::RectF(box_rect.width(), box_rect.height()),
+      NoOverdraw, /*bounds=*/gfx::RectF(box_rect.width(), box_rect.height()),
       CanvasRenderingContext2DState::kImagePaintType,
       CanvasRenderingContext2DState::kNonOpaqueImage,
       CanvasPerformanceMonitor::DrawType::kElement);

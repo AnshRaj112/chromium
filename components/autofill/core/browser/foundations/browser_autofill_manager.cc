@@ -68,6 +68,7 @@
 #include "components/autofill/core/browser/crowdsourcing/determine_possible_field_types.h"
 #include "components/autofill/core/browser/crowdsourcing/votes_uploader.h"
 #include "components/autofill/core/browser/data_manager/addresses/address_data_manager.h"
+#include "components/autofill/core/browser/data_manager/autofill_ai/entity_data_manager.h"
 #include "components/autofill/core/browser/data_manager/payments/payments_data_manager.h"
 #include "components/autofill/core/browser/data_manager/personal_data_manager.h"
 #include "components/autofill/core/browser/data_manager/valuables/valuables_data_manager.h"
@@ -747,6 +748,16 @@ BrowserAutofillManager::GetCreditCardAccessManager() const {
       ->GetCreditCardAccessManager();
 }
 
+payments::AmountExtractionManager&
+BrowserAutofillManager::GetAmountExtractionManager() {
+  if (!amount_extraction_manager_) {
+    amount_extraction_manager_ =
+        std::make_unique<AmountExtractionManager>(this);
+  }
+
+  return *amount_extraction_manager_;
+}
+
 payments::BnplManager* BrowserAutofillManager::GetPaymentsBnplManager() {
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS)
@@ -1156,10 +1167,13 @@ void BrowserAutofillManager::OnAskForValuesToFillImpl(
   // needed.
   suggestion_generators_.clear();
   // TODO(crbug.com/409962888): Populate `suggestion_generators_` here.
-  suggestion_generators_.emplace_back(
+  suggestion_generators_.push_back(
       std::make_unique<IbanSuggestionGenerator>());
-  suggestion_generators_.emplace_back(
+  suggestion_generators_.push_back(
       std::make_unique<MerchantPromoCodeSuggestionGenerator>());
+  suggestion_generators_.push_back(
+      std::make_unique<AutocompleteSuggestionGenerator>(
+          client().GetAutocompleteHistoryManager()->GetProfileDatabase()));
 
   SuggestionsContext context = BuildSuggestionsContext(
       form, form_structure, field, autofill_field, trigger_source);
@@ -1554,7 +1568,7 @@ void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase3(
     // `on_suggestions_returned` is still called with an empty list of
     // suggestions.
     client().GetAutocompleteHistoryManager()->OnGetSingleFieldSuggestions(
-            field, client(), std::move(on_suggestions_returned));
+            form, field, client(), std::move(on_suggestions_returned));
   } else {
     std::move(on_single_field_suggestions_callback)
         .Run(/*single_field_suggestions=*/{});
@@ -1650,7 +1664,7 @@ void BrowserAutofillManager::OnGenerateSuggestionsComplete(
   // should happen, and if so, triggers amount extraction.
   if (autofill_field) {
     const DenseSet<AmountExtractionManager::EligibleFeature> eligible_features =
-        amount_extraction_manager_->GetEligibleFeatures(
+        GetAmountExtractionManager().GetEligibleFeatures(
             context,
             ShouldSuppressSuggestions(context.suppress_reason, log_manager()),
             !suggestions.empty(), autofill_field->Type().GetStorableType());
@@ -1666,7 +1680,7 @@ void BrowserAutofillManager::OnGenerateSuggestionsComplete(
         }
         NOTREACHED();
       }
-      amount_extraction_manager_->TriggerCheckoutAmountExtraction();
+      GetAmountExtractionManager().TriggerCheckoutAmountExtraction();
     }
   }
 
@@ -2162,9 +2176,20 @@ void BrowserAutofillManager::DidShowSuggestions(
                             return GetFillingProductFromSuggestionType(type) ==
                                    FillingProduct::kAutofillAi;
                           })) {
-    ai_manager->OnSuggestionsShown(CHECK_DEREF(form_structure),
-                                   CHECK_DEREF(autofill_field),
-                                   driver().GetPageUkmSourceId());
+    DenseSet<EntityType> suggested_entity_types;
+    for (const Suggestion& suggestion : suggestions) {
+      if (const auto* payload =
+              std::get_if<Suggestion::AutofillAiPayload>(&suggestion.payload)) {
+        if (base::optional_ref<const EntityInstance> entity =
+                client().GetEntityDataManager()->GetEntityInstance(
+                    payload->guid)) {
+          suggested_entity_types.insert(entity->type());
+        }
+      }
+    }
+    ai_manager->OnSuggestionsShown(
+        CHECK_DEREF(form_structure), CHECK_DEREF(autofill_field),
+        suggested_entity_types, driver().GetPageUkmSourceId());
   }
 
   // Notify the BNPL manager about suggestion shown if the current shown
@@ -2542,6 +2567,8 @@ void BrowserAutofillManager::Reset() {
     touch_to_fill_delegate_->Reset();
   }
   form_filler_->Reset();
+  amount_extraction_manager_.reset();
+  bnpl_manager_.reset();
 
   // The order below is relevant:
   // `credit_card_access_manager_` has a reference to `metrics_`.
@@ -2611,8 +2638,8 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
           [&](const EntityInstance* entity) {
             if (AutofillAiManager* ai_manager =
                     client().GetAutofillAiManager()) {
-              ai_manager->OnDidFillSuggestion(entity->guid(), form,
-                                              trigger_field, safe_filled_fields,
+              ai_manager->OnDidFillSuggestion(*entity, form, trigger_field,
+                                              safe_filled_fields,
                                               driver().GetPageUkmSourceId());
             }
           },

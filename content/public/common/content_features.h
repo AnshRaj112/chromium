@@ -103,6 +103,7 @@ CONTENT_EXPORT extern const base::FeatureParam<base::TimeDelta>
     kBtmClientBounceDetectionTimeout;
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBtmDualUse);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebContentsDiscard);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kDisablePartialStorageCleanupForGPUDiskCache);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kDrawCutoutEdgeToEdge);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kEarlyEstablishGpuChannel);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kEnableCanvas2DLayers);
@@ -189,6 +190,8 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kPeriodicBackgroundSync);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrefetchPrerenderIntegration);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrefetchProxy);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrerender2ReuseHost);
+CONTENT_EXPORT BASE_DECLARE_FEATURE_PARAM(bool,
+                                          kPrerender2ReuseSearchResultHost);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kFeaturePolicyHeader);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrefetchBrowserInitiatedTriggers);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrivacySandboxAdsAPIsOverride);
@@ -274,6 +277,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kStrictOriginIsolation);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSubframeProcessReuseThresholds);
 CONTENT_EXPORT extern const base::FeatureParam<double>
     kSubframeProcessReuseMemoryThreshold;
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kSubframePriorityContribution);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSuppressDifferentOriginSubframeJSDialogs);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSyntheticPointerActions);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kTouchDragAndContextMenu);
@@ -342,6 +346,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kGroupRebindingForGroupImportance);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kReduceGpuPriorityOnBackground);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSmartZoom);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kSubframeImportance);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kUserMediaScreenCapturing);
 #endif  // BUILDFLAG(IS_ANDROID)
 

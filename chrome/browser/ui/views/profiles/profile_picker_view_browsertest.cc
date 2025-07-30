@@ -49,7 +49,9 @@
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/signin/chrome_signin_client_factory.h"
 #include "chrome/browser/signin/chrome_signin_client_test_util.h"
+#include "chrome/browser/signin/dice_tab_helper.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
+#include "chrome/browser/signin/process_dice_header_delegate_impl.h"
 #include "chrome/browser/signin/signin_promo.h"
 #include "chrome/browser/signin/signin_util.h"
 #include "chrome/browser/sync/sync_service_factory.h"
@@ -154,11 +156,6 @@
 #include "components/policy/core/common/management/scoped_management_service_override_for_testing.h"
 #endif  // BUILDFLAG(IS_MAC)
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-#include "chrome/browser/signin/dice_tab_helper.h"
-#include "chrome/browser/signin/process_dice_header_delegate_impl.h"
-#endif
-
 using signin::constants::kNoHostedDomainFound;
 using testing::_;
 
@@ -191,7 +188,7 @@ AccountInfo FillAccountInfo(
   account_info.locale = "en";
   account_info.picture_url = "https://get-avatar.com/foo";
   AccountCapabilitiesTestMutator(&account_info.capabilities)
-      .set_is_subject_to_enterprise_policies(hosted_domain !=
+      .set_is_subject_to_enterprise_features(hosted_domain !=
                                              kNoHostedDomainFound);
   return account_info;
 }
@@ -653,11 +650,9 @@ class ProfilePickerCreationFlowBrowserTest
 #endif
   }
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
   bool IsNativeToolbarVisible() {
     return view()->IsNativeToolbarVisibleForTesting();
   }
-#endif
 
  protected:
   const GURL kLocalProfileCreationUrl = AppendProfileCustomizationQueryParams(
@@ -2048,8 +2043,8 @@ IN_PROC_BROWSER_TEST_F(ProfilePickerCreationFlowBrowserTest,
 
   EXPECT_CALL(
       *hats_service,
-      LaunchSurvey(kHatsSurveyTriggerIdentitySwitchProfileFromProfilePicker, _,
-                   _, _, _, _, _))
+      LaunchDelayedSurvey(
+          kHatsSurveyTriggerIdentitySwitchProfileFromProfilePicker, _, _, _))
       .Times(2);
 
   // Open the picker.

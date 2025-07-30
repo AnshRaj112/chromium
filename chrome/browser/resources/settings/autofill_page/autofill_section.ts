@@ -106,6 +106,11 @@ export class SettingsAutofillSectionElement extends
       showAddressDialog_: Boolean,
       showAddressRemoveConfirmationDialog_: Boolean,
 
+      isHomeOrWorkAddress: {
+        type: Boolean,
+        computed: 'computeIsHomeOrWorkAddress_(activeAddress)',
+      },
+
       isPlusAddressEnabled_: {
         type: Boolean,
         value: () => loadTimeData.getBoolean('plusAddressEnabled'),
@@ -119,6 +124,7 @@ export class SettingsAutofillSectionElement extends
   declare private accountInfo_: chrome.autofillPrivate.AccountInfo|null;
   declare private showAddressDialog_: boolean;
   declare private showAddressRemoveConfirmationDialog_: boolean;
+  declare private isHomeOrWorkAddress: boolean;
   declare private isPlusAddressEnabled_: boolean;
   private autofillManager_: AutofillManagerProxy =
       AutofillManagerImpl.getInstance();
@@ -174,17 +180,6 @@ export class SettingsAutofillSectionElement extends
     this.autofillManager_.removePersonalDataManagerListener(
         this.setPersonalDataListener_!);
     this.setPersonalDataListener_ = null;
-  }
-
-  /**
-   * Returns the text for the edit button in the action menu.
-   */
-  private getMenuEditAddressLabel_(
-      address: chrome.autofillPrivate.AddressEntry): string {
-    const isHomeOrWorkAddress = this.isAccountHomeAddress_(address) ||
-        this.isAccountWorkAddress_(address);
-
-    return this.i18n(isHomeOrWorkAddress ? 'editAddressInAccount' : 'edit');
   }
 
   /**
@@ -247,6 +242,9 @@ export class SettingsAutofillSectionElement extends
         this.shadowRoot!
             .querySelector(
                 'settings-address-remove-confirmation-dialog')!.wasConfirmed();
+    const isHomeOrWorkAddress =
+        this.isAccountHomeAddress_(this.activeAddress!) ||
+        this.isAccountWorkAddress_(this.activeAddress!);
     if (wasDeletionConfirmed) {
       // Two corner cases are handled:
       // 1. removing the only address: the focus goes to the Add button
@@ -264,8 +262,9 @@ export class SettingsAutofillSectionElement extends
       }
 
       this.autofillManager_.removeAddress(this.activeAddress!.guid as string);
-      getAnnouncerInstance().announce(
-          loadTimeData.getString('addressRemovedMessage'));
+      getAnnouncerInstance().announce(loadTimeData.getString(
+          isHomeOrWorkAddress ? 'homeAndWorkAddressRemovedMessage' :
+                                'addressRemovedMessage'));
     }
     chrome.metricsPrivate.recordBoolean(
         'Autofill.ProfileDeleted.Settings',
@@ -306,6 +305,16 @@ export class SettingsAutofillSectionElement extends
   private isAccountWorkAddress_(address: chrome.autofillPrivate.AddressEntry) {
     return address.metadata?.recordType ===
         chrome.autofillPrivate.AddressRecordType.ACCOUNT_WORK;
+  }
+
+  private computeIsHomeOrWorkAddress_(
+      address: chrome.autofillPrivate.AddressEntry): boolean {
+    if (!address) {
+      return false;
+    }
+
+    return this.isAccountHomeAddress_(address) ||
+        this.isAccountWorkAddress_(address);
   }
 
   private getAddressIcon_(address: chrome.autofillPrivate.AddressEntry) {

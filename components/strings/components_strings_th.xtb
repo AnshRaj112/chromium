@@ -538,7 +538,6 @@
 <translation id="1876399092304384674">ตามวันที่</translation>
 <translation id="1877026089748256423">Chrome ไม่ใช่เวอร์ชันล่าสุด</translation>
 <translation id="187918866476621466">เปิดหน้าเริ่มต้นใช้งาน</translation>
-<translation id="1880901968112404879">โปรดบันทึกบัตร รหัสความปลอดภัยที่เข้ารหัส และที่อยู่สำหรับการเรียกเก็บเงินไว้ในบัญชี Google เพื่อให้ชำระเงินได้เร็วขึ้นในครั้งถัดไป</translation>
 <translation id="1883255238294161206">ยุบรายการ</translation>
 <translation id="1884843295353628214">แจ๊ส</translation>
 <translation id="1890171020361705182">เกมไดโนเสาร์ ไดโนเสาร์ที่มีรูปร่างเป็นพิกเซลต้องคอยหลบหลีกต้นกระบองเพชรและนกยักษ์ดึกดำบรรพ์ขณะวิ่งผ่านภูมิประเทศที่รกร้าง เมื่อคุณได้ยินเสียงสัญญาณ ให้แตะเพื่อกระโดดข้ามสิ่งกีดขวาง</translation>
@@ -716,7 +715,6 @@
 <translation id="2183238148268545307">ซอฟต์แวร์เกี่ยวกับวิดีโอ</translation>
 <translation id="2183608646556468874">หมายเลขโทรศัพท์</translation>
 <translation id="2184405333245229118">{COUNT,plural, =1{ที่อยู่ 1 รายการ}other{ที่อยู่ # รายการ}}</translation>
-<translation id="2187317261103489799">ตรวจหา (ค่าเริ่มต้น)</translation>
 <translation id="2188375229972301266">เจาะรูด้านล่างหลายรู</translation>
 <translation id="218940509700321686">ค่าที่คั่นด้วยคอมมา</translation>
 <translation id="2194856509914051091">สิ่งที่ควรพิจารณา</translation>
@@ -794,7 +792,6 @@
 <translation id="2303437270440428119">สเปรดชีต OpenDocument</translation>
 <translation id="2305294852062272447">บันทึกใบขับขี่ไหม</translation>
 <translation id="2306124309679506798">อนุญาตประสบการณ์ที่สมจริงไหม</translation>
-<translation id="2307711332257985952">ที่อยู่บ้านและที่ทำงานของคุณพร้อมใช้งานใน Chrome แล้ว</translation>
 <translation id="2310789833878085574">บันทึกและป้อนข้อมูลบัตรอัตโนมัติ</translation>
 <translation id="2312234273148520048">เครื่องปรุงรสและน้ำสลัด</translation>
 <translation id="2316087952091171402">ไม่ถึง <ph name="UPPER_ESTIMATE" /> บางเว็บไซต์อาจโหลดช้ากว่าเดิมเมื่อคุณเข้าชมครั้งถัดไป</translation>
@@ -940,7 +937,6 @@
 <translation id="2535659140340599600">{COUNT,plural, =1{และอีก 1 โดเมน}other{และอีก # โดเมน}}</translation>
 <translation id="2536110899380797252">เพิ่มที่อยู่</translation>
 <translation id="2537931901612099523">คนอื่นๆ ที่ใช้อุปกรณ์นี้จะไม่เห็นกิจกรรมของคุณ คุณจึงท่องเว็บได้แบบส่วนตัวมากขึ้น โหมดนี้จะไม่เปลี่ยนแปลงวิธีเก็บรวบรวมข้อมูลโดยเว็บไซต์ที่คุณเข้าชมและบริการที่เว็บไซต์เหล่านั้นใช้ รวมถึง Google ด้วย ระบบจะบันทึกรายการที่ดาวน์โหลดและบุ๊กมาร์กไว้</translation>
-<translation id="2539524384386349900">ตรวจหา</translation>
 <translation id="2541219929084442027">หน้าที่คุณดูในแท็บที่ไม่ระบุตัวตนจะไม่เก็บอยู่ในประวัติการเข้าชมของเบราว์เซอร์ การจัดเก็บคุกกี้ หรือประวัติการค้นหาหลังจากที่คุณปิดแท็บที่ไม่ระบุตัวตนทั้งหมด แต่จะมีการเก็บไฟล์ที่คุณดาวน์โหลดหรือบุ๊กมาร์กที่คุณสร้างขึ้น</translation>
 <translation id="2542106216580219892">โต้คลื่น</translation>
 <translation id="2543236854123609690"><ph name="ORIGIN" /> – หากต้องการออกจากโหมดเต็มหน้าจอ ให้กด |<ph name="ACCELERATOR" />| ค้างไว้</translation>
@@ -1210,6 +1206,7 @@
 <translation id="3027915437837548462">ภาพ SVG</translation>
 <translation id="3030331669969285614">Flag เหล่านี้จะป้องกันหรือเปลี่ยนกลับการเปลี่ยนแปลงที่ส่งผลกับส่วนอื่นในระบบและจะใช้ได้ในเวลาจำกัดเท่านั้น</translation>
 <translation id="3030542417256082866">บันทึกยานพาหนะไหม</translation>
+<translation id="3033200136993730761">ที่อยู่บ้านจะช่วยให้คุณทำสิ่งต่างๆ ให้เสร็จด้วยบริการของ Google ได้ เช่น ผลการค้นหาที่เกี่ยวข้องมากขึ้นและเส้นทางใน Google Maps คุณแก้ไขหรือลบที่อยู่ใน<ph name="BEGIN_LINK" />บัญชี Google ชื่อ <ph name="ACCOUNT" /><ph name="END_LINK" /> ได้</translation>
 <translation id="3034526003882782781">อนุญาตให้เลื่อนและซูม</translation>
 <translation id="3036894576201005614">อุปกรณ์ทำความสะอาดในครัวเรือน</translation>
 <translation id="3037177537145227281">กำลังติดตามราคา</translation>
@@ -1332,7 +1329,6 @@
 <translation id="3229041911291329567">ข้อมูลเวอร์ชันเกี่ยวกับอุปกรณ์และเบราว์เซอร์</translation>
 <translation id="3229277193950731405">คัดลอกสตริงเวอร์ชัน</translation>
 <translation id="323107829343500871">ป้อน CVC สำหรับ <ph name="CREDIT_CARD" /></translation>
-<translation id="3234666976984236645">ตรวจหาเนื้อหาที่สำคัญบนไซต์นี้เสมอ</translation>
 <translation id="323585066388831737">สีแดงอ่อน</translation>
 <translation id="3235902901585019063">ระบบจะลบไฟล์ในเครื่องในวันที่ <ph name="DATE_TIME" /> ตรวจสอบว่าข้อมูลธุรกิจหรือข้อมูลส่วนตัวที่สำคัญจัดเก็บไว้ภายนอก</translation>
 <translation id="3236212803136366317">สิทธิประโยชน์ของบัตร</translation>
@@ -1891,7 +1887,6 @@
 <translation id="4147897805161313378">Google Photos</translation>
 <translation id="4148925816941278100">American Express</translation>
 <translation id="4150099059797363385">Envelope Chinese #4</translation>
-<translation id="4151403195736952345">ใช้ค่าเริ่มต้นส่วนกลาง (ตรวจหา)</translation>
 <translation id="4152318981910038897">{COUNT,plural, =1{หน้า 1}other{หน้า {COUNT}}}</translation>
 <translation id="4152670763139331043">{NUM_TABS,plural, =1{1 แท็บ}other{# แท็บ}}</translation>
 <translation id="4153446078232988116"><ph name="SITE" /> ไม่รองรับการเชื่อมต่อที่ปลอดภัยด้วย HTTPS</translation>
@@ -2091,6 +2086,7 @@
 <translation id="4451135742916150903">สามารถขอเชื่อมต่อกับอุปกรณ์ HID ได้</translation>
 <translation id="4451684391620232683">ข้อความที่แสดงต่อผู้ใช้:</translation>
 <translation id="4452328064229197696">ระบบพบว่ารหัสผ่านที่คุณเพิ่งใช้มีการรั่วไหลในการละเมิดข้อมูลครั้งหนึ่ง เพื่อรักษาความปลอดภัยของบัญชี เครื่องมือจัดการรหัสผ่านบน Google แนะนำให้ตรวจสอบรหัสผ่านที่บันทึกไว้</translation>
+<translation id="4454620051637646665">ปิดแบนเนอร์</translation>
 <translation id="4456937135469235202">การท่องเที่ยวแบบผจญภัย</translation>
 <translation id="4458013283022578512">ป้อนคำถาม</translation>
 <translation id="4464826014807964867">เว็บไซต์ที่มีข้อมูลจากองค์กรของคุณ</translation>
@@ -2676,8 +2672,10 @@
 <translation id="5464236009658034488">อุปกรณ์สำนักงาน</translation>
 <translation id="5465724643247062031">กระจก (ทึบแสง)</translation>
 <translation id="5466018172325111652">หากไม่ได้รับรหัส ให้<ph name="BEGIN_LINK" />ขอรหัสใหม่<ph name="END_LINK" /></translation>
+<translation id="5466818462212249084">แอปการชำระเงิน</translation>
 <translation id="5470861586879999274">&amp;ทำซ้ำการแก้ไข</translation>
 <translation id="5472588168895083535">การติดตามการเคลื่อนไหวของมือถูกบล็อก</translation>
+<translation id="5477756102936130143">เปิดใช้การเปลี่ยนเส้นทางไปยังแอปการชำระเงินที่รองรับ</translation>
 <translation id="5479505548832623900">ส่วนขยายอาจไม่สนใจ</translation>
 <translation id="547963486735802022">ลองโอนไฟล์อีกครั้ง</translation>
 <translation id="5481076368049295676">เนื้อหานี้อาจพยายามติดตั้งซอฟต์แวร์อันตรายที่จะขโมยหรือลบข้อมูลในอุปกรณ์ของคุณ <ph name="BEGIN_LINK" />แสดงเนื้อหา<ph name="END_LINK" /></translation>
@@ -2787,6 +2785,7 @@
 <translation id="5642362243427711530"><ph name="FIRST_STRING" /> <ph name="SECOND_STRING" /></translation>
 <translation id="5642411781689336699">เครื่องเล่นและอุปกรณ์สเตอริโอ</translation>
 <translation id="5644090287519800334">เปลี่ยนตำแหน่งรูปภาพด้าน 1 ตามแกน X</translation>
+<translation id="5644128326840674462">แบนเนอร์โปรโมชัน</translation>
 <translation id="5645132789250840550">พลาสติก (กึ่งเงา)</translation>
 <translation id="5645719697465708351">ของใช้สำหรับงานเลี้ยงและวันหยุด</translation>
 <translation id="5645854190134202180">กะที่ 2</translation>
@@ -2806,6 +2805,7 @@
 <translation id="567604591393105935">Bottom Sheet ของ Commerce เปิดแบบครึ่งหน้า</translation>
 <translation id="5676641328629468296">Google Pay, Pix</translation>
 <translation id="5678007133659493065">ฟอยล์</translation>
+<translation id="5679086391497468752">ที่อยู่บ้าน</translation>
 <translation id="5680642791693447368">ภาพยนตร์ลึกลับ สืบสวน และเขย่าขวัญ</translation>
 <translation id="568292603005599551">ตำแหน่งรูปภาพตามแกน X</translation>
 <translation id="5684874026226664614">อ๊ะ หน้านี้ไม่สามารถแปลได้</translation>
@@ -2907,6 +2907,7 @@
 <translation id="5879272455334365707">การวางแผนและจัดการด้านการเงิน</translation>
 <translation id="5879989559903563723">ไม่อนุญาตในโหมดผู้มาเยือน</translation>
 <translation id="5880050725127890683">ไปที่การตรวจสอบความปลอดภัยของ Chrome</translation>
+<translation id="5880385758720707152">ป้อนที่อยู่บ้านและที่ทำงานจากบัญชี Google โดยอัตโนมัติ</translation>
 <translation id="5884465125445718607">Envelope Chinese #6</translation>
 <translation id="5886961930368713749">ส่งความคิดเห็นสำหรับการเปรียบเทียบ</translation>
 <translation id="5887400589839399685">บันทึกการ์ดแล้ว</translation>
@@ -2916,6 +2917,7 @@
 <translation id="5898767305816764989">ปุ่มชอบ กด Enter เพื่อส่งความคิดเห็นว่าคุณชอบ<ph name="THUMBS_UP_SUGGESTION_BUTTON_FOCUSED_FRIENDLY_MATCH_TEXT" /></translation>
 <translation id="5901630391730855834">สีเหลือง</translation>
 <translation id="5903264686717710770">ชื่อ:</translation>
+<translation id="5905671155741555195">ที่อยู่ที่ทำงานจะช่วยให้คุณทำสิ่งต่างๆ ให้เสร็จด้วยบริการของ Google ได้ เช่น ผลการค้นหาที่เกี่ยวข้องมากขึ้นและเส้นทางใน Google Maps คุณแก้ไขหรือลบที่อยู่ใน<ph name="BEGIN_LINK" />บัญชี Google ชื่อ <ph name="ACCOUNT" /><ph name="END_LINK" /> ได้</translation>
 <translation id="5908541034548427511"><ph name="TYPE_1" /> (ซิงค์แล้ว)</translation>
 <translation id="5910140988253729859">ยกเลิกการป้อนข้อความอัตโนมัติ</translation>
 <translation id="5911020115933784199">กิจกรรมและรายการ</translation>
@@ -3300,6 +3302,7 @@
 <translation id="6494750904506170417">ป๊อปอัปและการเปลี่ยนเส้นทาง</translation>
 <translation id="6495664197699704593">รหัสผ่านข้างต้นจะบันทึกไว้ในอุปกรณ์นี้เท่านั้น หากต้องการใช้งานในอุปกรณ์อื่น ให้<ph name="GOOGLE_PASSWORD_MANAGER" /></translation>
 <translation id="649611364763911650">หากต้องการใช้บริการป้อนข้อความอัตโนมัติอื่นใน Chrome ให้เลือกผู้ให้บริการป้อนข้อความอัตโนมัติในการตั้งค่า Android</translation>
+<translation id="6496888501595572660">แสดง<ph name="PAY_LATER_OPTIONS_HELP_LINK_BEGIN" />ตัวเลือกการชำระเงินภายหลัง<ph name="PAY_LATER_OPTIONS_HELP_LINK_END" />ที่จุดชำระเงิน</translation>
 <translation id="6499038740797743453">รีเซ็ตรหัสผ่านไหม</translation>
 <translation id="6502510275417601303">การแจ้งเตือนเกี่ยวกับการตั้งค่าการชำระเงินใหม่ปิดอยู่</translation>
 <translation id="6502991525169604759">แบบไม่มีการเปลี่ยนแปลงที่ทำ</translation>
@@ -3582,6 +3585,7 @@
 <translation id="6989763994942163495">แสดงการตั้งค่าขั้นสูง...</translation>
 <translation id="6991376411634620997">พาสคีย์ • Windows Hello</translation>
 <translation id="6997288673234694149">อุปกรณ์เบสบอลและซอฟต์บอล</translation>
+<translation id="6998512609912910179">กรอกแบบฟอร์มได้เร็วขึ้น</translation>
 <translation id="6999480632062519056">การฝึกสอนฟิตเนสและการฝึกตัวต่อตัว</translation>
 <translation id="7003278537452757231">พรมและพรมปูพื้น</translation>
 <translation id="7003322000677139268">อุปกรณ์และอะไหล่รถยนต์</translation>
@@ -3813,6 +3817,7 @@
 <translation id="7403392780200267761">แชร์แท็บนี้โดยการแชร์ลิงก์ สร้างคิวอาร์โค้ด แคสต์ และอื่นๆ</translation>
 <translation id="7403591733719184120"><ph name="DEVICE_NAME" /> ของคุณมีการจัดการ</translation>
 <translation id="7405878640835614059"><ph name="ENROLLMENT_DOMAIN" /> ได้ติดตั้งแอปพลิเคชันสำหรับฟังก์ชันเพิ่มเติม แอปพลิเคชันมีสิทธิ์เข้าถึงข้อมูลบางส่วนของคุณได้</translation>
+<translation id="740691708085211707">นำที่อยู่ที่ทำงานออกจากฟีเจอร์ป้อนข้อความอัตโนมัติของ Chrome ใช่ไหม</translation>
 <translation id="7407424307057130981">&lt;p&gt;คุณจะเห็นข้อผิดพลาดนี้หากมีซอฟต์แวร์ Superfish ในคอมพิวเตอร์ที่ใช้ระบบปฏิบัติการ Windows&lt;/p&gt;
       &lt;p&gt;ทำตามขั้นตอนการปิดใช้ซอฟต์แวร์ชั่วคราวต่อไปนี้เพื่อให้เข้าสู่เว็บได้ ทั้งนี้คุณจะต้องมีสิทธิ์ของผู้ดูแลระบบ&lt;/p&gt;
       &lt;ol&gt;
@@ -3909,6 +3914,7 @@
 <translation id="7534987659046836932">Envelope C7</translation>
 <translation id="7535087603100972091">ราคา</translation>
 <translation id="753556296624075801">ขับเคลื่อนโดย Google</translation>
+<translation id="753713322968419914">นำที่อยู่บ้านออกจากฟีเจอร์ป้อนข้อความอัตโนมัติของ Chrome ใช่ไหม</translation>
 <translation id="7537536606612762813">จำเป็น</translation>
 <translation id="7543525346216957623">ถามผู้ปกครอง</translation>
 <translation id="7546409722674205727">เริ่มใช้งาน <ph name="APP_NAME" /></translation>
@@ -3965,6 +3971,7 @@
 <translation id="7625242817712715120">นโยบายของผู้ดูแลระบบไม่แนะนำให้พิมพ์เนื้อหานี้</translation>
 <translation id="7627785503571172573">รูปภาพ (ฟิล์ม)</translation>
 <translation id="762844065391966283">ทีละรายการ</translation>
+<translation id="7629058630148860366">ที่อยู่ที่ทำงาน</translation>
 <translation id="763042426047865637">บริการด้านอัคคีภัยและความปลอดภัย</translation>
 <translation id="7630470133768862132">สถานะความยินยอม:</translation>
 <translation id="7631072086707140121">URL ต้องเป็น HTTPS</translation>
@@ -4651,6 +4658,7 @@
 <translation id="8816395686387277279"><ph name="UPDATE_CHROME_FOCUSED_FRIENDLY_MATCH_TEXT" /> กด Tab ตามด้วย Enter เพื่ออัปเดต Chrome จากการตั้งค่า Chrome</translation>
 <translation id="8820817407110198400">บุ๊กมาร์ก</translation>
 <translation id="882338992931677877">ช่องแบบเลือกด้วยตนเอง</translation>
+<translation id="8827067923357481311">ตัวเลือกการชำระเงินภายหลัง</translation>
 <translation id="8830320733681313421">ไปรษณียบัตร Hagaki</translation>
 <translation id="8830565333350631528">ดูไฟล์ใน <ph name="CLOUD_PROVIDER" /></translation>
 <translation id="8831783793142731637">ใช้ได้กับการซื้อที่มีมูลค่ามากกว่า <ph name="RANGE_MINIMUM" /></translation>

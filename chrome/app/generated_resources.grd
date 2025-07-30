@@ -8834,6 +8834,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_NTP_MODULES_TAB_GROUPS_TITLE" desc="Title for Tab Groups NTP module on the new tab page.">
         Your tab groups
       </message>
+      <message name="IDS_NTP_MODULES_TAB_GROUPS_ZERO_STATE_TITLE" desc="Title shown in the zero state tab groups module.">
+        Stay organized with tab groups
+      </message>
+      <message name="IDS_NTP_MODULES_TAB_GROUPS_ZERO_STATE_TEXT" desc="Text shown in the zero state tab groups module.">
+        You can group tabs to keep related pages together and saved across your devices
+      </message>
       <message name="IDS_NTP_MICROSOFT_AUTHENTICATION_DISABLE_BUTTON_TEXT" desc="Text shown on the disable button of the Microsoft Authentication module.">
        Don't show this card
       </message>
@@ -9427,8 +9433,8 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_READING_MODE_VOICE_HIGHLIGHT" desc="Accessibility label for button that opens a dropdown with options for changing the highlight granularity for following along with speech in Read Aloud.">
         Voice highlight
       </message>
-      <message name="IDS_READING_MODE_AUTO_HIGHLIGHT_LABEL" desc="Dropdown option for setting the automatic highlight granularity in Read Aloud.">
-        Auto
+      <message name="IDS_READING_MODE_AUTO_HIGHLIGHT_LABEL" desc="Dropdown option that makes read aloud highlight words, phrases or sentences, depending on the voice speed.">
+        Adaptive highlighting
       </message>
       <message name="IDS_READING_MODE_WORD_HIGHLIGHT_LABEL" desc="Dropdown option for setting the word highlight granularity in Read Aloud.">
         Word
@@ -17791,7 +17797,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
       </message>
 
       <message name="IDS_WEB_DIGITAL_CREDENTIALS_QR_BODY">
-        Safely use an ID from your Android device
+        Safely use an ID from your mobile device
       </message>
 
       <message name="IDS_WEB_DIGITAL_CREDENTIALS_QR_CODE_ALT_TEXT">
@@ -18774,6 +18780,9 @@ Please help our engineers fix this problem. Tell us what happened right before y
        <message name="IDS_GEMINI_WORKING_ON_TASK_BODY" desc="Text on a toast notification that is shown when gemini is working in the background">
         Gemini will keep working on your task
       </message>
+      <message name="IDS_NON_MILESTONE_UPDATE_TOAST_BODY" desc="Text on a toast notification that is shown when a non milestone update is complete.">
+        Chrome was updated
+      </message>
     </if>
 
     <if expr="is_android">
@@ -19134,6 +19143,9 @@ Please help our engineers fix this problem. Tell us what happened right before y
       <message name="IDS_NTP_EXTENSIONS_PROMO" desc="The text shown in the body of the New Tab Page extensions promotion">
         Add extensions to stay organized, simplify tasks, and enhance your browsing
       </message>
+      <message name="IDS_NTP_EXTENSIONS_PROMO_ACTION_BUTTON" is_accessibility_with_no_ui="true" desc="The screenreader text for the action button on the Extensions New Tab Page promo">
+        Add extensions
+      </message>
       <message name="IDS_NTP_SIGN_IN_PROMO" desc="The text shown in the body of the New Tab Page sign in promotion">
         Sign in to Chrome to get your passwords and more on all your devices
       </message>
@@ -19144,6 +19156,26 @@ Please help our engineers fix this problem. Tell us what happened right before y
         Sign in
       </message>
     </if>
+
+    <!-- Save to Drive -->
+    <message name="IDS_ACCOUNT_CHOOSER_SINGLE_ACCOUNT_TITLE" desc="Text to prompt a user to save a file to their account.">
+      Save to your account
+    </message>
+    <message name="IDS_ACCOUNT_CHOOSER_MULTI_ACCOUNT_TITLE" desc="Text to prompt a user to choose an account to save a file to.">
+      Choose your account
+    </message>
+    <message name="IDS_ACCOUNT_CHOOSER_SUBTITLE" desc="Text description for saving files to Drive via Chrome PDF viewer.">
+      Find your file in the <ph name="FEATURE_NAME">$1<ex>Saved from Chrome</ex></ph> folder
+    </message>
+    <message name="IDS_ACCOUNT_CHOOSER_SAVED_FROM_CHROME" desc="Text to describe the feature.">
+      Saved from Chrome
+    </message>
+    <message name="IDS_ACCOUNT_CHOOSER_DRIVE" desc="Google Drive product name.">
+      Drive
+    </message>
+    <message name="IDS_ACCOUNT_CHOOSER_ADD_ACCOUNT" desc="Text for the button to add an account.">
+      Use a different account
+    </message>
 
   </messages>
 </release>

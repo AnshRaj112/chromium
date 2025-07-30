@@ -305,6 +305,15 @@ WebContentsDelegateAndroid::PreHandleKeyboardEvent(
     WebContents* source,
     const input::NativeWebKeyboardEvent& event) {
   if (event.native_key_code == AKEYCODE_ESCAPE) {
+    JNIEnv* env = AttachCurrentThread();
+    ScopedJavaLocalRef<jobject> obj = GetJavaDelegate(env);
+
+    if (!obj.is_null() &&
+        Java_WebContentsDelegateAndroid_preHandleKeyboardEvent(
+            env, obj, reinterpret_cast<intptr_t>(&event))) {
+      return content::KeyboardEventProcessingResult::HANDLED;
+    }
+
     auto* rwhva = source->GetTopLevelRenderWidgetHostView();
     if (rwhva && rwhva->IsPointerLocked()) {
       rwhva->UnlockPointer();
@@ -366,7 +375,8 @@ void WebContentsDelegateAndroid::EnterFullscreenModeForTab(
   if (obj.is_null())
     return;
   Java_WebContentsDelegateAndroid_enterFullscreenModeForTab(
-      env, obj, options.prefers_navigation_bar, options.prefers_status_bar);
+      env, obj, reinterpret_cast<jlong>(requesting_frame),
+      options.prefers_navigation_bar, options.prefers_status_bar);
 }
 
 void WebContentsDelegateAndroid::FullscreenStateChangedForTab(
@@ -550,7 +560,6 @@ SkBitmap WebContentsDelegateAndroid::MaybeCopyContentAreaAsBitmapSync() {
   if (obj.is_null()) {
     return SkBitmap();
   }
-  base::TimeTicks start_time = base::TimeTicks::Now();
   ScopedJavaLocalRef<jobject> bitmap =
       Java_WebContentsDelegateAndroid_maybeCopyContentAreaAsBitmapSync(env,
                                                                        obj);
@@ -560,8 +569,6 @@ SkBitmap WebContentsDelegateAndroid::MaybeCopyContentAreaAsBitmapSync() {
   gfx::JavaBitmap java_bitmap_lock(bitmap);
   SkBitmap skbitmap = gfx::CreateSkBitmapFromJavaBitmap(java_bitmap_lock);
   skbitmap.setImmutable();
-  base::UmaHistogramTimes("Android.MaybeCopyContentAreaAsBitmapSync.Time",
-                          base::TimeTicks::Now() - start_time);
   return skbitmap;
 }
 

@@ -4,17 +4,24 @@
 
 package org.chromium.ui.listmenu;
 
+import static android.view.View.INVISIBLE;
+import static android.view.View.VISIBLE;
+
 import static org.chromium.ui.listmenu.ListMenuUtils.createAdapter;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.ColorRes;
+import androidx.annotation.DrawableRes;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 
@@ -103,6 +110,8 @@ public class BasicListMenu implements ListMenu {
     }
 
     private final ListView mListView;
+    private final ModelList mHeaderModelList = new ModelList();
+    private final ModelList mContentModelList;
     private final ModelListAdapter mAdapter;
     private final View mContentView;
     private final List<Runnable> mClickRunnables = new LinkedList<>();
@@ -110,41 +119,54 @@ public class BasicListMenu implements ListMenu {
     /**
      * @param context The {@link Context} to inflate the layout.
      * @param data Data representing the list items. All items in data are assumed to be enabled.
-     * @param contentView The background of the list menu.
-     * @param listView The {@link ListView} of the list menu.
      * @param delegate The {@link ListMenu.Delegate} used to handle menu clicks. If not provided,
      *     the item's CLICK_LISTENER or listMenu's onMenuItemSelected method will be used.
+     * @param backgroundDrawable The {@link DrawableRes} to use as the menu background. If 0, the
+     *     default ({@code @drawable/list_menu_background)} will be used.
      * @param backgroundTintColor The background tint color of the menu.
+     * @param bottomHairlineColor The {@link ColorInt} to use as the color for the bottom hairline
+     *     of the unscrollable header. If -1, the default ({@code ?android:attr/listDivider}) will
+     *     be used.
      */
     public BasicListMenu(
             Context context,
             ModelList data,
-            View contentView,
-            ListView listView,
             @Nullable Delegate delegate,
-            @ColorRes int backgroundTintColor) {
-        mAdapter =
-                createAdapter(
-                        data,
-                        Set.of(),
-                        (model) -> {
-                            if (delegate != null) delegate.onItemSelected(model);
-                            // We will run the runnables that are registered by the time this lambda
-                            // is called.
-                            for (Runnable r : mClickRunnables) {
-                                r.run();
-                            }
-                        });
+            @DrawableRes int backgroundDrawable,
+            @ColorRes int backgroundTintColor,
+            @Nullable @ColorInt Integer bottomHairlineColor) {
+        View contentView = LayoutInflater.from(context).inflate(R.layout.list_menu_layout, null);
+        View hairline = contentView.findViewById(R.id.menu_header_bottom_hairline);
+        ListView listView = contentView.findViewById(R.id.menu_list);
+        mAdapter = createAdapter(data, Set.of(), (model) -> callDelegate(delegate, model));
         mContentView = contentView;
+        mContentModelList = data;
         mListView = listView;
         mListView.setAdapter(mAdapter);
         mListView.setDivider(null);
 
+        ListView headerListView = mContentView.findViewById(R.id.menu_header);
+        headerListView.setAdapter(
+                createAdapter(
+                        mHeaderModelList, Set.of(), (model) -> callDelegate(delegate, model)));
+
+        // Allow keyboard focus + keyboard clicks on list items.
+        headerListView.setItemsCanFocus(true);
+        listView.setItemsCanFocus(true);
+
+        if (backgroundDrawable != Resources.ID_NULL) {
+            contentView.setBackgroundResource(backgroundDrawable);
+        }
         if (backgroundTintColor != 0) {
             ViewCompat.setBackgroundTintList(
                     mContentView,
                     ColorStateList.valueOf(ContextCompat.getColor(context, backgroundTintColor)));
         }
+        if (bottomHairlineColor != null) {
+            hairline.setBackgroundColor(bottomHairlineColor);
+        }
+
+        mListView.setOnScrollChangeListener(new ContentListOnScrollChangeListener(hairline));
     }
 
     @Override
@@ -182,6 +204,46 @@ public class BasicListMenu implements ListMenu {
 
     public ModelListAdapter getAdapterForTesting() {
         return mAdapter;
+    }
+
+    /**
+     * Runs {@param dismissDialog} at the end of each callback, recursively (through submenu items).
+     * If an item doesn't already have a click callback in its model, no click callback is added.
+     *
+     * @param dismissDialog The {@link Runnable} to run.
+     */
+    public void setupCallbacksRecursively(Runnable dismissDialog) {
+        ListMenuUtils.setupCallbacksRecursively(mHeaderModelList, mContentModelList, dismissDialog);
+    }
+
+    private void callDelegate(@Nullable Delegate delegate, PropertyModel model) {
+        if (delegate != null) delegate.onItemSelected(model);
+        // We will run the runnables that are registered by the time this lambda
+        // is called.
+        for (Runnable r : mClickRunnables) {
+            r.run();
+        }
+    }
+
+    /** Listens to scrolls on list view contents and changes visibility of header hairline. */
+    private static class ContentListOnScrollChangeListener implements View.OnScrollChangeListener {
+
+        private final View mDivider;
+        private int mVisibility = INVISIBLE; // "Cache" so we don't set visibility per scroll event
+
+        ContentListOnScrollChangeListener(View divider) {
+            mDivider = divider;
+        }
+
+        @Override
+        public void onScrollChange(
+                View view, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
+            int desiredVisibility = scrollY == 0 ? INVISIBLE : VISIBLE;
+            if (desiredVisibility != mVisibility) {
+                mVisibility = desiredVisibility;
+                mDivider.setVisibility(desiredVisibility);
+            }
+        }
     }
 
     public void clickItemForTesting(int i) {

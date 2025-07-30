@@ -37,7 +37,6 @@ import org.chromium.components.embedder_support.contextmenu.ContextMenuParams;
 import org.chromium.components.embedder_support.contextmenu.ContextMenuUi;
 import org.chromium.components.embedder_support.contextmenu.ContextMenuUtils;
 import org.chromium.content_public.browser.LoadCommittedDetails;
-import org.chromium.content_public.browser.RenderCoordinates;
 import org.chromium.content_public.browser.Visibility;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
@@ -80,7 +79,7 @@ public class ContextMenuCoordinator implements ContextMenuUi {
     private ContextMenuDialog mDialog;
     private Runnable mOnMenuClosed;
     private final ContextMenuNativeDelegate mNativeDelegate;
-    private boolean mIsInterestForWithShiftedMenu;
+    private final boolean mIsCustomItemPresent;
 
     /**
      * Constructor that also sets the content offset.
@@ -90,8 +89,22 @@ public class ContextMenuCoordinator implements ContextMenuUi {
      *     native.
      */
     ContextMenuCoordinator(float topContentOffsetPx, ContextMenuNativeDelegate nativeDelegate) {
+        this(topContentOffsetPx, nativeDelegate, false);
+    }
+
+    /**
+     * @param topContentOffsetPx content offset from the top.
+     * @param nativeDelegate The {@link ContextMenuNativeDelegate} to retrieve the thumbnail from
+     *     native.
+     * @param isCustomItemPresent Whether a custom item is present in the context menu.
+     */
+    ContextMenuCoordinator(
+            float topContentOffsetPx,
+            ContextMenuNativeDelegate nativeDelegate,
+            boolean isCustomItemPresent) {
         mTopContentOffsetPx = topContentOffsetPx;
         mNativeDelegate = nativeDelegate;
+        mIsCustomItemPresent = isCustomItemPresent;
     }
 
     @Override
@@ -188,21 +201,9 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         assert activity != null;
 
         final boolean isDragDropEnabled = ContextMenuUtils.isDragDropEnabled(activity);
-        // There are two experimental modes for the interestfor feature:
-        //  1. the context menu is "shifted", to leave room for the page content, with the available
-        //     space communicated back to the site via env() variables.
-        //  2. the context menu is shown "as usual", but an item is added to the top of the context
-        //     menu, allowing the user to show interest in the link.
-        // If mIsInterestForWithShiftedMenu is true, we're in case 1. The
-        // interestForNodeID being set to 0 indicate this, and that'll happen
-        // if the `HTMLInterestForContextMenuItemOnly` feature is disabled.
-        mIsInterestForWithShiftedMenu =
-                params.getOpenedFromInterestFor() && params.getInterestForNodeID() == 0;
-
         final boolean usePopupWindow =
                 isDragDropEnabled
-                        || ContextMenuUtils.isMouseOrHighlightPopup(params)
-                        || mIsInterestForWithShiftedMenu;
+                        || ContextMenuUtils.isMouseOrHighlightPopup(params);
 
         final View layout =
                 LayoutInflater.from(activity)
@@ -219,50 +220,6 @@ public class ContextMenuCoordinator implements ContextMenuUi {
                         usePopupWindow,
                         layout);
         boolean shouldRemoveScrim = ContextMenuUtils.isPopupSupported(activity);
-
-        // If this is an interestfor element, the top (or left) half of the
-        // screen should be left open for the site to locate its hovercard.
-        // TODO(masonf): Still left to do:
-        //  1. For larger screens, simply provide a rectangular area around the
-        //     tapped screen location, and let the context menu position itself
-        //     relative to that.
-        if (mIsInterestForWithShiftedMenu) {
-            var displayMetrics = activity.getResources().getDisplayMetrics();
-            float displayWidth = (float) displayMetrics.widthPixels;
-            float displayHeight = (float) displayMetrics.heightPixels;
-            float page_scale_factor =
-                    RenderCoordinates.fromWebContents(webContents).getPageScaleFactor();
-            float device_scale_factor =
-                    assumeNonNull(webContents.getTopLevelNativeWindow()).getDisplay().getDipScale();
-            float scale_factor = device_scale_factor * page_scale_factor;
-            float safeAreaWidth;
-            float safeAreaHeight;
-            if (displayWidth < displayHeight) {
-                // Portrait - leave the top half of the screen available to the
-                // site.
-                contextMenuRect = new Rect(0, 0, (int) displayWidth, (int) (displayHeight / 2));
-                safeAreaWidth = displayWidth / scale_factor;
-                safeAreaHeight = ((displayHeight / 2) - mTopContentOffsetPx) / scale_factor;
-            } else {
-                // Landscape - leave the left half of the screen available to
-                // the site.
-                // TODO(masonf) Since the context menu is wider than half the
-                // width of the screen, the context menu will be simply shown at
-                // the top left. Likely the context menu needs to be made
-                // narrower in this case.
-                contextMenuRect = new Rect(0, 0, (int) (displayWidth / 2), (int) displayHeight);
-                safeAreaWidth = displayWidth / 2 / scale_factor;
-                safeAreaHeight = (displayHeight - mTopContentOffsetPx) / scale_factor;
-            }
-            // Remove the darkened "scrim" behind the context menu.
-            shouldRemoveScrim = true;
-
-            // Notify Blink of the new still-open "safe area" not covered by the context menu. It is
-            // in DIPs, and is adjusted for page zoom.
-            Rect safeAreaRect =
-                    new Rect(0, 0, Math.round(safeAreaWidth), Math.round(safeAreaHeight));
-            webContents.setContextMenuInsets(safeAreaRect);
-        }
 
         int dialogTopMarginPx = ContextMenuDialog.NO_CUSTOM_MARGIN;
         int dialogBottomMarginPx = ContextMenuDialog.NO_CUSTOM_MARGIN;
@@ -332,16 +289,16 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         mDialog.setOnDismissListener(
                 (dialogInterface) -> {
                     mOnMenuClosed.run();
-                    if (mIsInterestForWithShiftedMenu) {
-                        // Remove context menu insets when the menu closes.
-                        webContents.setContextMenuInsets(new Rect());
-                    }
                 });
 
         mWebContents = webContents;
         mHeaderCoordinator =
                 new ContextMenuHeaderCoordinator(
-                        activity, params, Profile.fromWebContents(mWebContents), mNativeDelegate);
+                        activity,
+                        params,
+                        Profile.fromWebContents(mWebContents),
+                        mNativeDelegate,
+                        mIsCustomItemPresent);
         ContextMenuMediator mediator =
                 new ContextMenuMediator(activity, mHeaderCoordinator, onItemClicked, this::dismiss);
 
@@ -447,10 +404,6 @@ public class ContextMenuCoordinator implements ContextMenuUi {
             mChipController.dismissChipIfShowing();
         }
         mDialog.dismiss();
-        if (mIsInterestForWithShiftedMenu) {
-            // Remove context menu insets if the menu is dismissed.
-            mWebContents.setContextMenuInsets(new Rect());
-        }
     }
 
     Callback<ChipRenderParams> getChipRenderParamsCallbackForTesting(ChipDelegate chipDelegate) {

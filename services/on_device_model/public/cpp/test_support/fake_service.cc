@@ -412,7 +412,7 @@ void FakeOnDeviceModelService::LoadModel(
     LoadModelCallback callback) {
   FakeOnDeviceModel::Data data;
   data.base_weight = ReadFile(params->assets.weights.file());
-  if (params->assets.cache.IsValid()) {
+  if (params->assets.cache.IsValid() && params->assets.cache.GetLength() > 0) {
     data.cache_weight = ReadFile(params->assets.cache);
   }
   data.adaptation_ranks = params->adaptation_ranks;
@@ -454,7 +454,7 @@ void FakeOnDeviceModelService::LoadTextSafetyModel(
 void FakeOnDeviceModelService::GetDevicePerformanceInfo(
     GetDevicePerformanceInfoCallback callback) {
   auto result = mojom::DevicePerformanceInfo::New();
-  result->performance_class = mojom::PerformanceClass::kVeryHigh;
+  result->performance_class = settings_->performance_class;
   base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE, base::BindOnce(std::move(callback), std::move(result)),
       settings_->estimated_performance_delay);

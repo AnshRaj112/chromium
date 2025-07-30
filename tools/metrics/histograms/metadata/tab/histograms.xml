@@ -970,7 +970,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabGroups.NumberOfRootIdsFixed" units="groups"
-    expires_after="2025-11-26">
+    expires_after="2026-01-25">
   <owner>ckitagawa@chromium.org</owner>
   <owner>clank-tab-dev@chromium.org</owner>
   <summary>
@@ -1329,7 +1329,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="TabGroups.Shortcuts" enum="TabGroupShortcut"
-    expires_after="2025-11-24">
+    expires_after="2026-01-25">
   <owner>dljames@chromium.org</owner>
   <owner>top-chrome-desktop-ui@google.com</owner>
   <summary>
@@ -2090,7 +2090,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.ArchivedTabs.MaxLimitReachedAt" units="count"
-    expires_after="2025-09-07">
+    expires_after="2026-01-11">
   <owner>wylieb@google.com</owner>
   <owner>clank-tab-dev@google.com</owner>
   <summary>
@@ -2124,7 +2124,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.ArchiveSettings.AutoDeleteEnabled" enum="Boolean"
-    expires_after="2025-09-07">
+    expires_after="2026-01-11">
   <owner>wylieb@google.com</owner>
   <owner>clank-tab-dev@google.com</owner>
   <summary>
@@ -2204,7 +2204,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.DeleteWithPTD.DurationMs" units="ms"
-    expires_after="2025-09-07">
+    expires_after="2026-01-11">
   <owner>wylieb@google.com</owner>
   <owner>clank-tab-dev@google.com</owner>
   <summary>
@@ -2302,7 +2302,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.InitializePTD.DurationMs" units="ms"
-    expires_after="2025-09-07">
+    expires_after="2026-01-11">
   <owner>wylieb@google.com</owner>
   <owner>clank-tab-dev@google.com</owner>
   <summary>
@@ -2372,6 +2372,19 @@ chromium-metrics-reviews@google.com.
     build).
   </summary>
   <token key="BatteryState" variants="BatteryState"/>
+</histogram>
+
+<histogram name="Tabs.Metadata.FileSizeOnRead.{TabModelSelectorType}"
+    units="KB" expires_after="2026-07-28">
+  <owner>skym@chromium.org</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <summary>
+    Records the size of the tab list metadata file that's loaded on tab model
+    creation split out by client type. This is for the regular tab model, not
+    the incognito. Additionally this file may be loaded more times for various
+    things such as clean up and merging, these loads are all ignored. Clients
+    such as headless will still report with their selector type.
+  </summary>
 </histogram>
 
 <histogram name="Tabs.MissingWebStateStorageFileOnSessionRestore"
@@ -2864,7 +2877,7 @@ chromium-metrics-reviews@google.com.
 <histogram name="Tabs.SplitViewMenu.{SplitViewMenuSource}"
     enum="SplitViewMenuEntry" expires_after="2025-12-24">
   <owner>agale@chromium.org</owner>
-  <owner>chrome-desktop-ui-sea@google.com</owner>
+  <owner>top-chrome-desktop-ui@google.com</owner>
   <summary>
     Records the menu item selected from the split view menu anchored to
     {SplitViewMenuSource}.
@@ -2947,7 +2960,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.TabArchived.FoundDuplicateInRegularModel" units="count"
-    expires_after="2025-09-07">
+    expires_after="2026-01-11">
   <owner>wylieb@google.com</owner>
   <owner>clank-tab-dev@google.com</owner>
   <summary>
@@ -3670,7 +3683,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.TabStateCleanupAbortedByArchive" enum="Boolean"
-    expires_after="2025-09-07">
+    expires_after="2026-01-11">
   <owner>wylieb@google.com</owner>
   <owner>clank-tab-dev@google.com</owner>
   <summary>
@@ -3681,7 +3694,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tabs.TabThumbnailCleanupAbortedByArchive" enum="Boolean"
-    expires_after="2025-09-07">
+    expires_after="2026-01-11">
   <owner>wylieb@google.com</owner>
   <owner>clank-tab-dev@google.com</owner>
   <summary>
@@ -3838,6 +3851,16 @@ chromium-metrics-reviews@google.com.
   <summary>
     When the user switches tab, records the time since the mouse entered the
     tabstrip.
+  </summary>
+</histogram>
+
+<histogram name="TabStrip.SplitView.Created" enum="SplitTabCreatedSource"
+    expires_after="2026-01-18">
+  <owner>agale@chromium.org</owner>
+  <owner>top-chrome-desktop-ui@google.com</owner>
+  <summary>
+    When a split tab is created, records the method through which it was
+    created.
   </summary>
 </histogram>
 

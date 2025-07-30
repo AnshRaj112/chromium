@@ -65,6 +65,7 @@
 <translation id="1263433075299269530">ਤੁਹਾਡੀ ਆਖਰੀ ਵਾਰ ਖੋਲ੍ਹੀ ਗਈ ਟੈਬ</translation>
 <translation id="1264156759663453185">ਅੰਸ਼ਕ ਅਨੁਵਾਦ ਲਈ ਚੁਣੀ ਗਈ ਲਿਖਤ ਬਹੁਤ ਜ਼ਿਆਦਾ ਵੱਡੀ ਹੈ।</translation>
 <translation id="1264974993859112054">ਖੇਡਾਂ</translation>
+<translation id="126737128831326059">ਨਿਰਯਾਤ ਕਰਨਾ ਸਫਲ ਰਿਹਾ</translation>
 <translation id="1272079795634619415">ਰੋਕੋ</translation>
 <translation id="1273416271143914096">{count,plural, =1{{count} ਪਾਸਵਰਡ}one{{count} ਪਾਸਵਰਡ}other{{count} ਪਾਸਵਰਡ}}</translation>
 <translation id="1275718070701477396">ਚੁਣਿਆ ਗਿਆ</translation>
@@ -140,6 +141,7 @@
 <translation id="1520027731907768768">ਤੁਹਾਡੇ ਵੱਲੋਂ ਟਰੈਕ ਕੀਤੇ ਜਾਣ ਵਾਲੇ ਉਤਪਾਦਾਂ ਲਈ ਕੀਮਤਾਂ ਘਟਣ ਸੰਬੰਧੀ ਅਲਰਟ ਪ੍ਰਾਪਤ ਕਰੋ।</translation>
 <translation id="1521366073263497277">ਆਪਣੇ ਟੈਬ ਗਰਿੱਡ 'ਤੇ ਜਾਓ</translation>
 <translation id="1521774566618522728">ਅੱਜ ਕਿਰਿਆਸ਼ੀਲ</translation>
+<translation id="1523567067736644845">ਪਾਸਵਰਡ ਦਿਖਾਉਣ ਲਈ ਅਣਲਾਕ ਕਰੋ</translation>
 <translation id="1524563461097350801">ਨਹੀਂ, ਧੰਨਵਾਦ</translation>
 <translation id="1531038290222364269">ਟੈਬਾਂ ਦਿਖਾਓ</translation>
 <translation id="1536390784834419204">ਪੰਨੇ ਦਾ ਅਨੁਵਾਦ ਕਰੋ</translation>
@@ -167,6 +169,7 @@
 <translation id="1641113438599504367">ਸੁਰੱਖਿਅਤ ਬ੍ਰਾਊਜ਼ਿੰਗ</translation>
 <translation id="1644574205037202324">ਇਤਿਹਾਸ</translation>
 <translation id="164673457281113247">{count,plural, =1{ਬੁੱਕਮਾਰਕ ਰੱਖਿਅਤ ਕੀਤਾ ਗਿਆ}one{ਬੁੱਕਮਾਰਕ ਰੱਖਿਅਤ ਕੀਤਾ ਗਿਆ}other{ਬੁੱਕਮਾਰਕ ਰੱਖਿਅਤ ਕੀਤੇ ਗਏ}}</translation>
+<translation id="1651260071709244114">ਐਪਾਂ</translation>
 <translation id="1652051421944182562">ਸੁਰੱਖਿਆ ਜਾਂਚ ਸੂਚਨਾਵਾਂ ਨੂੰ ਚਾਲੂ ਕਰੋ…</translation>
 <translation id="1652333207707886577">ਆਪਣੇ ਮੀਨੂ ਨੂੰ ਵਿਉਂਤਬੱਧ ਕਰੋ</translation>
 <translation id="1653274177966208838">{TIME,plural, =0{ਬਾਕੀ ਸਮਾਂ: {TIME} ਸਕਿੰਟ}=1{ਬਾਕੀ ਸਮਾਂ: {TIME} ਸਕਿੰਟ}other{ਬਾਕੀ ਸਮਾਂ: {TIME} ਸਕਿੰਟ}}</translation>
@@ -309,6 +312,7 @@
 <translation id="218350106843433823">ਪਾਸਵਰਡ ਅਤੇ ਪਾਸਕੀਆਂ ਨੂੰ ਆਟੋਫਿਲ ਕਰਨ ਦੀ ਸੁਵਿਧਾ</translation>
 <translation id="2184272387334793084">ਆਪਣੇ ਸਾਰੇ ਡੀਵਾਈਸਾਂ 'ਤੇ ਆਪਣੇ ਪਾਸਵਰਡ ਅਤੇ ਹੋਰ ਬਹੁਤ ਕੁਝ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਸਾਈਨ-ਇਨ ਕਰੋ</translation>
 <translation id="2186206192313702726">Google Lens</translation>
+<translation id="2188993354115194873"><ph name="BEGIN_BOLD" />ਡਾਊਨਲੋਡ ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੋ<ph name="END_BOLD" /> 'ਤੇ ਟੈਪ ਕਰੋ</translation>
 <translation id="219283042927675668">ਗਰੁੱਪ ਵਿਚਲੇ ਟੈਬ</translation>
 <translation id="2194856509914051091">ਵਿਚਾਰੇ ਜਾਣ ਵਾਲੀਆਂ ਚੀਜ਼ਾਂ</translation>
 <translation id="2196428379625389579">ਵੈੱਬ 'ਤੇ ਖੋਜੋ</translation>
@@ -321,7 +325,6 @@
 <translation id="2220529011494928058">ਇੱਕ ਸਮੱਸਿਆ ਦੀ ਰਿਪੋਰਟ ਕਰੋ</translation>
 <translation id="2223461067862937305">QR ਕੋਡ ਬਣਾਓ</translation>
 <translation id="2225701818156393674">ਉਤਪਾਦ ਨੂੰ ਤੁਹਾਡੀ "ਟਰੈਕ ਕੀਤੇ ਉਤਪਾਦ" ਸੂਚੀ ਵਿੱਚ ਸ਼ਾਮਲ ਕੀਤਾ ਗਿਆ।</translation>
-<translation id="2229345671837147090">ਰਿਮੋਟ ਟੈਬ ਗਰਿੱਡ</translation>
 <translation id="2230173723195178503">ਵੈੱਬਪੰਨਾ ਲੋਡ ਕੀਤਾ ਗਿਆ</translation>
 <translation id="2236949375853147973">ਮੇਰੀ ਸਰਗਰਮੀ</translation>
 <translation id="2240256190924001613">ਸੰਰੂਪਣ ਪ੍ਰੋਫਾਈਲ ਉਪਲਬਧ ਹੈ</translation>
@@ -363,6 +366,7 @@
 <translation id="236977714248711277">ਸਾਈਟਾਂ ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਿੰਗ ਅਨੁਭਵ ਨੂੰ ਬਿਹਤਰ ਬਣਾਉਣ ਲਈ ਕੁਕੀਜ਼ ਨੂੰ ਨਹੀਂ ਵਰਤ ਸਕਦੀਆਂ, ਉਦਾਹਰਨ ਲਈ, ਤੁਹਾਨੂੰ ਸਾਈਨ-ਇਨ ਜਾਂ ਤੁਹਾਡੇ ਖਰੀਦਦਾਰੀ ਕਾਰਟ ਵਿਚਲੀਆਂ ਆਈਟਮਾਂ ਨੂੰ ਯਾਦ ਰੱਖਣ ਲਈ।
 
 ਸਾਈਟਾਂ ਵੱਖ-ਵੱਖ ਸਾਈਟਾਂ ਵਿਚਲੀ ਤੁਹਾਡੀ ਬ੍ਰਾਊਜ਼ਿੰਗ ਸਰਗਰਮੀ ਦੇਖਣ ਲਈ ਕੁਕੀਜ਼ ਨੂੰ ਨਹੀਂ ਵਰਤ ਸਕਦੀਆਂ, ਉਦਾਹਰਨ ਲਈ, ਵਿਗਿਆਪਨਾਂ ਨੂੰ ਵਿਅਕਤੀਗਤ ਬਣਾਉਣ ਲਈ।</translation>
+<translation id="2377230674627603057">ਟੈਬ ਗਰੁੱਪ ਗਰਿੱਡ</translation>
 <translation id="2377336083033403521">ਟੈਬਾਂ ਖੋਜੋ…</translation>
 <translation id="2381405137052800939">ਮੂਲ-ਸਿਧਾਂਤ</translation>
 <translation id="2384692388811649784">ਇਨਕੋਗਨਿਟੋ ਟੈਬਾਂ ਨੂੰ ਲੁਕਾਓ</translation>
@@ -537,7 +541,6 @@
 <translation id="3081338492074632642">ਪੱਕਾ ਕਰੋ ਕਿ ਤੁਹਾਡੇ ਵੱਲੋਂ ਰੱਖਿਅਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਪਾਸਵਰਡ <ph name="WEBSITE" /> ਦੇ ਤੁਹਾਡੇ ਪਾਸਵਰਡ ਨਾਲ ਮੇਲ ਖਾਂਦਾ ਹੋਵੇ</translation>
 <translation id="3087734570205094154">ਹੇਠਲਾ</translation>
 <translation id="309710370695886264">ਤੁਹਾਡਾ 1 ਮੁੜ-ਵਰਤਿਆ ਪਾਸਵਰਡ ਹੈ। ਸੁਰੱਖਿਅਤ ਰਹਿਣ ਲਈ ਇਸਨੂੰ ਹੁਣੇ ਠੀਕ ਕਰੋ।</translation>
-<translation id="3102790820790869053">ਹਾਲੀਆ ਟੈਬਾਂ ਖੋਜੋ</translation>
 <translation id="3106258548858559536">ਪੜ੍ਹਨ ਸੰਬੰਧੀ ਮੋਡ ਬੰਦ ਕਰੋ</translation>
 <translation id="3106690631878101882">'ਅਨੁਵਾਦ ਕਰੋ' ਲੁਕਾਓ</translation>
 <translation id="310900540163454140">ਕੀ <ph name="WEBSITE" /> ਦਾ ਪਾਸਵਰਡ ਮਿਟਾਉਣਾ ਹੈ?</translation>
@@ -560,6 +563,7 @@
 <translation id="3174662312949010067">ਰੱਖਿਅਤ ਕੀਤੇ ਪਾਸਵਰਡ ਤੁਹਾਡੇ ਹੋਰ ਡੀਵਾਈਸਾਂ 'ਤੇ ਵੀ ਵਰਤੇ ਜਾ ਸਕਦੇ ਹਨ।</translation>
 <translation id="3177338796769255211">ਆਪਣੇ ਸਾਰੇ ਡੀਵਾਈਸਾਂ 'ਤੇ ਆਪਣੇ ਬੁੱਕਮਾਰਕ ਅਤੇ ਹੋਰ ਬਹੁਤ ਕੁਝ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਸਾਈਨ-ਇਨ ਕਰੋ</translation>
 <translation id="3181954750937456830">ਸੁਰੱਖਿਅਤ ਬ੍ਰਾਊਜ਼ਿੰਗ (ਖਤਰਨਾਕ ਸਾਈਟਾਂ ਤੋਂ ਤੁਹਾਡੀ ਅਤੇ ਤੁਹਾਡੇ ਡੀਵਾਈਸ ਦੀ ਸੁਰੱਖਿਆ ਕਰਦੀ ਹੈ)</translation>
+<translation id="3186796054637504691">ਇਤਿਹਾਸ ਅਤੇ ਵੈੱਬਸਾਈਟ ਡਾਟਾ ਕਲੀਅਰ ਕਰੋ</translation>
 <translation id="3190736958609431397">ਟਰੈਕਿੰਗ ਬੰਦ ਕਰੋ</translation>
 <translation id="3208260410153224535">ਤੁਹਾਡੀ ਸੰਸਥਾ ਨੇ ਸਾਈਨ-ਇਨ ਕਰਨ ਦੀ ਸੁਵਿਧਾ ਨੂੰ ਬੰਦ ਕਰ ਦਿੱਤਾ ਹੈ। ਨਵੇਂ ਬੁੱਕਮਾਰਕਾਂ, ਪਾਸਵਰਡਾਂ ਅਤੇ ਹੋਰ ਬਹੁਤ ਕੁਝ ਨੂੰ ਸਿਰਫ਼ ਇਸ ਡੀਵਾਈਸ 'ਤੇ ਰੱਖਿਅਤ ਕੀਤਾ ਜਾਵੇਗਾ।</translation>
 <translation id="3213807041830307252">ਤੁਹਾਨੂੰ ਜਿਹੜੀਆਂ ਚੀਜ਼ਾਂ ਦਿਖ ਰਹੀਆਂ ਹਨ, ਉਨ੍ਹਾਂ ਨੂੰ ਕੈਮਰੇ ਅਤੇ ਫ਼ੋਟੋ ਗੈਲਰੀ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਖਰੀਦੋ, ਅਨੁਵਾਦ ਕਰੋ ਅਤੇ ਉਨ੍ਹਾਂ ਦੀ ਪਛਾਣ ਕਰੋ।</translation>
@@ -648,11 +652,9 @@
 <translation id="3581564640715911333">ਹੋਰ ਭਾਸ਼ਾਵਾਂ ਵਿੱਚ ਪੰਨਿਆਂ ਦਾ ਅਨੁਵਾਦ ਕਰਨ ਲਈ ਪੇਸ਼ਕਸ਼ ਕਰੋ</translation>
 <translation id="3587885837929752825">ਤੁਹਾਡੀ ਸੰਸਥਾ ਇਹ ਸੀਮਤ ਕਰਦੀ ਹੈ ਕਿ ਤੁਸੀਂ ਆਪਣੇ Google ਖਾਤੇ ਵਿੱਚ ਕਿਸ ਤਰ੍ਹਾਂ ਦਾ ਡਾਟਾ ਰੱਖਿਅਤ ਕਰ ਸਕਦੇ ਹੋ।</translation>
 <translation id="3588820906588687999">ਨਵੀਂ ਟੈਬ ਵਿੱਚ ਚਿੱਤਰ ਖੋਲ੍ਹੋ</translation>
-<translation id="3591006724568464696">ਹਾਲੀਆਂ ਟੈਬਾਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ</translation>
 <translation id="3595252146048399851">ਤੁਸੀਂ <ph name="BEGIN_LINK" />ਸੈਟਿੰਗਾਂ<ph name="END_LINK" /> ਵਿੱਚ ਇਹ ਕਿਸੇ ਵੀ ਵੇਲੇ ਚੁਣ ਸਕਦੇ ਹੋ ਕਿ ਕੀ ਸਿੰਕ ਕਰਨਾ ਹੈ। Google ਤੁਹਾਡੇ ਇਤਿਹਾਸ ਦੇ ਆਧਾਰ 'ਤੇ Search ਅਤੇ ਹੋਰ ਸੇਵਾਵਾਂ ਨੂੰ ਵਿਅਕਤੀਗਤ ਬਣਾ ਸਕਦਾ ਹੈ।</translation>
 <translation id="3596414637720633074">ਇਨਕੋਗਨਿਟੋ ਵਿੱਚ ਤੀਜੀ-ਧਿਰ ਦੀਆਂ ਕੁਕੀਜ਼ ਨੂੰ ਬਲਾਕ ਕਰੋ</translation>
 <translation id="3602260545951981695">"ਵਿਸਤ੍ਰਿਤ ਸੁਰੱਖਿਆ" ਚੁਣੋ</translation>
-<translation id="3608436266458100337">ਪਾਠਕ ਮੋਡ</translation>
 <translation id="3610041351087301930">ਰੀਡਰ ਮੋਡ ਲੁਕਾਓ</translation>
 <translation id="3622175633937495219">ਖੋਜ ਇਤਿਹਾਸ (<ph name="COUNT" /> ਮੇਲ ਖਾਂਦੀਆਂ ਆਈਟਮਾਂ ਮਿਲੀਆਂ)</translation>
 <translation id="3625008969091706597">ਤੁਸੀਂ ਪਿੱਛੇ ਜਾਣ ਲਈ ਕੋਨੇ 'ਤੇ ਸਵਾਈਪ ਕਰ ਸਕਦੇ ਹੋ।</translation>
@@ -702,6 +704,7 @@
 <translation id="3851938967634752633"><ph name="WEBSITE" />, <ph name="SECOND_WEBSITE" />, ਅਤੇ ਹੋਰ <ph name="NUMBER_OF_ACCOUNTS" /> ਦੇ ਪਾਸਵਰਡਾਂ ਨੂੰ ਮਿਟਾ ਦਿੱਤਾ ਜਾਵੇਗਾ। ਤੁਹਾਡੇ ਖਾਤਿਆਂ ਨੂੰ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾਵੇਗਾ।</translation>
 <translation id="3853162385423733133">ਆਪਣੇ Google ਖਾਤੇ <ph name="EMAIL" /> ਵਿੱਚ ਪਾਸਵਰਡਾਂ ਨੂੰ ਵਰਤਣਾ ਅਤੇ ਉਨ੍ਹਾਂ ਨੂੰ ਰੱਖਿਅਤ ਕਰਨਾ ਜਾਰੀ ਰੱਖੋ</translation>
 <translation id="3853873210696342070">ਆਯਾਤ ਕਰੋ</translation>
+<translation id="3857113360369572832"><ph name="BEGIN_BOLD" />Safari ਸੈਟਿੰਗਾਂ<ph name="END_BOLD" /> ਖੋਲ੍ਹੋ</translation>
 <translation id="3858860766373142691">ਨਾਮ</translation>
 <translation id="3868495844258915202">ਪੂਰਾ URL ਦਿਖਾਓ</translation>
 <translation id="3875783148670536197">ਮੈਨੂੰ ਤਰੀਕਾ ਦਿਖਾਓ</translation>
@@ -892,7 +895,6 @@
 <translation id="4611811151908969241">'<ph name="DOMAIN_NAME" /> ਦਾ ਅਨੁਸਰਣ ਕਰਨਾ ਬੰਦ ਕਰੋ' ਨੂੰ ਲੁਕਾਓ</translation>
 <translation id="461440297010471931">Google ਨਾਲ ਖੋਜ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ</translation>
 <translation id="4619564267100705184">ਆਪਣੀ ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ</translation>
-<translation id="4619615317237390068">ਹੋਰ ਡੀਵਾਈਸਾਂ ਤੋਂ ਟੈਬਾਂ</translation>
 <translation id="4621768135601674446">ਪੜ੍ਹਨ ਸੰਬੰਧੀ ਮੋਡ ਦੇ ਵਿਕਲਪ ਖੋਲ੍ਹੋ</translation>
 <translation id="4624080227980645783">ਨਵੀਂ ਇਨਕੋਗਨਿਟੋ ਵਿੰਡੋ</translation>
 <translation id="4627107755957573804">ਸਾਈਟਾਂ ਅਤੇ ਐਪਾਂ ਨੂੰ ਮੌਜੂਦਾ ਖਾਤਿਆਂ ਨੂੰ ਅੱਪਗ੍ਰੇਡ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ, ਤਾਂ ਜੋ ਉਹ ਪਾਸਕੀਆਂ ਦੀ ਵਰਤੋਂ ਕਰ ਸਕਣ</translation>
@@ -1234,6 +1236,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="5869522115854928033">ਸੁਰੱਖਿਅਤ ਕੀਤੇ ਪਾਸਵਰਡ</translation>
 <translation id="5873179562631407582">ਕਿਸੇ ਵੀ ਖੁੱਲ੍ਹੀ ਟੈਬ 'ਤੇ ਟੈਪ ਕਰੋ ਅਤੇ ਦਬਾਈ ਰੱਖੋ</translation>
 <translation id="5878899964490256268"><ph name="EMAIL" />. ਤੁਹਾਡੀ ਸੰਸਥਾ ਵੱਲੋਂ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।</translation>
+<translation id="5887400589839399685">ਕਾਰਡ ਰੱਖਿਅਤ ਕੀਤਾ ਗਿਆ</translation>
 <translation id="5888889603768021126">ਇਸ ਨਾਲ ਸਾਈਨ-ਇਨ ਕੀਤਾ ਗਿਆ</translation>
 <translation id="5889333064153755823">ਬ੍ਰਾਊਜ਼ਿੰਗ ਡਾਟਾ ਮਿਟਾਓ</translation>
 <translation id="5896576662943111387">iOS ਲਈ ਬਣਾਇਆ ਗਿਆ</translation>
@@ -1334,9 +1337,11 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="6234310016144827337">ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ</translation>
 <translation id="6234438496206735891">ਡਾਊਨਲੋਡ ਦਿਖਾਓ</translation>
 <translation id="6236952928980352967">ਚਿਤਾਵਨੀ ਨੂੰ ਮੁੜ-ਬਹਾਲ ਕਰੋ</translation>
+<translation id="623755660902014047">ਪੜ੍ਹਨ ਦਾ ਮੋਡ</translation>
 <translation id="6247557882553405851">Google Password Manager</translation>
 <translation id="6251835855431997163"><ph name="VALUE" /> ਆਟੋਫਿਲ ਕਰੋ</translation>
 <translation id="6254066287920239840">ਲਿੰਕਾਂ ਨੂੰ ਬ੍ਰਾਊਜ਼ਰ ਦੀ ਬਜਾਏ ਐਪ ਵਿੱਚ ਖੋਲ੍ਹੋ।</translation>
+<translation id="6259928806013786178">ਪੜ੍ਹਨ ਸੰਬੰਧੀ ਮੋਡ ਅਸਫਲ ਰਿਹਾ</translation>
 <translation id="6268773951964630964">ਕਾਪੀ ਕੀਤਾ ਚਿੱਤਰ ਖੋਜੋ</translation>
 <translation id="6271462272606946663">'ਮੋਬਾਈਲ ਸਾਈਟ ਲਈ ਬੇਨਤੀ ਕਰੋ' ਨੂੰ ਲੁਕਾਓ</translation>
 <translation id="6271824294945464304">ਪਾਸਵਰਡ ਨੂੰ ਸਾਂਝਾ ਕਰਨਾ</translation>
@@ -1592,6 +1597,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="7215621211572884440">ਪੌਪ-ਅੱਪਾਂ ਦੀ ਆਗਿਆ ਦਿੱਤੀ</translation>
 <translation id="7218491361283758048">ਜ਼ਿੱਪ ਕੋਡ</translation>
 <translation id="7221173315674413369">'ਨਵਾਂ ਕੀ ਹੈ' ਵਿੱਚ ਨਵੀਆਂ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਨੁਕਤਿਆਂ ਦੀ ਪੜਚੋਲ ਕਰੋ</translation>
+<translation id="7223134495231529579">ਡਾਊਨਲੋਡ ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੋ</translation>
 <translation id="722339453342442311">ਹੁਣ ਜਾਂਚ ਕਰੋ</translation>
 <translation id="7227235818314667565">ਸਾਂਝਾਕਰਨ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰੋ</translation>
 <translation id="7233006041370588369">ਭਰਨ ਲਈ ਕੋਈ ਪਾਸਵਰਡ ਚੁਣੋ।</translation>
@@ -1729,6 +1735,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="7781829728241885113">ਕੱਲ੍ਹ</translation>
 <translation id="7788868432173225918">ਵਿਸਤ੍ਰਿਤ ਦ੍ਰਿਸ਼ ਨੂੰ ਖਾਰਜ ਕਰੋ</translation>
 <translation id="7791543448312431591">ਜੋੜੋ</translation>
+<translation id="7795253248079882669"><ph name="BEGIN_BOLD" />ਨਿਰਯਾਤ ਕਰੋ <ph name="END_BOLD" /> 'ਤੇ ਟੈਪ ਕਰੋ</translation>
 <translation id="7801064017114765401">ਕੰਪਿਊਟਰ</translation>
 <translation id="7802239711290932774">ਸੁਝਾਏ ਗਏ ਪਾਸਵਰਡ ਦੀ ਵਰਤੋਂ ਕਰੋ</translation>
 <translation id="780301667611848630">ਨਹੀਂ ਧੰਨਵਾਦ</translation>
@@ -1816,7 +1823,6 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="8076492880354921740">ਟੈਬਾਂ</translation>
 <translation id="8079530767338315840">ਦੋਹਰਾਓ</translation>
 <translation id="8079602123447022758">ਇਹ ਸੈਟਿੰਗ ਪ੍ਰਬੰਧਿਤ ਹੈ, ਹੋਰ ਜਾਣਕਾਰੀ ਲਈ ਡਬਲ ਟੈਪ ਕਰੋ</translation>
-<translation id="8080028325999236607">ਸਾਰੀਆਂ ਟੈਬਸ ਬੰਦ ਕਰੋ</translation>
 <translation id="8084285576995584326">ਆਪਣੇ Google ਖਾਤੇ ਦੇ ਡਾਟੇ ਨੂੰ ਕੰਟਰੋਲ ਕਰੋ</translation>
 <translation id="809543534949702122">ਖੋਜ ਇਤਹਾਸ</translation>
 <translation id="8095985449280932182">{COUNT,plural, =1{ਤੁਹਾਡੇ ਵੱਲੋਂ ਨਾ ਵਰਤੀਆਂ ਜਾਣ ਵਾਲੀਆਂ ਟੈਬਾਂ ਨੂੰ {COUNT} ਦਿਨ ਬਾਅਦ ਇੱਥੇ ਲਿਜਾਇਆ ਜਾਂਦਾ ਹੈ}one{ਤੁਹਾਡੇ ਵੱਲੋਂ ਨਾ ਵਰਤੀਆਂ ਜਾਣ ਵਾਲੀਆਂ ਟੈਬਾਂ ਨੂੰ {COUNT} ਦਿਨ ਬਾਅਦ ਇੱਥੇ ਲਿਜਾਇਆ ਜਾਂਦਾ ਹੈ}other{ਤੁਹਾਡੇ ਵੱਲੋਂ ਨਾ ਵਰਤੀਆਂ ਜਾਣ ਵਾਲੀਆਂ ਟੈਬਾਂ ਨੂੰ {COUNT} ਦਿਨਾਂ ਬਾਅਦ ਇੱਥੇ ਲਿਜਾਇਆ ਜਾਂਦਾ ਹੈ}}</translation>
@@ -1840,6 +1846,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="8161614462829037225"><ph name="BIOMETRIC_AUTHENITCATION_TYPE" /> ਨਾਲ ਅਣਲਾਕ ਕਰੋ</translation>
 <translation id="8173034266693057059">ਲੰਬਾਈ</translation>
 <translation id="8182037667962849780">{count,plural, =1{{website_1} ਲਈ}=2{{website_1}, {website_2} ਲਈ}=3{{website_1}, {website_2} ਅਤੇ 1 ਹੋਰ ਲਈ}one{{website_1}, {website_2} ਅਤੇ {more_count} ਹੋਰ ਲਈ}other{{website_1}, {website_2} ਅਤੇ {more_count} ਹੋਰ ਲਈ}}</translation>
+<translation id="8185076488803799132">ਆਯਾਤ ਕਰੋ</translation>
 <translation id="8189615296021678665">ਅਗਲੀ ਵਾਰ ਸਾਈਨ-ਇਨ ਕਰਨ 'ਤੇ ਇਸ ਪਾਸਵਰਡ ਤੱਕ ਆਸਾਨੀ ਨਾਲ ਪਹੁੰਚ ਕਰਨ ਲਈ "ਰੱਖਿਅਤ ਕਰੋ" 'ਤੇ ਟੈਪ ਕਰੋ।</translation>
 <translation id="8193953846147532858"><ph name="BEGIN_LINK" />ਤੁਹਾਡੇ ਡੀਵਾਈਸ<ph name="END_LINK" /> · <ph name="EMAIL" /></translation>
 <translation id="8195191503358432289">ਪਾਸਵਰਡ ਸ਼ਾਮਲ ਕਰੋ</translation>
@@ -1856,6 +1863,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="8230355548492839438">ਪਿਛਲਾ ਲੱਭੋ</translation>
 <translation id="8232956427053453090">ਡਾਟਾ ਰੱਖੋ</translation>
 <translation id="8233237502828137700">ਬੈਨਰ ਪ੍ਰੋਮੋ ਬੰਦ ਕਰੋ</translation>
+<translation id="8258734532103758067">ਮੈਂ ਆਪਣਾ ਡਾਟਾ ਨਿਰਯਾਤ ਕਰ ਲਿਆ ਹੈ</translation>
 <translation id="8258999165172757081">ਸ਼ਾਮਲ ਕੀਤਾ ਗਿਆ</translation>
 <translation id="8261506727792406068">ਮਿਟਾਓ</translation>
 <translation id="82619448491672958">ਹੋਰ ਟੈਬਾਂ ਦੇਖੋ</translation>
@@ -1924,6 +1932,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="8505361906966222822">ਇਸ ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੋ…</translation>
 <translation id="850600235656508448">ਇਨਕੋਗਨਿਟੋ ਵਿੱਚ ਖੋਲ੍ਹੋ</translation>
 <translation id="8511141513131731477">ਪਹਿਲੀ ਟੈਬ 'ਤੇ ਜਾਓ</translation>
+<translation id="8515534223594179607">ਬ੍ਰਾਊਜ਼ਿੰਗ ਡਾਟਾ ਨਿਰਯਾਤ ਕਰੋ</translation>
 <translation id="852075982791215701">ਆਖਰੀ ਟੈਬ 'ਤੇ ਜਾਓ</translation>
 <translation id="8522147671363140027">{count,plural, =1{{count} ਪਾਸਵਰਡ ਅਤੇ ਹੋਰ ਆਈਟਮਾਂ ਸਿਰਫ਼ ਇਸ ਡੀਵਾਈਸ 'ਤੇ ਰੱਖਿਅਤ ਕੀਤੀਆਂ ਗਈਆਂ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਆਪਣੇ ਹੋਰ ਡੀਵਾਈਸਾਂ 'ਤੇ ਵਰਤਣ ਲਈ, ਉਨ੍ਹਾਂ ਨੂੰ ਆਪਣੇ Google ਖਾਤੇ {email} ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੋ।}one{{count} ਪਾਸਵਰਡ ਅਤੇ ਹੋਰ ਆਈਟਮਾਂ ਸਿਰਫ਼ ਇਸ ਡੀਵਾਈਸ 'ਤੇ ਰੱਖਿਅਤ ਕੀਤੀਆਂ ਗਈਆਂ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਆਪਣੇ ਹੋਰ ਡੀਵਾਈਸਾਂ 'ਤੇ ਵਰਤਣ ਲਈ, ਉਨ੍ਹਾਂ ਨੂੰ ਆਪਣੇ Google ਖਾਤੇ {email} ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੋ।}other{{count} ਪਾਸਵਰਡ ਅਤੇ ਹੋਰ ਆਈਟਮਾਂ ਸਿਰਫ਼ ਇਸ ਡੀਵਾਈਸ 'ਤੇ ਰੱਖਿਅਤ ਕੀਤੀਆਂ ਗਈਆਂ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਆਪਣੇ ਹੋਰ ਡੀਵਾਈਸਾਂ 'ਤੇ ਵਰਤਣ ਲਈ, ਉਨ੍ਹਾਂ ਨੂੰ ਆਪਣੇ Google ਖਾਤੇ {email} ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੋ।}}</translation>
 <translation id="8524799873541103884"><ph name="INCOGNITO" /> <ph name="NUMBER_OF_OPEN_TABS" /> ਵਿੱਚੋਂ <ph name="LAST_VISIBLE_TAB" /> ਰਾਹੀਂ ਟੈਬਸ <ph name="FIRST_VISIBLE_TAB" /></translation>
@@ -1975,6 +1984,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="8680787084697685621">ਖਾਤਾ ਸਾਈਨ-ਇਨ ਵੇਰਵੇ ਪੁਰਾਣੇ ਹਨ।</translation>
 <translation id="8690752723634292147">ਮਿਟਾਉਣ ਦੀ ਤਸਦੀਕ ਕਰੋ</translation>
 <translation id="8692689525339542358">ਖਤਰਨਾਕ ਸਾਈਟਾਂ, ਡਾਊਨਲੋਡਾਂ ਅਤੇ ਐਕਸਟੈਂਸ਼ਨਾਂ ਤੋਂ ਸੁਰੱਖਿਆ ਪ੍ਰਾਪਤ ਕਰੋ।</translation>
+<translation id="8692897097252418799">ਉਹ ਡਾਟਾ ਚੁਣੋ ਜਿਸਨੂੰ ਤੁਸੀਂ ਨਿਰਯਾਤ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ</translation>
 <translation id="8694281486652655615">ਇਸ ਆਈਟਮ ਨੂੰ ਦਿਖਾਇਆ ਜਾਂਦਾ ਹੈ</translation>
 <translation id="8696297579102085705">ਆਪਣੇ ਡੀਵਾਈਸ 'ਤੇ ਭੇਜੋ</translation>
 <translation id="8697136149718343437">ਪਤਾ ਬਾਰ ਨੂੰ ਹੇਠਾਂ ਲਿਜਾਓ</translation>
@@ -2009,14 +2019,11 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="8796634520835503150">ਪੜ੍ਹਨ ਸੰਬੰਧੀ ਮੋਡ ਉਪਲਬਧ ਹੈ</translation>
 <translation id="8803526663383843427">ਚਾਲੂ ਹੋਣ 'ਤੇ</translation>
 <translation id="8803639129939845298">ਸੁਰੱਖਿਅਤ</translation>
-<translation id="8806823403540278281">ਤੁਹਾਡੀ ਸੰਸਥਾ ਲਈ ਤੁਹਾਨੂੰ ਨਿੱਜੀ ਤੌਰ 'ਤੇ ਬ੍ਰਾਊਜ਼ ਕਰਨ ਦੀ ਲੋੜ ਹੈ। ਇਨਕੋਗਨਿਟੋ ਮੋਡ ਵਿੱਚ ਟੈਬਾਂ ਰੱਖਿਅਤ ਨਹੀਂ ਹੁੰਦੀਆਂ ਹਨ।
-<ph name="BEGIN_LINK" />ਹੋਰ ਜਾਣੋ<ph name="END_LINK" /></translation>
 <translation id="8813277370772331957">ਮੈਨੂੰ ਬਾਅਦ ਵਿੱਚ ਯਾਦ ਕਰਵਾਓ</translation>
 <translation id="8814719628147284151">ਜਾਰੀ ਰੱਖੋ</translation>
 <translation id="8819155700324279105">ਆਨਲਾਈਨ ਖਤਰਿਆਂ ਤੋਂ ਬਚਣ ਲਈ ਸੁਰੱਖਿਆ ਦੀ ਇੱਕ ਵਾਧੂ ਤਹਿ ਸ਼ਾਮਲ ਕਰੋ</translation>
 <translation id="8820817407110198400">Bookmarks</translation>
 <translation id="8822421075653507124">ਇਹ ਪੱਕਾ ਕਰਨ ਲਈ ਕਿ ਇਸ ਡੀਵਾਈਸ ਦੀ ਸੁਰੱਖਿਅਤ ਵਰਤੋਂ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ, ਤੁਹਾਡੀ ਸੰਸਥਾ ਨੂੰ ਇਸਦੇ ਓਪਰੇਟਿੰਗ ਸਿਸਟਮ, ਬ੍ਰਾਊਜ਼ਰ, ਸੈਟਿੰਗਾਂ ਬਾਰੇ ਜਾਣਕਾਰੀ ਦੇਖਣ ਦੇ ਨਾਲ-ਨਾਲ ਇਹ ਵੀ ਦੇਖਣ ਦੀ ਲੋੜ ਹੋ ਸਕਦੀ ਹੈ ਕਿ ਡੀਵਾਈਸ 'ਤੇ ਕਿਹੜਾ ਸਾਫ਼ਟਵੇਅਰ ਸਥਾਪਤ ਕੀਤਾ ਗਿਆ ਹੈ।</translation>
-<translation id="8825562130641217944">ਆਪਣੇ ਬੁੱਕਮਾਰਕ, ਪਾਸਵਰਡ ਅਤੇ ਹੋਰ ਚੀਜ਼ਾਂ ਪ੍ਰਾਪਤ ਕਰੋ।</translation>
 <translation id="8831208860914609320">ਸਾਰੀਆਂ ਅਕਿਰਿਆਸ਼ੀਲ ਟੈਬਾਂ ਨੂੰ ਬੰਦ ਕਰੋ</translation>
 <translation id="8831944931153286232">ਪੜ੍ਹਨ ਸੂਚੀ ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ</translation>
 <translation id="8837654851594567190">ਪ੍ਰਕਾਸ਼ਕ ਮੁਤਾਬਕ ਕ੍ਰਮ-ਬੱਧ ਕਰੋ</translation>
@@ -2110,6 +2117,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="9144230693397287797">ਤੁਹਾਡੇ ਵੱਲੋਂ ਸੈੱਟ ਕੀਤੇ ਰਿਮਾਈਂਡਰਾਂ ਅਤੇ ਹੋਰ ਡੀਵਾਈਸਾਂ ਦੀਆਂ ਟੈਬਾਂ ਸੰਬੰਧੀ ਅੱਪਡੇਟ ਪ੍ਰਾਪਤ ਕਰੋ</translation>
 <translation id="914781932147356857">ਸਭ ਨਿਸ਼ਾਨਦੇਹ ਕਰੋ…</translation>
 <translation id="9148126808321036104">ਦੁਬਾਰਾ ਸਾਈਨ-ਇਨ ਕਰੋ</translation>
+<translation id="9149866541089851383">ਸੰਪਾਦਿਤ ਕਰੋ...</translation>
 <translation id="9159628751968616911">ਵੈੱਬ-ਪੰਨਾ ਭੇਜੋ</translation>
 <translation id="9162432979321511934">ਆਟੋਫਿਲ ਪਾਸਵਰਡ ਸੇਵਾ ਚਾਲੂ ਕਰੋ</translation>
 <translation id="9165320910061267720">ਕੀਮਤ ਘਟਣ ਸੰਬੰਧੀ ਅਲਰਟਾਂ ਬਾਰੇ ਸੂਚਨਾਵਾਂ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ, ਤੁਹਾਨੂੰ ਆਪਣੀਆਂ iOS ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਸੂਚਨਾਵਾਂ ਨੂੰ ਚਾਲੂ ਕਰਨ ਦੀ ਲੋੜ ਹੋਵੇਗੀ।</translation>
@@ -2131,6 +2139,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="939598580284253335">ਪਾਸਫਰੇਜ਼ ਦਾਖਲ ਕਰੋ</translation>
 <translation id="939736085109172342">ਨਵਾਂ ਫੋਲਡਰ</translation>
 <translation id="940409663738806563"><ph name="BEGIN_LINK" />ਦੇਖੋ ਕਿ ਤੁਸੀਂ ਕਿਸ ਚੀਜ਼ ਦਾ ਸਿੰਕ ਕਰ ਸਕਦੇ ਹੋ<ph name="END_LINK" /></translation>
+<translation id="942624946817804130">ਨਿਰਯਾਤ ਕਰੋ</translation>
 <translation id="945522503751344254">ਪ੍ਰਤੀਕਰਮ ਭੇਜੋ</translation>
 <translation id="94870150074703282">ਕੀ ਗਰੁੱਪ ਮਿਟਾਉਣਾ ਹੈ?</translation>
 <translation id="952704832371081537">ਰੱਦ ਕਰੋ</translation>

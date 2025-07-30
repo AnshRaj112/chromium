@@ -6558,18 +6558,31 @@ void NavigationRequest::CommitNavigation() {
   }
 
   // Sticky user activation should only be preserved for same-site subframe
-  // navigations. This is done to prevent newly navigated documents from
-  // re-using the sticky user activation state from the previously navigated
-  // document in the frame. We persist user activation across same-site
-  // navigations for compatibility reasons, and this does not need to match the
-  // same-site checks used in the process model. See: crbug.com/736415.
-  // TODO(crbug.com/40228985): Remove this once we find a way to reset
-  // activation unconditionally without breaking sites in practice.
+  // navigations, and same-origin top-frame navigations behind the feature flag
+  // StickyUserActivationAcrossSameOriginNavigation. These checks limit newly
+  // navigated documents from reusing the sticky user activation state from the
+  // previously navigated document in the frame.
+  //
+  // - We persist user activation across same-site navigations for compatibility
+  //   reasons, and this does not need to match the same-site checks used in the
+  //   process model. See https://crbug.com/40527366.
+  //
+  //   TODO(crbug.com/40228985): Remove this once we find a way to reset
+  //   activation unconditionally without breaking sites in practice.
+  //
+  // - The feature flag StickyUserActivationAcrossSameOriginNavigation relaxes
+  //   the preservation of sticky activation to include same-origin navigations
+  //   to ease multi-page app development which currently face problem with, for
+  //   example, virtual keyboards.  See https://crbug.com/433729626.
   commit_params_->should_have_sticky_user_activation =
-      !frame_tree_node_->IsMainFrame() &&
       old_frame_host->HasStickyUserActivation() &&
-      net::SchemefulSite::IsSameSite(old_frame_host->GetLastCommittedOrigin(),
-                                     origin_to_commit);
+      ((!frame_tree_node_->IsMainFrame() &&
+        net::SchemefulSite::IsSameSite(old_frame_host->GetLastCommittedOrigin(),
+                                       origin_to_commit)) ||
+       (base::FeatureList::IsEnabled(
+            blink::features::kStickyUserActivationAcrossSameOriginNavigation) &&
+        frame_tree_node_->IsMainFrame() &&
+        old_frame_host->GetLastCommittedOrigin() == origin_to_commit));
 
   // Generate a UKM source and track it on NavigationRequest. This will be
   // passed down to the blink::Document to be created, if any, and used for UKM
@@ -8487,6 +8500,24 @@ void NavigationRequest::UpdatePrivateNetworkRequestPolicy() {
     return;
   }
 
+  // Deprecation trial is to allow http sites to run LNA requests assuming the
+  // user grants the permission to the web site.
+  //
+  // Support for origin trial tokens in <meta> tags or programmatically are not
+  // supported, for the same reasons as in the previous PNA trial:
+  // https://developer.chrome.com/blog/private-network-access-update#register-deprecation-trial
+  if (!policies.is_web_secure_context &&
+      policies.allow_non_secure_local_network_access &&
+      base::FeatureList::IsEnabled(
+          network::features::kLocalNetworkAccessChecks)) {
+    web_features_to_log_.push_back(
+        blink::mojom::WebFeature::
+            kLocalNetworkAccessNonSecureContextAllowedDeprecationTrial);
+  }
+
+  // TODO(crbug.com/433300380): The lna_secure_context_overide check needs to be
+  // done in all other policy derivation points. This boolean should probably be
+  // put into PolicyContainerPolicies.
   private_network_request_policy_ = DerivePrivateNetworkRequestPolicy(
       policies, PrivateNetworkRequestContext::kSubresource);
 
@@ -8494,8 +8525,7 @@ void NavigationRequest::UpdatePrivateNetworkRequestPolicy() {
       ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
           kBlockInsteadOfWarn) {
     private_network_request_policy_ =
-        OverrideBlockWithWarn(DerivePrivateNetworkRequestPolicy(
-            policies, PrivateNetworkRequestContext::kSubresource));
+        OverrideBlockWithWarn(private_network_request_policy_);
   }
 }
 
@@ -9944,7 +9974,24 @@ NavigationRequest::BuildClientSecurityStateForNavigationFetch() {
     //
     // TODO(crbug.com/40258826): Determine how to treat guest views.
     case FrameType::kPrimaryMainFrame:
-    case FrameType::kGuestMainFrame:
+    case FrameType::kGuestMainFrame: {
+      if (!policy_container_builder_->InitiatorPolicies()) {
+        return nullptr;
+      }
+
+      network::mojom::ClientSecurityStatePtr state = DeriveClientSecurityState(
+          *policy_container_builder_->InitiatorPolicies(),
+          PrivateNetworkRequestContext::kMainFrameNavigation);
+
+      // Remove the initiator's COEP, it is unused. For iframes, the parent's
+      // COEP should be used: that is checked in `EnforceCOEP()`. The value
+      // in `ClientSecurityState` is used for subresources only, in which case
+      // the network service performs the check on behalf of the client.
+      state->cross_origin_embedder_policy =
+          network::CrossOriginEmbedderPolicy();
+
+      return state;
+    }
     case FrameType::kSubframe: {
       if (!policy_container_builder_->InitiatorPolicies()) {
         return nullptr;
@@ -9952,7 +9999,7 @@ NavigationRequest::BuildClientSecurityStateForNavigationFetch() {
 
       network::mojom::ClientSecurityStatePtr state = DeriveClientSecurityState(
           *policy_container_builder_->InitiatorPolicies(),
-          PrivateNetworkRequestContext::kNavigation);
+          PrivateNetworkRequestContext::kSubframeNavigation);
 
       // Remove the initiator's COEP, it is unused. For iframes, the parent's
       // COEP should be used: that is checked in `EnforceCOEP()`. The value
@@ -9980,23 +10027,6 @@ NavigationRequest::BuildClientSecurityStateForNavigationFetch() {
     // `is_embedder_initiated_fenced_frame_navigation_` to discriminate (1) from
     // (2).
     //
-    // NOTE: For an embedder initiated fenced frame navigation that is subject
-    // to private network access checks:
-    //
-    // 1. The preflight request is sent with an opaque origin: "Origin: null".
-    //    See: `FencedFrame::Navigate()`.
-    // 2. The credentials mode of the preflight request is "include". This
-    //    prevents response header `Access-Control-Allow-Origin: '*'` from
-    //    working. The response header must explicitly specify the origin.
-    // 3. However, we cannot know the origin because of (1).
-    // 4. It is also unsafe to respond to the preflight with response header
-    //    `Access-Control-Allow-Origin: 'null'`. See:
-    //    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
-    //
-    // This implies there is a limitation for fenced frames that send a
-    // preflight request because of private network access. Fenced frame
-    // embedder initiated private network accesses always fail.
-    //
     // NOTE: Fenced frames always have an outer document,
     // `GetParentFrameOrOuterDocument()` is never nullptr.
     case FrameType::kFencedFrameRoot: {
@@ -10005,14 +10035,11 @@ NavigationRequest::BuildClientSecurityStateForNavigationFetch() {
 
       // TODO(crbug.com/40258851): Remove COEP from
       // `client_security_state`, see the reasoning for subframes above.
-
-      // TODO(crbug.com/40258851): Consider enabling PNA for fenced
-      // frames independently of PNA for iframes.
       client_security_state->private_network_request_policy =
           DerivePrivateNetworkRequestPolicy(
               client_security_state->ip_address_space,
-              client_security_state->is_web_secure_context,
-              PrivateNetworkRequestContext::kNavigation);
+              client_security_state->is_web_secure_context, false,
+              PrivateNetworkRequestContext::kFencedFrameNavigation);
 
       return client_security_state;
     }
@@ -10256,6 +10283,24 @@ void NavigationRequest::ComputePoliciesToCommit() {
       CalculateIPAddressSpace(url, response_head_.get(),
                               GetContentClient()->browser());
   policy_container_builder_->SetIPAddressSpace(response_address_space);
+
+  // Deprecation trial is to allow http sites to run LNA requests assuming the
+  // user grants the permission to the web site.
+  //
+  // We don't set the use counter here yet because we only want to count the
+  // number of times this is actually included on a non-secure context, and
+  // whether a context is secure or not is computed later.
+  if (base::FeatureList::IsEnabled(
+          network::features::kLocalNetworkAccessChecks) &&
+      // If there is no response or no headers in the response, there are
+      // definitely no trial token headers.
+      response_head_ && response_head_->headers &&
+      blink::TrialTokenValidator().RequestEnablesDeprecatedFeature(
+          common_params_->url, response_head_->headers.get(),
+          "LocalNetworkAccessNonSecureContextAllowed", base::Time::Now())) {
+    policy_container_builder_->SetLocalNetworkAccessNonSecureContextAllowed(
+        true);
+  }
 
   if (!devtools_instrumentation::ShouldBypassCSP(*this)) {
     if (response_head_) {
@@ -10782,16 +10827,12 @@ NavigationRequest::ComputeCrossOriginIsolationKey() {
   // differences. To avoid this, we return the current CrossOriginIsolationKey
   // if the navigation is same-origin.
   if (!policy_container_builder_->HasComputedPolicies()) {
-    if (origin.IsSameOriginWith(frame_tree_node_->current_origin()) &&
-        frame_tree_node_->current_frame_host()
-            ->GetSiteInstance()
-            ->GetSiteInfo()
-            .agent_cluster_key()) {
+    if (origin.IsSameOriginWith(frame_tree_node_->current_origin())) {
       return frame_tree_node_->current_frame_host()
           ->GetSiteInstance()
           ->GetSiteInfo()
           .agent_cluster_key()
-          ->GetCrossOriginIsolationKey();
+          .GetCrossOriginIsolationKey();
     }
     return std::nullopt;
   }

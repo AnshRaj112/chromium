@@ -8,6 +8,7 @@
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/timer/timer.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/password_manager/password_change/change_password_form_waiter.h"
 #include "components/optimization_guide/content/browser/page_content_proto_provider.h"
@@ -33,12 +34,14 @@ class ChangePasswordFormFinder {
   static constexpr base::TimeDelta kFormWaitingTimeout = base::Seconds(30);
   using ChangePasswordFormFoundCallback =
       base::OnceCallback<void(password_manager::PasswordFormManager*)>;
+  using LoginFormFoundCallback = base::OnceCallback<void()>;
 
   ChangePasswordFormFinder(content::WebContents* web_contents,
                            password_manager::PasswordManagerClient* client,
                            ModelQualityLogsUploader* logs_uploader,
                            const GURL& change_password_url,
-                           ChangePasswordFormFoundCallback callback);
+                           ChangePasswordFormFoundCallback callback,
+                           LoginFormFoundCallback login_form_found_callback);
 
   ChangePasswordFormFinder(
       base::PassKey<class ChangePasswordFormFinderTest>,
@@ -47,6 +50,7 @@ class ChangePasswordFormFinder {
       ModelQualityLogsUploader* logs_uploader,
       const GURL& change_password_url,
       ChangePasswordFormFoundCallback callback,
+      LoginFormFoundCallback login_form_found_callback,
       base::OnceCallback<void(optimization_guide::OnAIPageContentDone)>
           capture_annotated_page_content);
 
@@ -90,6 +94,7 @@ class ChangePasswordFormFinder {
   const GURL change_password_url_;
 
   ChangePasswordFormFoundCallback callback_;
+  LoginFormFoundCallback login_form_found_callback_;
 
   base::OnceCallback<void(optimization_guide::OnAIPageContentDone)>
       capture_annotated_page_content_;
@@ -97,6 +102,8 @@ class ChangePasswordFormFinder {
   std::unique_ptr<PasswordFormWaiter> form_waiter_;
 
   std::unique_ptr<ButtonClickHelper> click_helper_;
+
+  base::OneShotTimer timeout_timer_;
 
   base::WeakPtrFactory<ChangePasswordFormFinder> weak_ptr_factory_{this};
 };

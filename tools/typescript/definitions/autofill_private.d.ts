@@ -59,7 +59,6 @@ declare global {
         CREDIT_CARD_TYPE,
         CREDIT_CARD_VERIFICATION_CODE,
         COMPANY_NAME,
-        FIELD_WITH_DEFAULT_VALUE,
         MERCHANT_EMAIL_SIGNUP,
         MERCHANT_PROMO_CODE,
         PASSWORD,
@@ -154,7 +153,8 @@ declare global {
         LOCAL_OR_SYNCABLE = 'LOCAL_OR_SYNCABLE',
         ACCOUNT = 'ACCOUNT',
         ACCOUNT_HOME = 'ACCOUNT_HOME',
-        ACCOUNT_WORK = 'ACCOUNT_WORK'
+        ACCOUNT_WORK = 'ACCOUNT_WORK',
+        ACCOUNT_NAME_EMAIL = "ACCOUNT_NAME_EMAIL"
       }
 
       export enum AttributeTypeDataType {

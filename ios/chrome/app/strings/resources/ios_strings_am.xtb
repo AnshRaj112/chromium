@@ -140,6 +140,7 @@
 <translation id="1520027731907768768">ለሚከታተሏቸው ምርቶች የዋጋ ቅናሽ ማንቂያዎችን ይቀበሉ።</translation>
 <translation id="1521366073263497277">ወደ እርስዎ የትር ፍርግርግ ይሂዱ</translation>
 <translation id="1521774566618522728">ገባሪ ዛሬ</translation>
+<translation id="1523567067736644845">የይለፍ ቃል ለማሳየት ይክፈቱ</translation>
 <translation id="1524563461097350801">አይ፣ አመሰግናለሁ</translation>
 <translation id="1531038290222364269">ትሮችን አሳይ</translation>
 <translation id="1536390784834419204">ገፅ ተርጉም</translation>
@@ -321,7 +322,6 @@
 <translation id="2220529011494928058">ችግር ሪፖርት አድርግ</translation>
 <translation id="2223461067862937305">QR ኮድ ፍጠር</translation>
 <translation id="2225701818156393674">ምርት ወደ የእርስዎ ክትትል የሚደረግባቸው ምርቶች ዝርዝር ታክሏል።</translation>
-<translation id="2229345671837147090">የርቀት መቆጣጠሪያ ትር ፍርግርግ</translation>
 <translation id="2230173723195178503">ድረ-ገፅ ተጭኗል</translation>
 <translation id="2236949375853147973">የእኔ እንቅስቃሴ</translation>
 <translation id="2240256190924001613">የውቅረት መገለጫ ይገኛል</translation>
@@ -363,6 +363,7 @@
 <translation id="236977714248711277">ጣቢያዎች የአሰሳዎን ተሞክሮ ለማሻሻል፣ ለምሳሌ እርስዎ በመለያ እንደገቡ ማቆየት ወይም በግዢ ጋሪዎ ውስጥ ንጥሎችን ለማስታወስ፣ ኩኪዎችን መጠቀም አይችሉም።
 
 ጣቢያዎች በተለያዩ ጣቢያዎች ላይ የእርስዎን የአሰሳ እንቅስቃሴ ለመመልከት፣ ለምሳሌ ማስታወቂያዎችን ግላዊነት ለማላበስ፣ ኩኪዎችን መጠቀም አይችሉም።</translation>
+<translation id="2377230674627603057">የትር ቡድኖች ፍርግርግ</translation>
 <translation id="2377336083033403521">ትሮችን ይፈልጉ…</translation>
 <translation id="2381405137052800939">መሠረታዊ ነገሮች</translation>
 <translation id="2384692388811649784">ማንነት የማያሳውቁ ትሮችን ደብቅ</translation>
@@ -537,7 +538,6 @@
 <translation id="3081338492074632642">እያስቀመጡት ያለው የይለፍ ቃል ከ<ph name="WEBSITE" /> ይለፍ ቃል ጋር የሚዛመድ መሆኑን ያረጋግጡ</translation>
 <translation id="3087734570205094154">ግርጌ</translation>
 <translation id="309710370695886264">1 ዳግም ጥቅም ላይ የዋለ የይለፍ ቃል አለዎት። ደህንነትዎን እንደተጠበቀ ለማቆየት አሁን ያስተካክሉት።</translation>
-<translation id="3102790820790869053">የቅርብ ጊዜ ትሮችን ይፈልጉ</translation>
 <translation id="3106258548858559536">የንባብ ሁነታ ያጥፉ</translation>
 <translation id="3106690631878101882">መተርጎሚያን ደብቅ</translation>
 <translation id="310900540163454140">የ<ph name="WEBSITE" /> የይለፍ ቃል ይሰረዝ?</translation>
@@ -648,11 +648,9 @@
 <translation id="3581564640715911333">በሌሎች ቋንቋዎች ለመተርጎም ሐሳብ አቅርብ</translation>
 <translation id="3587885837929752825">ድርጅትዎ በGoogle መለያዎ ውስጥ ማስቀመጥ የሚችሉትን ነገር ይገድባል።</translation>
 <translation id="3588820906588687999">ምስሉን በአዲስ ትር ውስጥ ክፈት</translation>
-<translation id="3591006724568464696">የቅርብ ጊዜ ትሮች አይገኙም</translation>
 <translation id="3595252146048399851"><ph name="BEGIN_LINK" />ቅንብሮች<ph name="END_LINK" /> ውስጥ በማንኛውም ጊዜ ምን እንደሚያሰምሩ መምረጥ ይችላሉ። Google በእርስዎ ታሪክ ላይ በመመስረት ፍለጋን እና ሌሎች አገልግሎቶችን ግላዊነት ሊያላብስ ይችላል።</translation>
 <translation id="3596414637720633074">ማንነትን በማያሳውቅ ሁነታ ሦስተኛ ወገን ኩኪዎች ያግዱ</translation>
 <translation id="3602260545951981695">«የላቀ ጥበቃ» የሚለውን ይምረጡ</translation>
-<translation id="3608436266458100337">የአንባቢ ሁነታ</translation>
 <translation id="3610041351087301930">አንባቢን ደብቅ</translation>
 <translation id="3622175633937495219">የፍለጋ ታሪክ (<ph name="COUNT" /> ይገኛሉ)</translation>
 <translation id="3625008969091706597">ወደ ኋላ ለመሄድ ጠርዙን ማንሸራተት ይችላሉ።</translation>
@@ -892,7 +890,6 @@
 <translation id="4611811151908969241"><ph name="DOMAIN_NAME" /> አለመከተልን ደብቅ</translation>
 <translation id="461440297010471931">በGoogle መፈለግ</translation>
 <translation id="4619564267100705184">እርስዎ መሆንዎን ያረጋግጡ</translation>
-<translation id="4619615317237390068">ከሌሎች መሣሪያዎች የመጡ ትሮች</translation>
 <translation id="4621768135601674446">የንባብ ሁነታ አማራጮችን ክፈት</translation>
 <translation id="4624080227980645783">አዲስ ማንነትን የማያሳውቅ መስኮት</translation>
 <translation id="4627107755957573804">የይለፍ ቁልፎችን ለመጠቀም ጣቢያዎች እና መተግበሪያዎች ነባር መለያዎችን እንዲያሻሽሉ ፍቀድ</translation>
@@ -1234,6 +1231,7 @@ Handoff እንዲሁም በSettings ውስጥ ባለው የGeneral ክፍል ላ
 <translation id="5869522115854928033">የተቀመጡ የይለፍ ቃሎች</translation>
 <translation id="5873179562631407582">ማናቸውም ክፍት ትሮች ላይ መታ አድርገው ይያዙ</translation>
 <translation id="5878899964490256268"><ph name="EMAIL" />። በእርስዎ ድርጅት የሚተዳደር።</translation>
+<translation id="5887400589839399685">ካርድ ተቀምጧል</translation>
 <translation id="5888889603768021126">በሚከተለው በመለያ ተገብቷል</translation>
 <translation id="5889333064153755823">የአሰሳ ውሂብን ይሰርዙ</translation>
 <translation id="5896576662943111387">ለiOS የተገነባ</translation>
@@ -1334,9 +1332,11 @@ Handoff እንዲሁም በSettings ውስጥ ባለው የGeneral ክፍል ላ
 <translation id="6234310016144827337">ግንኙነትዎን ይፈትሹ እና እንደገና ይሞክሩ</translation>
 <translation id="6234438496206735891">ውርዶችን አሳይ</translation>
 <translation id="6236952928980352967">ማስጠንቀቂያን ወደነበረበት መልስ</translation>
+<translation id="623755660902014047">የንባብ ሁነታ</translation>
 <translation id="6247557882553405851">Google የይለፍ ቃል አስተዳዳሪ</translation>
 <translation id="6251835855431997163"><ph name="VALUE" />ን በራስ-ሙላ</translation>
 <translation id="6254066287920239840">አገናኞችን ከአሳሽ ይልቅ በመተግበሪያ ውስጥ ይክፈቱ።</translation>
+<translation id="6259928806013786178">የንባብ ሁነታ አልተሳካም</translation>
 <translation id="6268773951964630964">የተቀዳ ምስል ይፈልጉ</translation>
 <translation id="6271462272606946663">የተንቀሳቃሽ ስልክ ጣቢያ ይጠይቁን ደብቅ</translation>
 <translation id="6271824294945464304">የይለፍ ቃል በመጋራት ላይ</translation>
@@ -1816,7 +1816,6 @@ Handoff እንዲሁም በSettings ውስጥ ባለው የGeneral ክፍል ላ
 <translation id="8076492880354921740">ትሮች</translation>
 <translation id="8079530767338315840">ድገም</translation>
 <translation id="8079602123447022758">ይህ ቅንብር የሚተዳደር ነው፣ ለተጨማሪ መረጃ ሁለቴ መታ ያድርጉ</translation>
-<translation id="8080028325999236607">ሁሉንም ትሮች ይዝጉ</translation>
 <translation id="8084285576995584326">የእርስዎን የGoogle መለያ ውሂብ ይቆጣጠሩ</translation>
 <translation id="809543534949702122">ታሪክ ፈልግ</translation>
 <translation id="8095985449280932182">{COUNT,plural, =1{የማይጠቀሟቸው ትሮች ከ{COUNT} ቀን በኋላ ወደዚህ ይንቀሳቀሳሉ}one{የማይጠቀሟቸው ትሮች ከ{COUNT} ቀን በኋላ ወደዚህ ይንቀሳቀሳሉ}other{የማይጠቀሟቸው ትሮች ከ{COUNT} ቀናት በኋላ ወደዚህ ይንቀሳቀሳሉ}}</translation>
@@ -2009,14 +2008,11 @@ Handoff እንዲሁም በSettings ውስጥ ባለው የGeneral ክፍል ላ
 <translation id="8796634520835503150">የንባብ ሁነታ አይገኝም</translation>
 <translation id="8803526663383843427">ሲበራ</translation>
 <translation id="8803639129939845298">ደህንነቱ የተጠበቀ ነው</translation>
-<translation id="8806823403540278281">ድርጅትዎ በግል እንዲያሰሱ ይፈልግብዎታል። ትሮች ማንነት በማያሳውቅ ሁነታ ውስጥ አልተቀመጡም።
-<ph name="BEGIN_LINK" />የበለጠ ለመረዳት<ph name="END_LINK" /></translation>
 <translation id="8813277370772331957">ቆይተህ አስታውሰኝ</translation>
 <translation id="8814719628147284151">ቀጥል</translation>
 <translation id="8819155700324279105">ከመስመር ላይ ዛቻዎች ለመጠበቅ ተጨማሪ የጥበቃ ንብርብር ያክሉ</translation>
 <translation id="8820817407110198400">ዕልባቶች</translation>
 <translation id="8822421075653507124">ይህ መሣሪያ ደህንነቱ በተጠበቀ ሁኔታ ጥቅም ላይ መዋል መቻሉን ለማረጋገጥ ድርጅትዎ ስለሥርዓተ ክወናው፣ አሳሹ እና ቅንብሮቹ እና በመሣሪያው ላይ ምን ዓይነት ሶፍትዌር እንደተጫነ መረጃ ማየት ሊኖርበት ይችላል።</translation>
-<translation id="8825562130641217944">የእርስዎን እልባቶች፣ የይለፍ ቃላት እና ሌሎችንም ያግኙ።</translation>
 <translation id="8831208860914609320">ሁሉንም ገቢር ያልሆኑትን ዝጋ</translation>
 <translation id="8831944931153286232">ወደ የንባብ ዝርዝር አክል</translation>
 <translation id="8837654851594567190">በአታሚ ደርድር</translation>
@@ -2110,6 +2106,7 @@ Handoff እንዲሁም በSettings ውስጥ ባለው የGeneral ክፍል ላ
 <translation id="9144230693397287797">ላቀናበሯቸው አስታዋሾች እና ከሌሎች መሣሪያዎች ለመጡ ትሮች ዝማኔዎችን ይቀበሉ</translation>
 <translation id="914781932147356857">ሁሉንም ምልክት አድርግባቸው…</translation>
 <translation id="9148126808321036104">እንደገና ይግቡ</translation>
+<translation id="9149866541089851383">አርትዕ…</translation>
 <translation id="9159628751968616911">ድረ-ገፅ ይላኩ</translation>
 <translation id="9162432979321511934">የይለፍ ቃላት በራስ ሰር ሙላን ያብሩ</translation>
 <translation id="9165320910061267720">የዋጋ ቅነሳ ማንቂያዎችን ማሳወቂያዎች ለማግኘት በእርስዎ iOS ቅንብሮች ውስጥ ማሳወቂያዎችን ማብራት ይኖርብዎታል።</translation>

@@ -7,13 +7,20 @@
 
 #import <UIKit/UIKit.h>
 
+#import "ios/chrome/browser/reader_mode/ui/reader_mode_options_consumer.h"
+
 @protocol BWGCommands;
 @protocol LensOverlayCommands;
 @protocol PageActionMenuCommands;
+@protocol PageActionMenuViewControllerDelegate;
 @protocol ReaderModeCommands;
 
 // The view controller representing the presented page action menu UI.
-@interface PageActionMenuViewController : UIViewController
+@interface PageActionMenuViewController
+    : UIViewController <ReaderModeOptionsConsumer>
+
+// The delegate for this view controller.
+@property(nonatomic, weak) id<PageActionMenuViewControllerDelegate> delegate;
 
 // Initializes the view controller adapted to whether Reader Mode is currently
 // active.

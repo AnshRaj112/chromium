@@ -482,6 +482,11 @@ const char kDownloadedPDFOpeningName[] = "Enables downloaded PDF opening";
 const char kDownloadedPDFOpeningDescription[] =
     "Enables the direct opening of downloaded PDF files in Chrome";
 
+const char kDownloadListName[] = "Enable Download List";
+const char kDownloadListDescription[] =
+    "Controls the UI type for the download list. When enabled, allows "
+    "switching between default and custom UI implementations.";
+
 const char kEnableFeedHeaderSettingsName[] =
     "Enables the feed header settings.";
 const char kEnableFeedHeaderSettingsDescription[] =
@@ -594,11 +599,6 @@ const char kEnhancedSafeBrowsingPromoDescription[] =
     "When enabled, the Enhanced Safe Browsing inline and infobar promos are "
     "displayed given certain preconditions are met.";
 
-const char kEnterpriseRealtimeEventReportingOnIOSName[] =
-    "Enable realtime event reporting for Enterprise on iOS";
-const char kEnterpriseRealtimeEventReportingOnIOSDescription[] =
-    "When enabled, realtime events will be reported to the user's organization";
-
 const char kFeedBackgroundRefreshName[] = "Enable feed background refresh";
 const char kFeedBackgroundRefreshDescription[] =
     "Schedules a feed background refresh after some minimum period of time has "
@@ -637,10 +637,11 @@ const char kFullscreenPromosManagerSkipInternalLimitsDescription[] =
     "When enabled, the internal Impression Limits of the Promos Manager will "
     "be ignored; this is useful for local development.";
 
-const char kFullscreenTransitionName[] = "Fullscreen Transition Tweaks";
-const char kFullscreenTransitionDescription[] =
-    "When enabled, the transition of fullscreen is either delayed or the speed "
-    "of the transition is increased-decreased.";
+const char kFullscreenTransitionSpeedName[] =
+    "Fullscreen Transition Speed Tweaks";
+const char kFullscreenTransitionSpeedDescription[] =
+    "When enabled, the speed of the fullscreen' transition is "
+    "increased-decreased.";
 
 const char kFullscreenSmoothScrollingName[] = "Fullscreen Smooth Scrolling";
 const char kFullscreenSmoothScrollingDescription[] =
@@ -861,6 +862,12 @@ const char kIOSExpandedTipsName[] = "Expanded Tips Notifications";
 const char kIOSExpandedTipsDescription[] =
     "Enables a feature that adds several new Tips Notifications that can be "
     "sent.";
+
+const char kIOSOneTimeDefaultBrowserNotificationName[] =
+    "One-time default browser notification";
+const char kIOSOneTimeDefaultBrowserNotificationDescription[] =
+    "Enables a one-time notification to prompt the user to set the app as the "
+    "default browser.";
 
 const char kIOSProvidesAppNotificationSettingsName[] =
     "IOS Provides App Notification Settings";
@@ -1258,6 +1265,10 @@ const char kPageActionMenuDescription[] =
     "When enabled, the entry point for the Page Action Menu becomes available "
     "for actions relating to the web page.";
 
+const char kGeminiCrossTabName[] = "Gemini Cross Tab";
+const char kGeminiCrossTabDescription[] =
+    "When enabled, the Gemini floaty conversation persists across all tabs.";
+
 const char kBWGPromoConsentName[] = "BWG Promo Consent";
 const char kBWGPromoConsentDescription[] =
     "Whether the promo consent flow is composed of a single or a double screen "
@@ -1476,11 +1487,6 @@ const char kSharedHighlightingIOSDescription[] =
 const char kSetUpListShortenedDurationName[] = "Set Up List Shortened Duration";
 const char kSetUpListShortenedDurationDescription[] =
     "Reduces the Set Up List duration in the NTP to the selected parameter.";
-
-const char kSetUpListWithoutSignInItemName[] =
-    "Set Up List without sign-in item";
-const char kSetUpListWithoutSignInItemDescription[] =
-    "Removes the sign-in item from the Set Up List.";
 
 const char kShareInWebContextMenuIOSName[] = "Share in web context menu";
 const char kShareInWebContextMenuIOSDescription[] =

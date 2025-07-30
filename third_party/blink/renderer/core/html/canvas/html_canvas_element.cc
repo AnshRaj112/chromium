@@ -386,18 +386,9 @@ bool HTMLCanvasElement::PrepareTransferableResource(
   if (RenderingContext()->did_print_in_current_task() || IsPrinting()) {
     reason = FlushReason::kCanvasPushFrameWhilePrinting;
   }
-  RenderingContext()->GetResourceProviderForCanvas2D()->FlushCanvas(reason);
 
-  // If the context is lost, we don't know if we should be producing GPU or
-  // software frames, until we get a new context, since the compositor will
-  // be trying to get a new context and may change modes.
-  if (!RenderingContext()->GetResourceProviderForCanvas2D()->IsValid()) {
-    return false;
-  }
-
-  scoped_refptr<CanvasResource> frame = RenderingContext()
-                                            ->GetResourceProviderForCanvas2D()
-                                            ->ProduceCanvasResource(reason);
+  scoped_refptr<CanvasResource> frame =
+      RenderingContext()->PaintRenderingResultsToResource(kBackBuffer, reason);
   if (!frame || !frame->IsValid()) {
     return false;
   }
@@ -841,11 +832,20 @@ void HTMLCanvasElement::PostFinalizeFrame(FlushReason reason) {
 
   if (IsWebGL()) {
     context_->ClearMarkedCanvasDirty();
-    if (LowLatencyEnabled()) {
+  }
+
+  // Note: LowLatencyEnabled() could be true for any context type as it just
+  // checks whether the `desynchronized` attribute is set on the context, but
+  // only WebGL and Canvas2D have specific flows for low latency (for other
+  // context types, setting the attribute is a no-op).
+  if (LowLatencyEnabled() && (IsWebGL() || IsRenderingContext2D())) {
+    bool resource_is_paintable =
+        IsRenderingContext2D()
+            ? RenderingContext()->IsCanvas2DResourceProviderValid()
+            : true;
+    if (frame_dispatcher_ && !dirty_rect_.IsEmpty() && resource_is_paintable) {
       if (scoped_refptr<CanvasResource> canvas_resource =
-              context_->PaintRenderingResultsToResource(!dirty_rect_.IsEmpty(),
-                                                        !!frame_dispatcher_,
-                                                        kBackBuffer, reason)) {
+              context_->PaintRenderingResultsToResource(kBackBuffer, reason)) {
         const gfx::Rect src_rect(Size());
         dirty_rect_.Intersect(src_rect);
         const gfx::Rect int_dirty = dirty_rect_;
@@ -855,24 +855,16 @@ void HTMLCanvasElement::PostFinalizeFrame(FlushReason reason) {
         frame_dispatcher_->DispatchFrame(std::move(canvas_resource),
                                          damage_rect, IsOpaque());
       }
+      // WebGL clears `dirty_rect_` every frame for low-latency, but for
+      // Canvas2D it occurs only if we actually attempted to paint the
+      // resource.
+      if (IsRenderingContext2D()) {
+        dirty_rect_ = gfx::Rect();
+      }
+    }
+    if (IsWebGL()) {
       dirty_rect_ = gfx::Rect();
     }
-  } else if (IsRenderingContext2D() && LowLatencyEnabled() &&
-             frame_dispatcher_ && !dirty_rect_.IsEmpty() &&
-             RenderingContext()->IsCanvas2DResourceProviderValid()) {
-    if (scoped_refptr<CanvasResource> canvas_resource =
-            RenderingContext()
-                ->GetResourceProviderForCanvas2D()
-                ->ProduceCanvasResource(reason)) {
-      const gfx::Rect src_rect(Size());
-      dirty_rect_.Intersect(src_rect);
-      const gfx::Rect int_dirty = dirty_rect_;
-      const SkIRect damage_rect = SkIRect::MakeXYWH(
-          int_dirty.x(), int_dirty.y(), int_dirty.width(), int_dirty.height());
-      frame_dispatcher_->DispatchFrame(std::move(canvas_resource), damage_rect,
-                                       IsOpaque());
-    }
-    dirty_rect_ = gfx::Rect();
   }
 
   // If the canvas is visible, notifying listeners is taken care of in

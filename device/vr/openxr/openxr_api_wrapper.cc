@@ -316,7 +316,8 @@ XrResult OpenXrApiWrapper::InitializeViewConfig(
     OpenXrViewConfiguration& view_config) {
   std::vector<XrViewConfigurationView> view_properties;
   RETURN_IF_XR_FAILED(GetPropertiesForViewConfig(type, view_properties));
-  view_config.Initialize(type, std::move(view_properties));
+  view_config.Initialize(type, std::move(view_properties),
+                         graphics_binding_->GetMaxTextureSize());
 
   return XR_SUCCESS;
 }
@@ -436,11 +437,6 @@ OpenXrHitTestManager* OpenXrApiWrapper::GetHitTestManager() {
 
 OpenXrLightEstimator* OpenXrApiWrapper::GetLightEstimator() {
   return light_estimator_.get();
-}
-
-OpenXRSceneUnderstandingManager*
-OpenXrApiWrapper::GetSceneUnderstandingManager() {
-  return scene_understanding_manager_.get();
 }
 
 OpenXrDepthSensor* OpenXrApiWrapper::GetDepthSensor() {
@@ -840,7 +836,7 @@ void OpenXrApiWrapper::OnContextProviderLost() {
   if (context_provider_ && graphics_binding_) {
     // Mark the shared mailboxes as invalid since the underlying GPU process
     // associated with them has gone down.
-    for (SwapChainInfo& info : graphics_binding_->GetSwapChainImages()) {
+    for (OpenXrSwapchainInfo& info : graphics_binding_->GetSwapChainImages()) {
       info.Clear();
     }
     context_provider_ = nullptr;
@@ -1077,7 +1073,8 @@ XrResult OpenXrApiWrapper::UpdateSecondaryViewConfigStates(
         std::vector<XrViewConfigurationView> view_properties;
         RETURN_IF_XR_FAILED(GetPropertiesForViewConfig(
             state.viewConfigurationType, view_properties));
-        view_config.SetProperties(std::move(view_properties));
+        view_config.SetProperties(std::move(view_properties),
+                                  graphics_binding_->GetMaxTextureSize());
       }
     }
   }

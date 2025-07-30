@@ -22,7 +22,6 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
 import android.util.Base64;
-import android.util.Log;
 import android.util.Pair;
 
 import androidx.test.filters.SmallTest;
@@ -45,6 +44,7 @@ import org.mockito.junit.MockitoRule;
 
 import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
+import org.chromium.base.Log;
 import org.chromium.base.PackageUtils;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.params.ParameterAnnotations.UseMethodParameter;
@@ -308,6 +308,19 @@ public class Fido2CredentialRequestTest {
                 return;
             }
             mSuccessCallback = successCallback;
+        }
+
+        @Override
+        public void invokePasskeyCacheGetCredentials(
+                AuthenticationContextProvider authenticationContextProvider,
+                String relyingParty,
+                OnSuccessListener<List<WebauthnCredentialDetails>> successListener,
+                OnFailureListener failureListener) {
+            if (mInvokeCallbackImmediately) {
+                successListener.onSuccess(mReturnedCredentialDetails);
+                return;
+            }
+            mSuccessCallback = successListener;
         }
 
         public void setReturnedCredentialDetails(List<WebauthnCredentialDetails> details) {
@@ -584,10 +597,10 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testMakeCredential_success() {
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulMakeCredentialIntent());
+        Fido2ApiTestHelper.mockClientDataJson();
 
         mRequest.handleMakeCredentialRequest(
                 mCreationOptions,
@@ -770,7 +783,6 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testMakeCredential_parametersContainEligibleAndNoneligible() {
         PublicKeyCredentialCreationOptions customOptions = mCreationOptions;
         PublicKeyCredentialParameters parameters = new PublicKeyCredentialParameters();
@@ -783,6 +795,7 @@ public class Fido2CredentialRequestTest {
         customOptions.publicKeyParameters = multiParams;
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulMakeCredentialIntent());
+        Fido2ApiTestHelper.mockClientDataJson();
 
         mRequest.handleMakeCredentialRequest(
                 customOptions,
@@ -801,10 +814,10 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testMakeCredential_noExcludeCredentials() {
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulMakeCredentialIntent());
+        Fido2ApiTestHelper.mockClientDataJson();
 
         PublicKeyCredentialCreationOptions customOptions = mCreationOptions;
         customOptions.excludeCredentials = new PublicKeyCredentialDescriptor[0];
@@ -825,8 +838,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testAuthenticatorImplMakeCredential_success() {
+        Fido2ApiTestHelper.mockClientDataJson();
         AuthenticatorImpl authenticator =
                 new AuthenticatorImpl(
                         mContext,
@@ -854,8 +867,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testAuthenticatorImplMakeCredential_withConfirmationUi_success() {
+        Fido2ApiTestHelper.mockClientDataJson();
         boolean[] wasCalled = new boolean[1];
         CreateConfirmationUiDelegate createConfirmationUiDelegate =
                 (accept, reject) -> {
@@ -953,8 +966,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testInternalAuthenticatorMakeCredential_success() {
+        Fido2ApiTestHelper.mockClientDataJson();
         InternalAuthenticator authenticator =
                 InternalAuthenticator.createForTesting(
                         mContext, mIntentSender, mFrameHost, mOrigin);
@@ -1096,9 +1109,9 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testGetCredentialWithoutUvmRequested_success() {
         mIntentSender.setNextResultIntent(Fido2ApiTestHelper.createSuccessfulGetAssertionIntent());
+        Fido2ApiTestHelper.mockClientDataJson();
 
         mRequest.handleGetCredentialRequest(
                 mRequestOptions,
@@ -1116,8 +1129,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testGetCredentialWithUvmRequestedWithoutUvmResponded_success() {
+        Fido2ApiTestHelper.mockClientDataJson();
         mIntentSender.setNextResultIntent(Fido2ApiTestHelper.createSuccessfulGetAssertionIntent());
 
         mRequestOptions.extensions.userVerificationMethods = true;
@@ -1137,8 +1150,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testGetCredentialWithUvmRequestedWithUvmResponded_success() {
+        Fido2ApiTestHelper.mockClientDataJson();
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulGetAssertionIntentWithUvm());
 
@@ -1304,8 +1317,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testGetAssertion_appIdUsed() {
+        Fido2ApiTestHelper.mockClientDataJson();
         PublicKeyCredentialRequestOptions customOptions = mRequestOptions;
         customOptions.extensions.appid = "www.example.com";
         mIntentSender.setNextResultIntent(Fido2ApiTestHelper.createSuccessfulGetAssertionIntent());
@@ -1328,8 +1341,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testAuthenticatorImplGetAssertionWithUvmRequestedWithUvmResponded_success() {
+        Fido2ApiTestHelper.mockClientDataJson();
         AuthenticatorImpl authenticator =
                 new AuthenticatorImpl(
                         mContext,
@@ -1436,8 +1449,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testInternalAuthenticatorGetCredentialWithUvmRequestedWithUvmResponded_success() {
+        Fido2ApiTestHelper.mockClientDataJson();
         InternalAuthenticator authenticator =
                 InternalAuthenticator.createForTesting(
                         mContext, mIntentSender, mFrameHost, mOrigin);
@@ -1476,8 +1489,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testMakeCredential_attestationNone() {
+        Fido2ApiTestHelper.mockClientDataJson();
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulMakeCredentialIntent());
 
@@ -1500,8 +1513,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testMakeCredential_attestationIndirect() {
+        Fido2ApiTestHelper.mockClientDataJson();
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulMakeCredentialIntent());
 
@@ -1525,8 +1538,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testMakeCredential_attestationDirect() {
+        Fido2ApiTestHelper.mockClientDataJson();
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulMakeCredentialIntent());
 
@@ -1549,8 +1562,8 @@ public class Fido2CredentialRequestTest {
 
     @Test
     @SmallTest
-    @DisabledTest(message = "crbug.com/347310677")
     public void testMakeCredential_attestationEnterprise() {
+        Fido2ApiTestHelper.mockClientDataJson();
         mIntentSender.setNextResultIntent(
                 Fido2ApiTestHelper.createSuccessfulMakeCredentialIntent());
 

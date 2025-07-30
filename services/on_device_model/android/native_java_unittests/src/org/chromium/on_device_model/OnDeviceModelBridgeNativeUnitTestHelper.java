@@ -8,7 +8,9 @@ import static org.junit.Assert.assertEquals;
 import org.jni_zero.CalledByNative;
 
 import org.chromium.base.ServiceLoaderUtil;
+import org.chromium.on_device_model.mojom.InputPiece;
 import org.chromium.on_device_model.mojom.SessionParams;
+import org.chromium.on_device_model.mojom.Token;
 
 /**
  * Helper class to verify the JNI bridge. Invoked by native unit tests:
@@ -20,6 +22,11 @@ public class OnDeviceModelBridgeNativeUnitTestHelper {
      * back as the response.
      */
     public static class MockAiCoreSession implements AiCoreSession {
+        // If true, the onComplete callback will be called asynchronously through
+        // resumeOnCompleteCallback.
+        private boolean mCompleteAsync;
+        private boolean mNativeDestroyed;
+        private long mNativeBackendSession;
         private final SessionParams mParams;
 
         public MockAiCoreSession(SessionParams params) {
@@ -27,30 +34,53 @@ public class OnDeviceModelBridgeNativeUnitTestHelper {
         }
 
         @Override
-        public void generate(long nativeBackendSession, InputPiece[] inputPieces) {
+        public void generate(long nativeBackendSession, Object[] inputPieces) {
             StringBuilder sb = new StringBuilder();
-            for (InputPiece piece : inputPieces) {
-                if (piece.isText()) {
-                    sb.append(piece.getText());
-                } else if (piece.isToken()) {
-                    switch (piece.getTokenId()) {
-                        case InputPiece.Token.SYSTEM:
-                            sb.append("<system>");
-                            break;
-                        case InputPiece.Token.MODEL:
-                            sb.append("<model>");
-                            break;
-                        case InputPiece.Token.USER:
-                            sb.append("<user>");
-                            break;
-                        case InputPiece.Token.END:
-                            sb.append("<end>");
-                            break;
-                    }
+            for (Object piece : inputPieces) {
+                assert piece instanceof InputPiece;
+                InputPiece inputPiece = (InputPiece) piece;
+                switch (inputPiece.which()) {
+                    case InputPiece.Tag.Token:
+                        switch (inputPiece.getToken()) {
+                            case Token.SYSTEM:
+                                sb.append("<system>");
+                                break;
+                            case Token.MODEL:
+                                sb.append("<model>");
+                                break;
+                            case Token.USER:
+                                sb.append("<user>");
+                                break;
+                            case Token.END:
+                                sb.append("<end>");
+                                break;
+                        }
+                        break;
+                    case InputPiece.Tag.Text:
+                        sb.append(inputPiece.getText());
+                        break;
                 }
             }
             AiCoreSessionJni.get().onResponse(nativeBackendSession, sb.toString());
-            AiCoreSessionJni.get().onComplete(nativeBackendSession);
+            if (mCompleteAsync) {
+                // Safe the native backend session pointer for later.
+                mNativeBackendSession = nativeBackendSession;
+            } else {
+                AiCoreSessionJni.get().onComplete(nativeBackendSession);
+            }
+        }
+
+        @Override
+        public void onNativeDestroyed() {
+            mNativeDestroyed = true;
+        }
+
+        public void resumeOnCompleteCallback() {
+            assert mCompleteAsync;
+            if (mNativeDestroyed) {
+                return;
+            }
+            AiCoreSessionJni.get().onComplete(mNativeBackendSession);
         }
     }
 
@@ -70,6 +100,13 @@ public class OnDeviceModelBridgeNativeUnitTestHelper {
     private MockAiCoreSessionFactory mMockAiCoreSessionFactory;
 
     @CalledByNative
+    public void verifySessionParams(int topK, float temperature) {
+        SessionParams params = mMockAiCoreSessionFactory.mSession.mParams;
+        assertEquals(topK, params.topK);
+        assertEquals(temperature, params.temperature, 0.01f);
+    }
+
+    @CalledByNative
     public void setMockAiCoreSessionFactory() {
         mMockAiCoreSessionFactory = new MockAiCoreSessionFactory();
         ServiceLoaderUtil.setInstanceForTesting(
@@ -77,10 +114,13 @@ public class OnDeviceModelBridgeNativeUnitTestHelper {
     }
 
     @CalledByNative
-    public void verifySessionParams(int topK, float temperature) {
-        SessionParams params = mMockAiCoreSessionFactory.mSession.mParams;
-        assertEquals(topK, params.topK);
-        assertEquals(temperature, params.temperature, 0.01f);
+    public void setCompleteAsync() {
+        mMockAiCoreSessionFactory.mSession.mCompleteAsync = true;
+    }
+
+    @CalledByNative
+    public void resumeOnCompleteCallback() {
+        mMockAiCoreSessionFactory.mSession.resumeOnCompleteCallback();
     }
 
     @CalledByNative

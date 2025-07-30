@@ -270,6 +270,7 @@
 <translation id="1202216683470826356">新しいタブページにカードを表示する</translation>
 <translation id="1203676252390737801">URL パターン別の WebRTC IP 処理</translation>
 <translation id="1204263402976895730">有効な企業プリンタ</translation>
+<translation id="120513772363332049">レンダラ プロセスの実行中に、同じ CPU コアで他のすべてのプロセスをスケジュール実行しない。</translation>
 <translation id="1207301487141109411">ローカル ファイルシステム、カメラ、Google プロフィールからユーザーのアバターを選択できないようにする</translation>
 <translation id="1209096923317019235">指定したファイル拡張子のデフォルト ハンドラとしてアプリを割り当てます</translation>
 <translation id="120937472976628837">ファン情報を報告する</translation>
@@ -393,6 +394,7 @@
       <ph name="DEFAULT_SEARCH_PROVIDER_NAME_POLICY_NAME" /> を未設定のままにした場合、検索 URL で指定されたホスト名が使用されます。</translation>
 <translation id="1312799700549720683">ディスプレイの設定を制御します。</translation>
 <translation id="131353325527891113">ログイン画面でユーザー名を表示する</translation>
+<translation id="1317158052518324525">拡張自動入力を許可しない。</translation>
 <translation id="1317658068839330898">ウェブでの <ph name="ASSISTANT_PRODUCT_NAME" /> の使用を許可しない</translation>
 <translation id="1318233005302276244">ユーザーが Chrome で荷物を追跡できるようにする。</translation>
 <translation id="1323501563951768821">F12 の設定で Shift 修飾キーを含むショートカットを使用する</translation>
@@ -1473,6 +1475,9 @@ accounts.google.com など一部の URL は認証に必要です。オンライ�
 <translation id="208566302163036794">無効にした機能をブロックする</translation>
 <translation id="2086040449830622332">印刷 LPAC サンドボックスを有効にする</translation>
 <translation id="208623333578980446">電源管理の画面の wake lock を許可する</translation>
+<translation id="2086505225896497574">このポリシーでは、ログイン画面でセキュリティ キーから構成証明書がリクエストされたときにプロンプトを表示しない WebAuthn RP ID を指定できます。このとき、セキュリティ キーには、企業の構成証明が使用されることを示すシグナルも送られます。このポリシーで指定しないサイトからセキュリティ キー構成証明がリクエストされた場合、ユーザーにメッセージが表示されます。
+
+このデバイス ポリシーは、既存のユーザー ポリシー <ph name="SECURITY_KEY_PERMIT_ATTESTATION_POLICY_NAME" /> と同じように機能しますが、ログイン画面のログイン プロファイルに適用されます。</translation>
 <translation id="2089541797660774692">管理対象ブラウザのクラウド レポートを有効にする</translation>
 <translation id="2090712407517297305">グループに分類した Chrome 履歴ページを chrome://history/grouped に表示する。</translation>
 <translation id="2090939118981888335">このポリシーを有効に設定した場合、データ圧縮プロキシが許可されます。このポリシーを無効に設定した場合、プロキシは許可されません。
@@ -3636,6 +3641,15 @@ HTTPS 用の RSA 証明書に両方を含める必要があります。</transla
       このポリシーを無効に設定した場合、Translator API の使用は許可されません。</translation>
 <translation id="366494444808132420">Gemini の統合を許可する。</translation>
 <translation id="3665437376055221832">自動選択と一致する証明書がない場合のみユーザーにメッセージを表示</translation>
+<translation id="3667089394451236198">URL パターンのリストを指定します。このリストのパターンと一致するオリジンのウェブサイトで発行されたリクエストに対しては、<ph name="LOCAL_NETWORK_ACCESS" /> のチェックを行いません。
+
+オリジンがこのポリシーと LocalNetworkAccessBlockedForUrls の両方に含まれている場合、LocalNetworkAccessBlockedForUrls が優先されます。
+
+ここで指定したパターンに含まれていないオリジンについては、ユーザーの個人設定が適用されます。
+
+有効な URL パターンについて詳しくは、https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns をご覧ください。
+
+<ph name="LOCAL_NETWORK_ACCESS" /> の制限については、https://wicg.github.io/local-network-access/ をご覧ください。</translation>
 <translation id="3671773704245936868">キーボード フォーカスによるハイライト表示を無効にする</translation>
 <translation id="3674010627788940405">CORS 非ワイルドカード リクエスト ヘッダーをサポートしない。</translation>
 <translation id="3675303748198647471">setTimeout(…, 0) は、一般的に長い JavaScript タスクを分割する目的で使用されます。
@@ -4193,6 +4207,17 @@ HTTPS 用の RSA 証明書に両方を含める必要があります。</transla
       <ph name="DEFAULT_SEARCH_PROVIDER_KEYWORD_POLICY_NAME" /> を未設定のままにした場合、キーワードで検索プロバイダは実行されません。</translation>
 <translation id="4090088362777472639">Ansible playbook の SHA-256 ハッシュです。</translation>
 <translation id="4091040199847925434">セーフ ブラウジングの改善に役立てるためのシステム情報とページ コンテンツのレポートを無効にする</translation>
+<translation id="4092882308219320847">URL パターンのリストを指定します。このリストのパターンと一致するオリジンのウェブサイトに対して、<ph name="LOCAL_NETWORK_ACCESS" /> のリクエストの発行をブロックします。
+
+オリジンがこのポリシーと LocalNetworkAccessAllowedForUrls の両方に含まれている場合、このポリシーが優先されます。
+
+<ph name="LOCAL_NETWORK_ACCESS" /> のロールアウトの段階によっては、このポリシーで <ph name="LOCAL_NETWORK_ACCESS" /> のリクエストをブロックするには、LocalNetworkAccessRestrictionsEnabled も有効にする必要があります。
+
+ここで指定したパターンに含まれていないオリジンについては、ユーザーの個人設定が適用されます。
+
+有効な URL パターンについて詳しくは、https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns をご覧ください。
+
+<ph name="LOCAL_NETWORK_ACCESS" /> の制限については、https://wicg.github.io/local-network-access/ をご覧ください。</translation>
 <translation id="4093058072421210667">インライン画像を許可しない。</translation>
 <translation id="4098920079809952737">背景のグラフィックありの印刷となしの印刷を両方許可する</translation>
 <translation id="410061592404122032">サイトがウィンドウの管理に関する権限を要求するたびに確認する</translation>
@@ -6177,6 +6202,7 @@ false に設定した場合、教師はこの機能にアクセスできませ�
 <translation id="5490462588616309068">このポリシーを true に設定するか未設定のままにした場合、保護されたコンテンツ識別子の使用が許可されます。これにより、保護されたコンテンツの再生品質を向上させることができます。
 
 このポリシーを false に設定した場合、保護されたコンテンツ識別子の使用は許可されません。</translation>
+<translation id="5492713303272131731">レンダラ プロセスの実行中に、同じ CPU コアで他のすべてのプロセスをスケジュール実行できる。</translation>
 <translation id="5494322570831642650"><ph name="PRODUCT_NAME" /> でユーザーがシークレット モードでページを開けるかどうかを指定します。「有効」を選択するかポリシーを未設定のままにした場合は、シークレット モードでページを開くことができます。「無効」を選択した場合、シークレット モードでページを開くことはできません。「強制」を選択した場合は、シークレット モードでのみページを開くことができます。「強制」は Android-on-Chrome では機能しません。注: iOS ではセッション中にポリシーが変更されると、変更後のポリシーは再起動するまで有効になりません。</translation>
 <translation id="549471902631700911">セーフ ブラウジングに関するアンケートの受け取りを無効にする</translation>
 <translation id="5499375345075963939">このポリシーは小売りモードでのみアクティブになります。
@@ -6523,6 +6549,7 @@ URL パターンは、<ph name="DIRECT_SOCKETS_PRIVATE_NETWORK_ACCESS_BLOCKED_FO
       注: 値が複数ある場合はカンマで区切ります。</translation>
 <translation id="5693469654327063861">データ移行を許可する</translation>
 <translation id="56936613186060503"><ph name="GOOGLE_DRIVE_NAME" /> にファイルを保存するオプションをダウンロード マネージャーに表示しない。</translation>
+<translation id="569457565603183">ログイン画面で直接のセキュリティ キー構成証明を自動的に許可する URL またはドメイン</translation>
 <translation id="5695209488612697377">コンテキスト メニューでデフォルトの検索プロバイダを使用できるようにします。
 
           このポリシーを無効にすると、デフォルトの検索プロバイダに依存する検索コンテキスト メニュー項目は使用できません。
@@ -7542,7 +7569,6 @@ DevTools の生成 AI 機能は次のとおりです。
 <translation id="6412352702230183710">システムレベルのネイティブ メッセージング ホストのみを許可</translation>
 <translation id="6412793408912788345">ログイン時に Gemini の紹介画面を表示する</translation>
 <translation id="6416506846917150119">ユーザーの入力時に物理キーボードの予測入力を無効にする</translation>
-<translation id="6416916931494972926">Kiosk Vision のテレメトリー レポートを有効にする。</translation>
 <translation id="6417265370957905582">Google アシスタント</translation>
 <translation id="6419001911253110938">ログインフロー中にセッション内 AI 機能の紹介画面を表示する処理を有効にする</translation>
 <translation id="6421254653839955267">このポリシーを有効に設定した場合、CNAME 検索はスキップされます。Kerberos SPN の生成時には、入力されたサーバー名が使用されます。
@@ -7694,7 +7720,6 @@ URL が <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" /> の URL パターンと競
 
       このポリシーを未設定のままにした場合、デフォルトの動作は管理対象ユーザーに対して無効になり、それ以外のユーザーに対しては有効になります。</translation>
 <translation id="6508403116553969858">対象となる <ph name="PRODUCT_NAME" /> の生成 AI 機能のデフォルト ポリシー値を設定する</translation>
-<translation id="6508882314969525299">Kiosk Vision のテレメトリー レポートを無効にする。</translation>
 <translation id="6509376413448002446">ユーザーのロック画面のスクリーンセーバーを設定します。
 
 このポリシーを true に設定した場合、<ph name="PRODUCT_OS_NAME" /> デバイスがアイドル状態になるとロック画面にスクリーンセーバーが表示されます。
@@ -7922,6 +7947,7 @@ URL が <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" /> の URL パターンと競
 <translation id="6659537776197644458">パスワード同期の認証フローをトリガーしない</translation>
 <translation id="6659877981632400997">コンテキスト メニューに、<ph name="GOOGLE_PHOTOS_PRODUCT_NAME" /> と画像を共有するためのメニュー項目を表示しない。</translation>
 <translation id="6661178198729301029">管理対象プロファイルのクラウド レポートを有効にする</translation>
+<translation id="666203515318060501">AI モデルの改善は行わずに、拡張自動入力を許可する。</translation>
 <translation id="6665670272107384733">ロックのクイック解除機能を使用するために必要なパスワード入力の頻度を設定する</translation>
 <translation id="6667586534922258705">ログイン画面とロック画面にパスワード表示ボタンを表示する</translation>
 <translation id="6667636336079341367">AI モデルの改善は行わずにスキャナを許可する。</translation>
@@ -8028,6 +8054,11 @@ URL が <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" /> の URL パターンと競
 
 <ph name="PRODUCT_NAME" /> の場合、このポリシーは <ph name="CLOUD_MANAGEMENT_ENROLLMENT_TOKEN" /> で登録されたマシンでのみ有効です。
 <ph name="PRODUCT_OS_NAME" /> の場合、このポリシーは常に有効です。</translation>
+<translation id="6720071484598746942">このポリシーを有効に設定した場合、<ph name="LOCAL_NETWORK_ACCCESS" /> チェックの失敗により <ph name="DEV_TOOLS_NAME" /> に警告が表示されると想定されるケースでは、代わりにメイン リクエストがブロックされます。
+
+このポリシーを無効に設定するか未設定のままにした場合、<ph name="LOCAL_NETWORK_ACCESS" /> リクエストでは、これらのリクエストのデフォルトの処理を使用します。
+
+<ph name="LOCAL_NETWORK_ACCESS" /> の制限については、https://wicg.github.io/local-network-access/ をご覧ください。</translation>
 <translation id="6720330829631914048">1 日の開始時間からの経過時間（24 時間表示）です。</translation>
 <translation id="6721252203593581486">サードパーティのコンテキスト（クロスサイト iframe など）での WebSQL は M97 の時点ではデフォルトでオフになっており、M101 では完全に削除されます。
           このポリシーを False に設定するか未設定のままにした場合、サードパーティのコンテキストでの WebSQL はオフのままになります。
@@ -9175,6 +9206,7 @@ Kyber の提供には下位互換性があります。既存の TLS サーバー
 <translation id="7657261947024629645">パフォーマンスを重視します。</translation>
 <translation id="76580522298425324">事前のユーザー操作なしでスクリーン キャプチャを許可する</translation>
 <translation id="7666228839913571182">サードパーティ Cookie を許可する</translation>
+<translation id="7666782560345386904">拡張自動入力の設定</translation>
 <translation id="7669630878711068277">このポリシーを有効に設定するか未設定のままにした場合、ユーザーは <ph name="PRODUCT_NAME" /> で印刷することができます。ユーザーはこの設定を変更できません。
 
       このポリシーを無効に設定した場合、ユーザーは <ph name="PRODUCT_NAME" /> から印刷できません。印刷は、その他メニュー、拡張機能、JavaScript アプリケーションで無効になります。</translation>
@@ -10073,7 +10105,12 @@ false に設定した場合、管理対象のネットワークに接続され�
 <translation id="8331421240786531350">ローカル ネットワーク エンドポイントへのリクエストをブロックするサイトを指定する</translation>
 <translation id="8331479227794770304">スティッキー キーを有効にする</translation>
 <translation id="8332822245414537447">RSA 鍵用途の確認を無効にする</translation>
+<translation id="8333141477131859004">拡張自動入力と AI モデルの改善を許可する。</translation>
 <translation id="8334685561819743286">ユーザーの入力時に物理キーボードの自動修正を無効にする</translation>
+<translation id="8336986243404088829">このポリシーでは、サイドチャネルのクロスプロセス メモリ攻撃を軽減するため、CPU コアのレンダラ プロセスを分離し、他のプロセスが同じコアを共有できないようにします。この軽減措置は、<ph name="MS_WIN_NAME" /> 11 24H2 以降でサポートされています。必要なスケジュール実行が OS でサポートされていない場合、このポリシーは無視されます。このポリシーによって、ハイパースレッディングを無効にした場合と同じように、負荷の高い状況でパフォーマンスが低下する可能性があります。詳しくは、https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-process_mitigation_side_channel_isolation_policy をご覧ください。
+      このポリシーを有効にした場合は、レンダラ プロセスの実行中に、同じ CPU コアで他のプロセスをスケジュール実行しません。
+      このポリシーを無効にした場合は、レンダラ プロセスの実行中に、同じ CPU コアで他のすべてのプロセスをスケジュール実行できます。
+      このポリシーを設定しない場合は、レンダラ プロセスの実行中に、同じ CPU コアで他のすべてのプロセスをスケジュール実行できます。この動作は、<ph name="PRODUCT_NAME" /> のリリース（現在はフィールド テスト中）およびプラットフォームによって変わる場合があります。</translation>
 <translation id="8337114537412769126"><ph name="DEFAULT_SEARCH_PROVIDER_ENABLED_POLICY_NAME" /> がオンの場合に、<ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" /> では、POST を使ったキーワード候補の検索に使用するパラメータを指定できます。名前と値のペアをカンマで区切って指定します。テンプレート パラメータ（<ph name="SEARCH_TERM_MARKER" /> など）の値は、実際の検索キーワードのデータに置き換えられます。
 
       <ph name="DEFAULT_SEARCH_PROVIDER_SUGGEST_URL_POST_PARAMS_POLICY_NAME" /> を未設定のままにした場合、キーワードの候補による検索リクエストは GET メソッドを使用して送信されます。</translation>
@@ -10478,9 +10515,6 @@ URL が <ph name="SERIAL_BLOCKED_FOR_URLS_POLICY_NAME" /> の URL パターン�
       このポリシーを true に設定した場合、5 分以上バックグラウンドになっているタブは凍結可能になります。タブを凍結すると、CPU、バッテリー、メモリの使用量が削減されます。<ph name="PRODUCT_NAME" /> ではヒューリスティックにより、バックグラウンドで有用な処理（通知の表示、サウンドの再生、動画のストリーミングなど）を行うタブが凍結の対象から外されます。ウェブ デベロッパーが自身のサイトを凍結の対象から外すこともできます（https://chromium.googlesource.com/chromium/src/+/HEAD/chrome/browser/performance_manager/docs/freezing_opt_out_opt_in.md）。
 
       このポリシーを false に設定した場合は、どのタブも凍結されません。</translation>
-<translation id="8607613052618540095">このポリシーを有効に設定した場合、Kiosk Vision のテレメトリー レポートが有効になります。
-Kiosk Vision フレームワークが起動し、オーディエンス テレメトリーのレポートが有効になります。
-このポリシーを未設定のままにするか無効に設定した場合、Kiosk Vision のテレメトリー レポートは無効になります。</translation>
 <translation id="8610216287193516769">M122 で削除 - これは、ChromeOS ポリシー インフラストラクチャをプロパゲートに使用したことがないサーバーサイド専用のポリシーです。
 このポリシーを <ph name="POLICY_VALUE_ALL" /> に設定するか未設定のままにした場合、管理対象アカウントの使用はすべて許可されます。これにより、管理対象アカウントは予備のアカウントとなる場合もあります。その場合、ブラウザ プロファイルのメイン アカウントとしてログインしているときのみ、ポリシーが適用されます。次の場合、アカウントに設定されたポリシーは適用されません。
         -  OS レベルの予備のアカウント（アカウント設定）
@@ -11300,6 +11334,7 @@ URL パターンは、<ph name="WEB_PRINTING_BLOCKED_FOR_URLS_POLICY_NAME" /> �
 <translation id="9162444960513782569">バックグラウンドの JavaScript タイマーのスロットリングを強制的に適用しない</translation>
 <translation id="9164656078867027374"><ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> へのアクセスを許可するドメインを定義する</translation>
 <translation id="9165128017344777105">ローカル フォントに関する権限を許可するサイトを指定する</translation>
+<translation id="9165498643231979857">レンダラ プロセスの CPU コアの共有を制限する</translation>
 <translation id="9166670902476893480">このポリシーに基づいて、<ph name="PRODUCT_NAME" /> が安全でない DNS リクエストを行ったときにその他の DNS レコードタイプのクエリを許可するかどうかを制御します。このポリシーは、その他の DNS タイプのクエリを常に行えるセキュア DNS を介して行われた DNS クエリには影響しません。
 
       このポリシーを設定しない場合または有効に設定した場合は、<ph name="DNS_TYPE_A" />（DNS タイプ 1）と <ph name="DNS_TYPE_AAAA" />（DNS タイプ 28）に加えて、<ph name="DNS_TYPE_HTTPS" />（DNS タイプ 65）などのその他のタイプのクエリも行えます。

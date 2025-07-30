@@ -63,10 +63,6 @@ void AwFieldTrials::RegisterFeatureOverrides(base::FeatureList* feature_list) {
   aw_feature_overrides.DisableFeature(
       blink::features::kEnforceNoopenerOnBlobURLNavigation);
 
-  // TODO(crbug.com/421547429): Temporarily disabled to address crashes.
-  aw_feature_overrides.DisableFeature(
-      network::features::kMaskedDomainListFlatbufferImpl);
-
 #if BUILDFLAG(ENABLE_VALIDATING_COMMAND_DECODER)
   // Disable the passthrough on WebView.
   aw_feature_overrides.DisableFeature(
@@ -75,6 +71,9 @@ void AwFieldTrials::RegisterFeatureOverrides(base::FeatureList* feature_list) {
 
   // HDR does not support webview yet. See crbug.com/1493153 for an explanation.
   aw_feature_overrides.DisableFeature(ui::kAndroidHDR);
+
+  // Disable launch_handler on WebView.
+  aw_feature_overrides.DisableFeature(::features::kAndroidWebAppLaunchHandler);
 
   // Disable Reducing User Agent minor version on WebView.
   aw_feature_overrides.DisableFeature(

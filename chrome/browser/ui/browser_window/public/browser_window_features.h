@@ -27,6 +27,7 @@ class BookmarkBarController;
 class BookmarksSidePanelCoordinator;
 class BreadcrumbManagerBrowserAgent;
 class Browser;
+class BrowserActions;
 class BrowserContentSettingBubbleModelDelegate;
 class BrowserInstantController;
 class BrowserLiveTabContext;
@@ -99,15 +100,17 @@ class TabDeclutterController;
 class VerticalTabStripStateController;
 }  // namespace tabs
 
+namespace chrome {
+class BrowserCommandController;
+}  // namespace chrome
+
 namespace commerce {
 class ProductSpecificationsEntryPointController;
 }  // namespace commerce
 
 namespace tabs {
 class GlicNudgeController;
-#if BUILDFLAG(ENABLE_GLIC)
 class GlicActorTaskIconController;
-#endif
 }
 
 namespace tab_groups {
@@ -177,6 +180,12 @@ class BrowserWindowFeatures {
   void TearDownPreBrowserWindowDestruction();
 
   // Public accessors for features:
+  BrowserActions* browser_actions() { return browser_actions_.get(); }
+
+  chrome::BrowserCommandController* browser_command_controller() {
+    return browser_command_controller_.get();
+  }
+
   extensions::Mv2DisabledDialogController*
   mv2_disabled_dialog_controller_for_testing() {
     return mv2_disabled_dialog_controller_.get();
@@ -250,11 +259,9 @@ class BrowserWindowFeatures {
     return glic_nudge_controller_.get();
   }
 
-#if BUILDFLAG(ENABLE_GLIC)
   tabs::GlicActorTaskIconController* glic_actor_task_icon_controller() {
     return glic_actor_task_icon_controller_.get();
   }
-#endif
 
   TabStripModel* tab_strip_model() { return tab_strip_model_; }
 
@@ -421,6 +428,10 @@ class BrowserWindowFeatures {
   // Features that are per-browser window will each have a controller. e.g.
   // std::unique_ptr<FooFeature> foo_feature_;
 
+  std::unique_ptr<BrowserActions> browser_actions_;
+
+  std::unique_ptr<chrome::BrowserCommandController> browser_command_controller_;
+
   std::unique_ptr<BookmarkBarController> bookmark_bar_controller_;
 
   std::unique_ptr<BrowserInstantController> instant_controller_;
@@ -495,9 +506,10 @@ class BrowserWindowFeatures {
 
   std::unique_ptr<tabs::GlicNudgeController> glic_nudge_controller_;
 
-#if BUILDFLAG(ENABLE_GLIC)
   std::unique_ptr<tabs::GlicActorTaskIconController>
       glic_actor_task_icon_controller_;
+
+#if BUILDFLAG(ENABLE_GLIC)
   std::unique_ptr<glic::GlicButtonController> glic_button_controller_;
   std::unique_ptr<glic::GlicIphController> glic_iph_controller_;
 #endif

@@ -101,6 +101,11 @@ export declare interface GlicWebClient {
    * as unresponsive and displaying an error state to the user.
    */
   checkResponsive?(): Promise<void>;
+
+  // !!! ATTENTION !!!
+  // Avoid adding new methods to this interface! Instead, to push information to
+  // the web client it's much more preferable to add new functions to
+  // GlicBrowserHost that return an Observable or ObservableValue instances.
 }
 
 /**
@@ -603,11 +608,6 @@ export declare interface GlicBrowserHost {
    *
    * Dynamic updates can be a costly operation so the observable value should be
    * released/destroyed as soon as it's not useful anymore.
-   *
-   * TODO(b/432258121): A race condition can occur when a consumer
-   * unsubscribes and a new one subscribes. An update from the first
-   * subscription that is already in-flight may be delivered to the second
-   * consumer.
    */
   getPinCandidates?
       (options: GetPinCandidatesOptions): ObservableValue<PinCandidate[]>;
@@ -687,7 +687,7 @@ export declare interface CreateTabOptions {
  * Provides measurement-related functionality to the Glic web client.
  *
  * The typical sequence of events should be either:
- *  (onUserInputSubmitted -> (onRequestStarted -> onResponseStarted ->
+ *  (onUserInputSubmitted -> (onResponseStarted ->
  *                            onResponseStopped)*
  *  )*
  * or
@@ -702,12 +702,6 @@ export declare interface CreateTabOptions {
 export declare interface GlicBrowserHostMetrics {
   /** Called when the user has submitted input via the web client. */
   onUserInputSubmitted?(mode: WebClientMode): void;
-
-  /**
-   * Called when the web client has submitted a request to the server
-   * awaiting a response.
-   */
-  onRequestStarted?(): void;
 
   /**
    * Called when the web client has sufficiently processed the input such that
@@ -924,6 +918,8 @@ export enum InvocationSource {
   WHATS_NEW = 9,
   /** User clicks sign-in and then signs in. */
   AFTER_SIGN_IN = 10,
+  /** User shared a tab. */
+  SHARED_TAB = 11,
 }
 
 /** The default value of TabContextOptions.pdfSizeLimit. */

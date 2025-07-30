@@ -140,6 +140,7 @@
 <translation id="1520027731907768768">آپ جو پروڈکٹس ٹریک کرتے ہیں ان کے لیے قیمت میں کمی کے الرٹس وصول کریں۔</translation>
 <translation id="1521366073263497277">اپنے ٹیب گرڈ پر جائیں</translation>
 <translation id="1521774566618522728">آج فعال کیا گیا</translation>
+<translation id="1523567067736644845">پاس ورڈ دکھانے کے لیے غیر مقفل کریں</translation>
 <translation id="1524563461097350801">نہیں شکریہ</translation>
 <translation id="1531038290222364269">ٹیبز دکھائیں</translation>
 <translation id="1536390784834419204">صفحہ کا ترجمہ کریں</translation>
@@ -321,7 +322,6 @@
 <translation id="2220529011494928058">ایک مسئلے کی اطلاع دیں</translation>
 <translation id="2223461067862937305">‏‫QR کوڈ تخلیق کریں</translation>
 <translation id="2225701818156393674">پروڈکٹ کو ٹریک کئے جانے والے پروڈکٹس کی آپ کی فہرست میں شامل کیا گیا۔</translation>
-<translation id="2229345671837147090">ریموٹ ٹیب کا گرڈ</translation>
 <translation id="2230173723195178503">ویب صفحہ لوڈ کر دیا گیا ہے</translation>
 <translation id="2236949375853147973">میری سرگرمی</translation>
 <translation id="2240256190924001613">کنفیگریشن پروفائل دستیاب ہے</translation>
@@ -363,6 +363,7 @@
 <translation id="236977714248711277">سائٹس آپ کے براؤزنگ کے تجربہ کو بہتر بنانے کے لیے کوکیز کا استعمال نہیں کر سکتی ہیں، مثال کے طور پر آپ کو سائن ان رکھنا یا آپ کی شاپنگ کارٹ میں آئٹمز کو یاد رکھنا۔
 
 سائٹس مختلف سائٹس پر آپ کی براؤزنگ کی سرگرمی دیکھنے کیلئے کوکیز کا استعمال نہیں کر سکتی ہیں، مثال کے طور پر اشتہارات کو ذاتی نوعیت کا بنانا۔</translation>
+<translation id="2377230674627603057">ٹیب گروپس گرڈ</translation>
 <translation id="2377336083033403521">ٹیبز تلاش کریں…</translation>
 <translation id="2381405137052800939">مبادیات</translation>
 <translation id="2384692388811649784">پوشیدگی ٹیبز کو چھپائیں</translation>
@@ -537,7 +538,6 @@
 <translation id="3081338492074632642">اس بات کو یقینی بنائیں کہ آپ جو پاس ورڈ محفوظ کر رہے ہیں وہ آپ کے <ph name="WEBSITE" /> کے پاس ورڈ سے مماثل ہے</translation>
 <translation id="3087734570205094154">نیچے</translation>
 <translation id="309710370695886264">آپ کے پاس 1 دوبارہ استعمال کردہ پاس ورڈ ہے۔ محفوظ رہنے کے لیے اسے ابھی صحیح کریں۔</translation>
-<translation id="3102790820790869053">حالیہ ٹیبز تلاش کریں</translation>
 <translation id="3106258548858559536">ریڈنگ موڈ آف کریں</translation>
 <translation id="3106690631878101882">ترجمہ کریں کو چھپائیں</translation>
 <translation id="310900540163454140"><ph name="WEBSITE" /> کا پاس ورڈ حذف کریں؟</translation>
@@ -648,11 +648,9 @@
 <translation id="3581564640715911333">صفحات کو دیگر زبانوں میں ترجمہ کرنے کی پیشکش کریں</translation>
 <translation id="3587885837929752825">‏آپ کی تنظیم یہ محدود کرتی ہے کہ آپ اپنے Google اکاؤنٹ میں کیا محفوظ کر سکتے ہیں۔</translation>
 <translation id="3588820906588687999">تصویر نئے ٹیب میں کھولیں</translation>
-<translation id="3591006724568464696">حالیہ ٹیبز دستیاب نہیں ہیں</translation>
 <translation id="3595252146048399851">‏آپ کسی بھی وقت اس بات کا انتخاب کر سکتے ہیں کہ <ph name="BEGIN_LINK" />ترتیبات<ph name="END_LINK" /> میں کس چیز کی مطابقت پذیری کرنی ہے۔ Google آپ کی سرگزشت کی بنیاد پر تلاش اور دیگر سروسز کو ذاتی نوعیت کا بنا سکتا ہے۔</translation>
 <translation id="3596414637720633074">پوشیدگی میں فریق ثالث کوکیز کو بلاک کریں</translation>
 <translation id="3602260545951981695">"بہتر کردہ حفاظت" منتخب کریں</translation>
-<translation id="3608436266458100337">ریڈر وض‏ع</translation>
 <translation id="3610041351087301930">ریڈر موڈ چھپائیں</translation>
 <translation id="3622175633937495219">تلاش کی سرگزشت (<ph name="COUNT" /> ملے)</translation>
 <translation id="3625008969091706597">آپ پیچھے جانے کے لیے کنارے کو سوائپ کر سکتے ہیں۔</translation>
@@ -892,7 +890,6 @@
 <translation id="4611811151908969241"><ph name="DOMAIN_NAME" /> کی پیروی ختم کریں کو چھپائیں</translation>
 <translation id="461440297010471931">‏Google کے ذریعے تلاش کیا جا رہا ہے</translation>
 <translation id="4619564267100705184">توثیق کریں کہ یہ آپ ہیں</translation>
-<translation id="4619615317237390068">دیگر آلات کے ٹیبز</translation>
 <translation id="4621768135601674446">ریڈنگ موڈ کے اختیارات کھولیں</translation>
 <translation id="4624080227980645783">نئی پوشیدگی ونڈو</translation>
 <translation id="4627107755957573804">سائٹس اور ایپس کو پاس کیز استعمال کرنے کے لیے موجودہ اکاؤنٹس کو اپ گریڈ کرنے کی اجازت دیں</translation>
@@ -1234,6 +1231,7 @@ Handoff ترتیبات کے عام سیکشن میں بھی فعال ہونی ض
 <translation id="5869522115854928033">محفوظ کردہ پاس ورڈز</translation>
 <translation id="5873179562631407582">کسی بھی کھلے ہوئے ٹیب پر تھپتھپائیں اور دبائے رکھیں</translation>
 <translation id="5878899964490256268"><ph name="EMAIL" />۔ آپ کی تنظیم کے زیر انتظآم۔</translation>
+<translation id="5887400589839399685">کارڈ محفوظ کیا گیا</translation>
 <translation id="5888889603768021126">آپ درج ذیل شناخت فراہم کنندہ کے ساتھ سائن ان ہیں</translation>
 <translation id="5889333064153755823">براؤزنگ ڈیٹا حذف کریں</translation>
 <translation id="5896576662943111387">‏iOS کیلئے بنایا گیا</translation>
@@ -1334,9 +1332,11 @@ Handoff ترتیبات کے عام سیکشن میں بھی فعال ہونی ض
 <translation id="6234310016144827337">اپنا کنکشن چیک کر کے دوبارہ کوشش کریں</translation>
 <translation id="6234438496206735891">ڈاؤن لوڈز دکھائیں</translation>
 <translation id="6236952928980352967">وارننگ بحال کریں</translation>
+<translation id="623755660902014047">Reading Mode</translation>
 <translation id="6247557882553405851">‏Google پاس ورڈ مینیجر</translation>
 <translation id="6251835855431997163"><ph name="VALUE" /> آٹو فل کریں</translation>
 <translation id="6254066287920239840">براؤزر کی بجائے لنکس کو ایپ میں کھولیں۔</translation>
+<translation id="6259928806013786178">ریڈنگ موڈ ناکام ہو گیا</translation>
 <translation id="6268773951964630964">کاپی کردہ تصویر تلاش کریں</translation>
 <translation id="6271462272606946663">موبائل سائٹ کی درخواست کو چھپائیں</translation>
 <translation id="6271824294945464304">پاس ورڈ کا اشتراک کرنا</translation>
@@ -1816,7 +1816,6 @@ Handoff ترتیبات کے عام سیکشن میں بھی فعال ہونی ض
 <translation id="8076492880354921740">ٹیبز</translation>
 <translation id="8079530767338315840">دہرائیں</translation>
 <translation id="8079602123447022758">یہ ترتیب نظم کردہ ہے، مزید معلومات کیلئے دوبار تھپتھپائیں</translation>
-<translation id="8080028325999236607">سبھی ٹیبز بند کریں</translation>
 <translation id="8084285576995584326">‏اپنے Google اکاؤنٹ کے ڈیٹا کو کنٹرول کریں</translation>
 <translation id="809543534949702122">تلاش کی سرگزشت</translation>
 <translation id="8095985449280932182">{COUNT,plural, =1{وہ ٹیبز جنہیں آپ استعمال نہیں کرتے ہیں {COUNT} دن کے بعد یہاں منتقل ہو جاتے ہیں}other{وہ ٹیبز جنہیں آپ استعمال نہیں کرتے ہیں {COUNT} دن کے بعد یہاں منتقل ہو جاتے ہیں}}</translation>
@@ -2009,14 +2008,11 @@ Handoff ترتیبات کے عام سیکشن میں بھی فعال ہونی ض
 <translation id="8796634520835503150">ریڈنگ موڈ دستیاب ہے</translation>
 <translation id="8803526663383843427">آن ہونے پر</translation>
 <translation id="8803639129939845298">محفوظ</translation>
-<translation id="8806823403540278281">آپ کی تنظیم چاہتی ہے کہ آپ نجی طور پر براؤز کریں۔ ٹیبز پوشیدگی وضع میں محفوظ نہیں ہیں۔
-<ph name="BEGIN_LINK" />مزید جانیں<ph name="END_LINK" /></translation>
 <translation id="8813277370772331957">مجھے بعد میں یاد دلائیں</translation>
 <translation id="8814719628147284151">جاری رکھیں</translation>
 <translation id="8819155700324279105">آن لائن خطرات سے تحفظ کی ایک اضافی پرت شامل کریں</translation>
 <translation id="8820817407110198400">بُک مارکس</translation>
 <translation id="8822421075653507124">اس بات کو یقینی بنانے کے لیے کہ اس آلہ کو محفوظ طریقے سے استعمال کیا جا سکتا ہے، آپ کی تنظیم کو اس کے آپریٹنگ سسٹم، براؤزر، ترتیبات اور آلے پر کون سا سافٹ ویئر انسٹال ہے کے بارے میں معلومات دیکھنے کی ضرورت پڑ سکتی ہے۔</translation>
-<translation id="8825562130641217944">اپنے بُک مارکس، پاس ورڈز وغیرہ حاصل کریں۔</translation>
 <translation id="8831208860914609320">سبھی غیر فعال بند کریں</translation>
 <translation id="8831944931153286232">پڑھنے کی فہرست میں شامل کریں</translation>
 <translation id="8837654851594567190">ناشر کے لحاظ سے ترتیب دیں</translation>
@@ -2110,6 +2106,7 @@ Handoff ترتیبات کے عام سیکشن میں بھی فعال ہونی ض
 <translation id="9144230693397287797">دوسرے آلات سے اپنی سیٹ کی گئی یاد دہانیوں اور ٹیبز کیلئے اپ ڈیٹس موصول کریں</translation>
 <translation id="914781932147356857">سبھی کو نشان زد کریں…</translation>
 <translation id="9148126808321036104">دوبارہ سائن ان کریں</translation>
+<translation id="9149866541089851383">ترمیم کریں…</translation>
 <translation id="9159628751968616911">ویب صفحہ بھیجیں</translation>
 <translation id="9162432979321511934">آٹو فل پاس ورڈز آن کریں</translation>
 <translation id="9165320910061267720">‏قیمت میں کمی کے الرٹس کی اطلاعات حاصل کرنے کے لیے، آپ کو اپنے iOS کی ترتیبات میں اطلاعات کو آن کرنا ہوگا۔</translation>

@@ -533,6 +533,9 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaFoundationAcceleratedEncodeOnArm64);
 #endif
 
 #if BUILDFLAG(IS_WIN)
+// Enables D3D12 video encode accelerator taking shared image as input.
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kD3D12SharedImageEncode);
+
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaFoundationD3DVideoProcessing);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaFoundationSharedImageEncode);
 #endif
@@ -554,6 +557,15 @@ MEDIA_EXPORT std::string GetEffectiveAutoplayPolicy(
     const base::CommandLine& command_line);
 
 MEDIA_EXPORT bool IsChromeWideEchoCancellationEnabled();
+
+#if BUILDFLAG(IS_MAC)
+MEDIA_EXPORT bool IsMacCatapSystemLoopbackCaptureSupported();
+MEDIA_EXPORT bool IsMacSckSystemLoopbackCaptureSupported();
+#endif
+
+// Returns true if system audio loopback capture is implemented for the current
+// OS.
+MEDIA_EXPORT bool IsSystemLoopbackCaptureSupported();
 
 // Returns true if loopback-based AEC can be used for audio input streams that
 // are configured to do so.

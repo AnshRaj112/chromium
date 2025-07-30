@@ -503,7 +503,14 @@ void AssertIsShowingDistillablePage(bool online, const GURL& distillable_url) {
 
 // Tests that navigating back to an offline page is still displaying the error
 // page and don't mess the navigation stack.
-- (void)testNavigateBackToDistilledPage {
+// TODO(crbug.com/435147625): Reenable this test.
+#if TARGET_OS_SIMULATOR
+#define MAYBE_testNavigateBackToDistilledPage testNavigateBackToDistilledPage
+#else
+#define MAYBE_testNavigateBackToDistilledPage \
+  FLAKY_testNavigateBackToDistilledPage
+#endif
+- (void)MAYBE_testNavigateBackToDistilledPage {
   [ReadingListAppInterface forceConnectionToWifi];
   GURL distillablePageURL(self.testServer->GetURL(kDistillableURL));
   GURL nonDistillablePageURL(self.testServer->GetURL(kNonDistillableURL));
@@ -554,7 +561,15 @@ void AssertIsShowingDistillablePage(bool online, const GURL& distillable_url) {
 // Tests that sharing a web page to the Reading List results in a snackbar
 // appearing, and that the Reading List entry is present in the Reading List.
 // Loads offline version via context menu.
-- (void)testSavingToReadingListAndLoadDistilled {
+// TODO(crbug.com/435147625): Reenable this test.
+#if TARGET_OS_SIMULATOR
+#define MAYBE_testSavingToReadingListAndLoadDistilled \
+  testSavingToReadingListAndLoadDistilled
+#else
+#define MAYBE_testSavingToReadingListAndLoadDistilled \
+  FLAKY_testSavingToReadingListAndLoadDistilled
+#endif
+- (void)MAYBE_testSavingToReadingListAndLoadDistilled {
   [ReadingListAppInterface forceConnectionToWifi];
   GURL distillablePageURL(self.testServer->GetURL(kDistillableURL));
   GURL nonDistillablePageURL(self.testServer->GetURL(kNonDistillableURL));
@@ -1156,7 +1171,13 @@ void AssertIsShowingDistillablePage(bool online, const GURL& distillable_url) {
 }
 
 // Tests the Open in New Tab context menu action for a reading list entry.
+// TODO(crbug.com/435093473): Reenable this test.
 - (void)testContextMenuOpenInNewTab {
+  if ([ChromeEarlGrey isIPhoneIdiom]) {
+    if (!@available(iOS 18, *)) {
+      EARL_GREY_TEST_DISABLED(@"Failing on iPhone Simulator iOS 17");
+    }
+  }
   GURL distillablePageURL(self.testServer->GetURL(kDistillableURL));
   [self addURLToReadingList:distillablePageURL];
   LongPressEntry(kDistillableTitle);

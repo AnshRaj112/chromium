@@ -126,8 +126,7 @@
 #include "chrome/browser/glic/browser_ui/glic_button_controller.h"
 #include "chrome/browser/glic/browser_ui/glic_iph_controller.h"
 #include "chrome/browser/glic/glic_enabling.h"
-#include "chrome/browser/glic/glic_keyed_service.h"
-#include "chrome/browser/ui/tabs/glic_actor_task_icon_controller.h"
+#include "chrome/browser/glic/public/glic_keyed_service.h"
 #endif
 
 #if defined(USE_AURA)
@@ -141,6 +140,13 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
   // This is used only for the controllers which will be created on demand
   // later.
   browser_ = browser;
+
+  browser_actions_ = std::make_unique<BrowserActions>(browser);
+
+  browser_command_controller_ =
+      std::make_unique<chrome::BrowserCommandController>(browser);
+
+  browser_actions_->InitializeBrowserActions();
 
   // Initialize bookmark bar controller for all browser types.
   bookmark_bar_controller_ = std::make_unique<BookmarkBarController>(
@@ -200,11 +206,6 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
       glic_iph_controller_ = std::make_unique<glic::GlicIphController>(browser);
       glic_nudge_controller_ =
           std::make_unique<tabs::GlicNudgeController>(browser);
-
-      if (features::kGlicActorUiTaskIcon.Get()) {
-        glic_actor_task_icon_controller_ =
-            std::make_unique<tabs::GlicActorTaskIconController>(browser);
-      }
     }
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
@@ -291,8 +292,8 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   extension_browser_window_helper_ =
       std::make_unique<extensions::ExtensionBrowserWindowHelper>(
-          browser->GetBrowserForMigrationOnly()->command_controller(),
-          browser->GetTabStripModel(), browser->GetProfile());
+          browser_command_controller_.get(), browser->GetTabStripModel(),
+          browser->GetProfile());
 #endif
 
   if (breadcrumbs::IsEnabled(g_browser_process->local_state())) {
@@ -354,7 +355,7 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
         location_bar = browser_view->GetLocationBarView();
       }
       lens_overlay_entry_point_controller_->Initialize(
-          browser, browser->command_controller(), location_bar);
+          browser, browser_command_controller_.get(), location_bar);
     }
 
     auto* experiment_manager =
@@ -486,6 +487,14 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
           browser_view->GetProfile(),
           browser_view->tab_strip_region_view()->GetTabStripActionContainer(),
           glic_service);
+
+      if (features::kGlicActorUiTaskIcon.Get() &&
+          browser_->GetProfile()->IsRegularProfile()) {
+        glic_actor_task_icon_controller_ =
+            std::make_unique<tabs::GlicActorTaskIconController>(
+                browser_->GetProfile(), browser_view->tab_strip_region_view()
+                                            ->GetTabStripActionContainer());
+      }
     }
 
 #endif  // BUILDFLAG(ENABLE_GLIC)
@@ -501,9 +510,11 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
     }
 
     if (features::kGlicActorUiOverlay.Get()) {
+      // TODO(crbug.com/433999185): Handle split view.
       actor_overlay_window_controller_ =
           std::make_unique<actor::ui::ActorOverlayWindowController>(
-              browser_view->GetActorOverlayView());
+              browser_view->GetActiveContentsContainerView()
+                  ->GetActorOverlayView());
     }
   }
 
@@ -537,6 +548,7 @@ void BrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
   toast_service_.reset();
   extension_window_controller_.reset();
   actor_overlay_window_controller_.reset();
+  glic_actor_task_icon_controller_.reset();
 
 #if BUILDFLAG(ENABLE_GLIC)
   glic_button_controller_.reset();
@@ -547,6 +559,8 @@ void BrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
     download_toolbar_ui_controller_->TearDownPreBrowserWindowDestruction();
   }
 #endif
+
+  comments_side_panel_coordinator_.reset();
 
   history_clusters_side_panel_coordinator_.reset();
 

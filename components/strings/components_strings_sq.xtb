@@ -34,6 +34,7 @@
 <translation id="1058344460600311577"><ph name="PLAY_CHROME_DINO_GAME_FOCUSED_FRIENDLY_MATCH_TEXT" />. Shtyp "Tab" dhe më pas "Enter" për të luajtur lojën Dino Run në Chrome</translation>
 <translation id="1060136083665017312">Sisteme dhe konsola lojërash</translation>
 <translation id="1060320201901229167">Zarf Kaku 5</translation>
+<translation id="1060985736456216896">Google Pay, logoja e Zip</translation>
 <translation id="1062407476771304334">Zëvendëso</translation>
 <translation id="1063822554756965137">Skedarët u fshinë me sukses</translation>
 <translation id="1064054731605354900">A3x5</translation>
@@ -125,6 +126,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="1209206284964581585">Fshih për momentin</translation>
 <translation id="121201262018556460">Tentove të hapje <ph name="DOMAIN" />, por serveri paraqiti një certifikatë që përmban një çelës të dobët. Një sulmues mund ta ketë prishur çelësin privat dhe serveri mund të mos jetë ai që prisje (mund të jesh duke komunikuar me një sulmues).</translation>
 <translation id="1212527389003717329">Shkarkimi filloi. Për ta parë atë, shtyp dhe mbaj shtypur |<ph name="ACCELERATOR" />|.</translation>
+<translation id="1215738931000958575">Përdor informacionin e ruajtur në "Llogarinë tënde të Google" për të plotësuar automatikisht fjalëkalimet, çelësat e kalimit, adresat, mënyrat e pagesës dhe informacione të tjera</translation>
 <translation id="1219129156119358924">Siguria e sistemit</translation>
 <translation id="1222060260947439312">Tabakaja e djathtë</translation>
 <translation id="1224330468394120478">A3x6</translation>
@@ -536,7 +538,6 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="1876399092304384674">Sipas datës</translation>
 <translation id="1877026089748256423">Chrome nuk është i përditësuar</translation>
 <translation id="187918866476621466">Hap faqet e nisjes</translation>
-<translation id="1880901968112404879">Për të paguar më shpejt herën tjetër, ruaje kartën, kodin e enkriptuar të sigurisë dhe adresën e faturimit në "Llogarinë tënde të Google"</translation>
 <translation id="1883255238294161206">Palos listën</translation>
 <translation id="1884843295353628214">Xhazi</translation>
 <translation id="1890171020361705182">Loja Dino. Një dinozaur i pikselizuar shmang kaktuset dhe pterodaktilët ndërsa vrapon përgjatë një peizazhi të shkretuar. Kur dëgjon një sinjalizim audioje, trokit për të kapërcyer mbi pengesa.</translation>
@@ -714,7 +715,6 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="2183238148268545307">Softuerët e videove</translation>
 <translation id="2183608646556468874">Numri i telefonit</translation>
 <translation id="2184405333245229118">{COUNT,plural, =1{1 adresë}other{# adresa}}</translation>
-<translation id="2187317261103489799">Zbulo (parazgjedhja)</translation>
 <translation id="2188375229972301266">Shumë shpime poshtë</translation>
 <translation id="218940509700321686">Vlera të ndara me presje</translation>
 <translation id="2194856509914051091">Gjëra për t'u pasur parasysh</translation>
@@ -792,7 +792,6 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="2303437270440428119">Fletëllogaritëse OpenDocument</translation>
 <translation id="2305294852062272447">Të ruhet leja e drejtimit?</translation>
 <translation id="2306124309679506798">Të lejohet një përvojë gjithëpërfshirëse?</translation>
-<translation id="2307711332257985952">Adresat e tua të shtëpisë dhe të punës tani janë të disponueshme në Chrome</translation>
 <translation id="2310789833878085574">Ruaj dhe plotëso automatikisht</translation>
 <translation id="2312234273148520048">Erëza dhe salca</translation>
 <translation id="2316087952091171402">Më pak se <ph name="UPPER_ESTIMATE" />. Disa sajte mund të ngarkohen më ngadalë në vizitën tënde të radhës.</translation>
@@ -938,7 +937,6 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="2535659140340599600">{COUNT,plural, =1{dhe 1 tjetër}other{dhe # të tjera}}</translation>
 <translation id="2536110899380797252">Shto adresë</translation>
 <translation id="2537931901612099523">Të tjerët që e përdorin këtë pajisje nuk do të shikojnë aktivitetin tënd, kështu që mund të shfletosh në mënyrë më private. Kjo nuk do të ndryshojë mënyrën se si mblidhen të dhënat nga uebsajtet që viziton ti dhe shërbimet që përdorin ato, duke përfshirë Google. Shkarkimet dhe faqeshënuesit do të ruhen.</translation>
-<translation id="2539524384386349900">Zbulo</translation>
 <translation id="2541219929084442027">Faqet që shikon në skedat "e fshehta" nuk do të ruhen në historikun e shfletuesit tënd, vendin e ruajtjes të kukive apo historikun e kërkimeve pasi ke mbyllur të gjitha skedat e tua "të fshehta". Çdo skedar që shkarkon apo faqeshënues që krijon do të mbahet.</translation>
 <translation id="2542106216580219892">Sërfi</translation>
 <translation id="2543236854123609690"><ph name="ORIGIN" /> - Për të dalë nga ekrani i plotë, shtyp dhe mbaj shtypur |<ph name="ACCELERATOR" />|</translation>
@@ -1330,7 +1328,6 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="3229041911291329567">Informacioni i versionit rreth pajisjes dhe shfletuesit tënd</translation>
 <translation id="3229277193950731405">Kopjo vargun e versionit</translation>
 <translation id="323107829343500871">Shkruaj kodin CVC për <ph name="CREDIT_CARD" /></translation>
-<translation id="3234666976984236645">Zbulo gjithmonë përmbajtje të rëndësishme në këtë sajt</translation>
 <translation id="323585066388831737">E kuqe e çelur</translation>
 <translation id="3235902901585019063">Skedarët lokalë do të fshihen më <ph name="DATE_TIME" />. Sigurohu që të dhënat kritike personale ose të biznesit të ruhen në nivel të jashtëm.</translation>
 <translation id="3236212803136366317">Përfitimet e kartave</translation>
@@ -1539,6 +1536,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="3576616784287504635">Një faqe e integruar në <ph name="SITE" /> thotë</translation>
 <translation id="3577473026931028326">Ndodhi një gabim. Provo përsëri.</translation>
 <translation id="3577902790357386792">Gjimnastika</translation>
+<translation id="3580550219062570293"><ph name="TOS_TITLE" /> <ph name="LOGO_DESCRIPTION" /></translation>
 <translation id="3581089476000296252">Chrome do të të njoftojë kur kjo faqe të jetë gati. &lt;a&gt;Anuloje&lt;/a&gt;</translation>
 <translation id="3582930987043644930">Shto emrin</translation>
 <translation id="3583757800736429874">&amp;Bëje përsëri zhvendosjen</translation>
@@ -1787,6 +1785,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="398470910934384994">Shpendët</translation>
 <translation id="3985750352229496475">Menaxho adresat...</translation>
 <translation id="3986506998755860149">mëso më shumë rreth plotësimit automatik me IA-në te cilësimet</translation>
+<translation id="3986557181852957825">Google Pay, logoja e Klarna</translation>
 <translation id="3986705137476756801">Çaktivizo "Titrat në çast" për momentin</translation>
 <translation id="3987460020348247775"><ph name="EXPRESSION" /> = <ph name="ANSWER" /></translation>
 <translation id="3987940399970879459">Më pak se 1 MB</translation>
@@ -1860,6 +1859,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="4104702906064390950">Po ruhen informacionet e numrit IBAN</translation>
 <translation id="4106887816571530227">Përmbajtja e integruar nuk lejohet</translation>
 <translation id="4107047499377819067">Instalimi i shërbimeve të VPN-së në sfond ka filluar. Kjo mund të zgjasë disa minuta.</translation>
+<translation id="4110642094637545339">Google Pay, logoja e AfterPay</translation>
 <translation id="4110652170750985508">Rishiko pagesën tënde</translation>
 <translation id="4111546256784973544">Lojërat me armë me bojë</translation>
 <translation id="4112140312785995938">Kërko prapa</translation>
@@ -1887,7 +1887,6 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="4147897805161313378">Fotografitë e Google</translation>
 <translation id="4148925816941278100">American Express</translation>
 <translation id="4150099059797363385">Zarf kinez nr. 4</translation>
-<translation id="4151403195736952345">Përdor parazgjedhjen globale (zbulo)</translation>
 <translation id="4152318981910038897">{COUNT,plural, =1{Faqja 1}other{Faqja {COUNT}}}</translation>
 <translation id="4152670763139331043">{NUM_TABS,plural, =1{1 skedë}other{# skeda}}</translation>
 <translation id="4153446078232988116"><ph name="SITE" /> nuk e mbështet një lidhje të sigurt me HTTPS</translation>
@@ -2278,6 +2277,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="4807098396393229769">Emri në kartë</translation>
 <translation id="4809079943450490359">Udhëzimet nga administratori i pajisjes sate:</translation>
 <translation id="4811450222531576619">Mëso rreth burimit të saj dhe temës</translation>
+<translation id="4811918461974803225">Google Pay, logoja e Affirm</translation>
 <translation id="4813512666221746211">Gabim në rrjet</translation>
 <translation id="4814114628197290459">Fshi numrin IBAN</translation>
 <translation id="4816341377198595747">Butoni "Kërko te faqeshënuesit". Aktivizoje për të kërkuar te faqeshënuesit</translation>
@@ -2527,6 +2527,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="5222812217790122047">Email-i është i detyrueshëm</translation>
 <translation id="5225215474235602477">Të ruhet pasaporta?</translation>
 <translation id="5228269245420405804">Mësimi në distancë</translation>
+<translation id="5229844812197559338"><ph name="SELECT_PROVIDER_TITLE" />. <ph name="LOGO_DESCRIPTION" /></translation>
 <translation id="5230733896359313003">Adresa e dërgimit</translation>
 <translation id="5230815978613972521">B8</translation>
 <translation id="523149107733989821">A4 Extra</translation>
@@ -2901,6 +2902,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="5879272455334365707">Planifikimi dhe menaxhimi financiar</translation>
 <translation id="5879989559903563723">Nuk lejohet në modalitetin "vizitor"</translation>
 <translation id="5880050725127890683">Shko te kontrolli i sigurisë i Chrome</translation>
+<translation id="5880385758720707152">Plotëso automatikisht adresat e shtëpisë dhe të punës nga "Llogaria jote e Google"</translation>
 <translation id="5884465125445718607">Zarf kinez nr. 6</translation>
 <translation id="5886961930368713749">Dërgo komente për "Krahaso"</translation>
 <translation id="5887400589839399685">Karta u ruajt</translation>
@@ -3292,6 +3294,7 @@ Ndryshe kjo do të bllokohet nga cilësimet e tua të privatësisë. Kjo do ta l
 <translation id="6493924760403974580">Ky aplikacion mbështet vetëm këtë madhësi.</translation>
 <translation id="6494750904506170417">dritaret kërcyese dhe ridrejtimet</translation>
 <translation id="6495664197699704593">Ky fjalëkalim ruhet vetëm në këtë pajisje. Për ta përdorur atë në pajisjet e tua të tjera, <ph name="GOOGLE_PASSWORD_MANAGER" />.</translation>
+<translation id="649611364763911650">Për të përdorur një shërbim tjetër të plotësimit automatik në Chrome, zgjidh ofruesin tënd të plotësimit automatik në cilësimet e Android</translation>
 <translation id="6499038740797743453">Të rivendoset fjalëkalimi?</translation>
 <translation id="6502510275417601303">Sinjalizimi për cilësimin e pagesës së re u mbyll</translation>
 <translation id="6502991525169604759">Pa ndryshimet e tua</translation>

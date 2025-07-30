@@ -28,6 +28,7 @@ source_set("color") {
     "new_tab_page_color_palette.mm",
     "new_tab_page_color_palette_util.h",
     "new_tab_page_color_palette_util.mm",
+    "new_tab_page_color_updating.h",
     "new_tab_page_trait.h",
     "new_tab_page_trait.mm",
     "theme_utils.h",
@@ -105,7 +106,6 @@ source_set("component_factory") {
     "//ios/chrome/browser/signin/model:authentication_service_factory",
     "//ios/chrome/browser/sync/model",
     "//ios/chrome/browser/url_loading/model",
-    "//ios/public/provider/chrome/browser/ui_utils:ui_utils_api",
   ]
 }
 
@@ -205,7 +205,6 @@ source_set("coordinator") {
     "//ios/chrome/common:string_conversions",
     "//ios/chrome/common:timing",
     "//ios/chrome/common/ui/util",
-    "//ios/public/provider/chrome/browser/ui_utils:ui_utils_api",
     "//ios/web/public",
     "//ios/web/public/navigation",
     "//ui/base",
@@ -279,6 +278,8 @@ source_set("ntp_internal") {
     "//ios/chrome/browser/location_bar/ui_bundled:fakebox_buttons_snapshot",
     "//ios/chrome/browser/metrics/model:metrics_internal",
     "//ios/chrome/browser/ntp/model",
+    "//ios/chrome/browser/ntp/search_engine_logo/mediator",
+    "//ios/chrome/browser/ntp/search_engine_logo/ui",
     "//ios/chrome/browser/ntp/shared/metrics",
     "//ios/chrome/browser/ntp/shared/metrics:constants",
     "//ios/chrome/browser/ntp/shared/metrics:home_metrics",
@@ -384,6 +385,7 @@ source_set("unit_tests") {
     "//ios/chrome/browser/home_customization/model",
     "//ios/chrome/browser/image_fetcher/model",
     "//ios/chrome/browser/ntp/model",
+    "//ios/chrome/browser/ntp/search_engine_logo/ui",
     "//ios/chrome/browser/ntp/shared/metrics",
     "//ios/chrome/browser/ntp/shared/metrics:constants",
     "//ios/chrome/browser/ntp/shared/metrics:home_metrics",

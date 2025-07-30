@@ -112,9 +112,11 @@ class BrowserFeaturePromoController2xUiTestBase
       : InteractiveFeaturePromoTest(UseMockTracker(), clock_mode) {}
   ~BrowserFeaturePromoController2xUiTestBase() override = default;
 
-  void OnCustomUiCustomAction(ui::ElementContext context,
-                              user_education::FeaturePromoHandle promo_handle) {
-    EXPECT_EQ(browser()->window()->GetElementContext(), context);
+  void OnCustomUiCustomAction(
+      const user_education::UserEducationContextPtr& context,
+      user_education::FeaturePromoHandle promo_handle) {
+    EXPECT_EQ(browser()->window()->GetElementContext(),
+              context->GetElementContext());
     continued_promo_handle_ = std::move(promo_handle);
   }
 
@@ -231,7 +233,8 @@ class BrowserFeaturePromoController2xUiTestBase
   }
 
   user_education::FeaturePromoController* promo_controller() const {
-    return BrowserUserEducationInterface::From(browser())
+    return UserEducationServiceFactory::GetForBrowserContext(
+               browser()->profile())
         ->GetFeaturePromoControllerForTesting();
   }
 
@@ -293,8 +296,9 @@ class BrowserFeaturePromoController2xUiTest
         user_education::FeaturePromoSpecification::CreateForCustomUi(
             kCustomUiTestFeature, kToolbarAppMenuButtonElementId,
             user_education::CreateCustomHelpBubbleViewFactoryCallback(
-                base::BindRepeating([](ui::ElementContext reference_context,
-                                       user_education::HelpBubbleArrow arrow,
+                base::BindRepeating([](const user_education::
+                                           UserEducationContextPtr&
+                                               reference_context,
                                        FeaturePromoSpecification::
                                            BuildHelpBubbleParams build_params) {
                   auto* const anchor_element =
@@ -302,7 +306,8 @@ class BrowserFeaturePromoController2xUiTest
                   return std::make_unique<
                       user_education::test::TestCustomHelpBubbleView>(
                       anchor_element->AsA<views::TrackedElementViews>()->view(),
-                      user_education::HelpBubbleViews::TranslateArrow(arrow));
+                      user_education::HelpBubbleViews::TranslateArrow(
+                          build_params.arrow));
                 })),
             base::BindRepeating(&BrowserFeaturePromoController2xUiTestBase::
                                     OnCustomUiCustomAction,
@@ -521,6 +526,10 @@ IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
                    ExpectedMetrics{.custom_action_count = 1}));
 }
 
+MATCHER_P(MatchesContext, expected, "Matches the expected context") {
+  return arg.get() == expected.get();
+}
+
 IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
                        CustomActionCallbackInSecondWindow) {
   // Create a second browser.
@@ -533,8 +542,9 @@ IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
           browser()->window()->GetElementContext());
   app_menu_button->SetVisible(false);
 
-  EXPECT_CALL(custom_action_callback_,
-              Run(other->window()->GetElementContext(), testing::_))
+  auto& context = BrowserUserEducationInterface::From(other)
+                      ->GetUserEducationContextForTesting();
+  EXPECT_CALL(custom_action_callback_, Run(MatchesContext(context), testing::_))
       .Times(1);
 
   RunTestSequence(InAnyContext(
@@ -548,6 +558,33 @@ IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
       MaybeShowPromo(kCustomActionTestFeature),
       // Perform the action, and verify that the second browser's context is
       // used when the action button is clicked.
+      PressNonDefaultPromoButton()));
+}
+
+IN_PROC_BROWSER_TEST_P(BrowserFeaturePromoController2xUiTest,
+                       CustomActionCallbackInSecondWindowAfterFirstCloses) {
+  // Create a second browser.
+  Browser* const other = CreateBrowser(browser()->profile());
+
+  // Hide the anchor element in the first browser.
+  auto* const app_menu_button =
+      views::ElementTrackerViews::GetInstance()->GetUniqueView(
+          kToolbarAppMenuButtonElementId,
+          browser()->window()->GetElementContext());
+  app_menu_button->SetVisible(false);
+
+  // The promo should now show in the second window.
+  auto& context = BrowserUserEducationInterface::From(other)
+                      ->GetUserEducationContextForTesting();
+  EXPECT_CALL(custom_action_callback_, Run(MatchesContext(context), testing::_))
+      .Times(1);
+
+  RunTestSequence(InAnyContext(
+      MaybeShowPromo(kCustomActionTestFeature),
+      Do([this]() { browser()->window()->Close(); }),
+      WaitForHide(kBrowserViewElementId).SetTransitionOnlyOnEvent(true),
+      EnsurePresent(
+          user_education::HelpBubbleView::kHelpBubbleElementIdForTesting),
       PressNonDefaultPromoButton()));
 }
 
@@ -618,12 +655,14 @@ class BrowserFeaturePromoController20CanShowPromoForElementUiTest
     return CheckElement(
         spec,
         [this](ui::TrackedElement* anchor) {
-          auto* const interface =
-              BrowserUserEducationInterface::From(browser());
-          return static_cast<BrowserFeaturePromoController20*>(
-                     interface->GetFeaturePromoControllerForTesting())
-              ->CanShowPromoForElement(
-                  anchor, interface->GetUserEducationContextForTesting());
+          const auto* const controller =
+              UserEducationServiceFactory::GetForBrowserContext(
+                  browser()->profile())
+                  ->GetFeaturePromoControllerForTesting();
+          const auto context = BrowserUserEducationInterface::From(browser())
+                                   ->GetUserEducationContextForTesting();
+          return static_cast<const BrowserFeaturePromoController20*>(controller)
+              ->CanShowPromoForElement(anchor, context);
         },
         expected);
   }

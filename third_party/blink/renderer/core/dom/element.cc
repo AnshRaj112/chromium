@@ -237,6 +237,7 @@
 #include "third_party/blink/renderer/core/view_transition/view_transition_supplement.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition_transition_element.h"
 #include "third_party/blink/renderer/core/view_transition/view_transition_utils.h"
+#include "third_party/blink/renderer/core/xlink_names.h"
 #include "third_party/blink/renderer/core/xml_names.h"
 #include "third_party/blink/renderer/platform/bindings/dom_data_store.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
@@ -1663,58 +1664,72 @@ bool Element::InterestLost(Element& target) {
 
 void Element::DefaultEventHandler(Event& event) {
   if (RuntimeEnabledFeatures::HTMLInterestForAttributeEnabled(
-          GetDocument().GetExecutionContext())) {
-    if (InterestForElement() || GetInterestInvoker() ||
-        GetInterestState() != InterestState::kNoInterest) [[unlikely]] {
-      // Handle new `interestfor` activation via mouse, keyboard, or long-
-      // press.
-      String type = event.type();
-      if (auto* mouse_event = DynamicTo<MouseEvent>(event)) {
-        if (!mouse_event->FromTouch()) {
-          if (type == event_type_names::kMouseover) {
-            HandleInterestForHoverOrFocus(InterestSource::kHover);
-          }
-          if (type == event_type_names::kMouseout) {
-            HandleInterestForHoverOrFocus(InterestSource::kDeHover);
-          }
-        }
-      }
-      if (auto* focus_event = DynamicTo<FocusEvent>(event)) {
-        if (!focus_event->sourceCapabilities() ||
-            !focus_event->sourceCapabilities()->firesTouchEvents()) {
-          if (type == event_type_names::kFocusin) {
-            HandleInterestForHoverOrFocus(InterestSource::kFocus);
-          }
-          if (type == event_type_names::kFocusout) {
-            HandleInterestForHoverOrFocus(InterestSource::kBlur);
-          }
-        }
-      }
-      if (IsA<GestureEvent>(event) &&
-          type == event_type_names::kGesturelongpress) {
-        // Delays don't apply to long-press, since the "long press" has a
-        // built-in delay. Just show interest immediately in this case. This
-        // follows the same path used by context-menu activations on link
-        // elements.
-        // TODO(crbug.com/364669918): Touchscreen / long-press still needs a
-        // unit test.
-        ShowInterestNow();
+          GetDocument().GetExecutionContext()) &&
+      (InterestForElement() || GetInterestInvoker() ||
+       GetInterestState() != InterestState::kNoInterest)) [[unlikely]] {
+    // Handle new `interestfor` activation via mouse, keyboard, or long-
+    // press.
+    String type = event.type();
+    if (auto* mouse_event = DynamicTo<MouseEvent>(event);
+        mouse_event && !mouse_event->FromTouch()) {
+      if (type == event_type_names::kMouseover) {
+        HandleInterestForHoverOrFocus(InterestSource::kHover);
+      } else if (type == event_type_names::kMouseout) {
+        HandleInterestForHoverOrFocus(InterestSource::kDeHover);
       }
     }
-    if (GetInterestState() != InterestState::kNoInterest) [[unlikely]] {
+    if (auto* focus_event = DynamicTo<FocusEvent>(event);
+        focus_event &&
+        (!focus_event->sourceCapabilities() ||
+         !focus_event->sourceCapabilities()->firesTouchEvents())) {
+      if (type == event_type_names::kFocusin) {
+        HandleInterestForHoverOrFocus(InterestSource::kFocus);
+      } else if (type == event_type_names::kFocusout) {
+        HandleInterestForHoverOrFocus(InterestSource::kBlur);
+      }
+    }
+
+    // For long presses on buttons, no context menu will be generated, because
+    // the UA stylesheet adds `user-select:none` in this case. However, this
+    // decision is made on the browser-side, async, which means we can't
+    // explicitly check it here. So we just immediately show interest here for
+    // all buttons that don't yet have interest.
+    // TODO: should <area> elements be handled here also?
+    if (auto* button = DynamicTo<HTMLButtonElement>(this);
+        button && IsA<GestureEvent>(event) &&
+        type == event_type_names::kGesturelongpress &&
+        GetInterestState() == InterestState::kNoInterest) {
+      // The pointer event manager will send a `pointerup` at the end of
+      // this long-press, and (without intervention) that will immediately
+      // light dismiss any target popover. To avoid this problem, set the
+      // pointerdown target to the target popover, which will not match the
+      // `null` target for that pointerup event.
+      if (auto* target_popover = DynamicTo<HTMLElement>(InterestForElement());
+          target_popover && target_popover->IsPopover()) {
+        GetDocument().SetPopoverPointerdownTarget(target_popover);
+      }
+      // Delays don't apply to long-press, since the "long press" has a
+      // built-in delay. Just show interest immediately in this case. This
+      // follows the same path used by context-menu activations on link
+      // elements.
+      // TODO(crbug.com/364669918): Touchscreen / long-press still needs a
+      // unit test.
+      ShowInterestNow();
+    }
+
+    if (auto* keyboard_event = DynamicTo<KeyboardEvent>(event);
+        keyboard_event && event.type() == event_type_names::kKeydown &&
+        GetInterestState() != InterestState::kNoInterest) {
       // Handle `interestfor` "activation" hotkey, and ESC key to lose
       // interest.
-      if (auto* keyboard_event = DynamicTo<KeyboardEvent>(event);
-          keyboard_event && event.type() == event_type_names::kKeydown) {
-        const int modifiers = keyboard_event->GetModifiers() &
-                              blink::WebInputEvent::kKeyModifiers;
-        auto* target = GetInvokerData()->ActiveInterestTarget();
-        DCHECK_EQ(InterestForElement(), target);
-        if (keyboard_event->key() == keywords::kEscape && !modifiers) {
-          if (GainOrLoseInterest(this, target, InterestState::kNoInterest)) {
-            event.SetDefaultHandled();
-            return;
-          }
+      const int modifiers =
+          keyboard_event->GetModifiers() & blink::WebInputEvent::kKeyModifiers;
+      auto* target = GetInvokerData()->ActiveInterestTarget();
+      DCHECK_EQ(InterestForElement(), target);
+      if (keyboard_event->key() == keywords::kEscape && !modifiers) {
+        if (GainOrLoseInterest(this, target, InterestState::kNoInterest)) {
+          event.SetDefaultHandled();
+          return;
         }
       }
     }
@@ -3291,40 +3306,108 @@ const AttrNameToTrustedType& Element::GetCheckedAttributeTypes() const {
   return attribute_map;
 }
 
-SpecificTrustedType Element::ExpectedTrustedTypeForAttribute(
-    const QualifiedName& q_name) const {
-  // There are only a handful of namespaced attributes we care about
-  // (xlink:href), and all of those have identical Trusted Types
-  // properties to their namespace-less counterpart. So we check whether this
-  // is one of SVG's 'known' attributes, and if so just check the local
-  // name part as usual.
-  if (!q_name.NamespaceURI().IsNull() &&
-      !SVGAnimatedHref::IsKnownAttribute(q_name)) {
-    return SpecificTrustedType::kNone;
-  }
+const std::tuple<SpecificTrustedType, const char*, const AtomicString>
+Element::GetTrustedTypeDataForAttribute(const QualifiedName& q_name,
+                                        const char* legacy_sink_name) const {
+  // https://w3c.github.io/trusted-types/dist/spec/#abstract-opdef-get-trusted-type-data-for-attribute
 
-  const AttrNameToTrustedType* attribute_types = &GetCheckedAttributeTypes();
-  AttrNameToTrustedType::const_iterator iter =
-      attribute_types->find(q_name.LocalName());
-  if (iter != attribute_types->end()) {
-    return iter->value;
-  }
-
-  // Since event handlers can be defined on nearly all elements, we will
-  // consider them independently of the specific element they're attached to.
+  // We implement both legacy and new behaviour, guarded by TrustedTypesHTML.
   //
-  // Note: Element::IsEventHandlerAttribute is different and over-approximates
-  // event-handler-ness, since it is expected to work only for builtin
-  // attributes (like "onclick"), while Trusted Types needs to deal with
-  // whatever users pass into setAttribute (for example "one"). Also, it
-  // requires the actual Attribute rather than the QName, which means
-  // Element::IsEventHandlerAttribute can only be called after an attribute has
-  // been constructed.
-  if (IsTrustedTypesEventHandlerAttribute(q_name)) {
-    return SpecificTrustedType::kScript;
-  }
+  // Once TrustedTypesHTML is perma-enabled, the second branch can be removed,
+  // as can the legacy_sink_name parameter. And the return type can become
+  // AttrNameToTrustedType::value_type.
+  if (RuntimeEnabledFeatures::TrustedTypesHTMLEnabled()) {
+    // Step 1: Let data be null. (Nothing to do; we don't set data.)
+    // Step 2: If [... conditions ...] and attribute is the name of an event
+    //         handler content attribute: [...]
+    if (q_name.NamespaceURI().IsNull() &&
+        (namespaceURI() == html_names::xhtmlNamespaceURI ||
+         namespaceURI() == svg_names::kNamespaceURI ||
+         namespaceURI() == mathml_names::kNamespaceURI) &&
+        IsTrustedTypesEventHandlerAttribute(q_name)) {
+      return {SpecificTrustedType::kScript, "Element", q_name.LocalName()};
+    }
 
-  return SpecificTrustedType::kNone;
+    // Step 3: Find the row in the following table [...]
+    // Since there's only one namespaced, TT-relevant attribute, we'll keep
+    // namespaces out of the tables. Thus, we'll handle the one namespaced
+    // attribute separately.
+    if (!q_name.NamespaceURI().empty() &&
+        !q_name.Matches(xlink_names::kHrefAttr)) {
+      return {SpecificTrustedType::kNone, "Element", q_name.LocalName()};
+    }
+    const AttrNameToTrustedType* attribute_types = &GetCheckedAttributeTypes();
+    AttrNameToTrustedType::const_iterator iter =
+        attribute_types->find(q_name.LocalName());
+
+    // Step 4: Return data. [data might be null.]
+    if (iter == attribute_types->end()) {
+      return {SpecificTrustedType::kNone, "Element", q_name.LocalName()};
+    }
+    return {iter->value.first, iter->value.second, q_name.LocalName()};
+  } else {
+    // Legacy behaviour; no longer spec compliant.
+
+    // TODO(vogelheim): We construct an AtomicString based on legacy_sink_name
+    // so that we can use the same type across all cases. Because this instance
+    // is constructed here, we need to return a `const AtomicString` rather
+    // than a `const AtomicString&`, so that the memory is owned at all times.
+    // In blink_unittests V8ElementTest.SetAttributeOperationCallback, the
+    // number of AtomicString references is tested for, which is sensitive to
+    // this operation.
+    // Once the TrustedTypesHTML flag is removed, this code also gets removed
+    // and it should be easy to change the return type back to a reference.
+    AtomicString property_name(legacy_sink_name);
+    if (!q_name.NamespaceURI().IsNull() &&
+        !SVGAnimatedHref::IsKnownAttribute(q_name)) {
+      return {SpecificTrustedType::kNone, "Element", property_name};
+    }
+    const AttrNameToTrustedType* attribute_types = &GetCheckedAttributeTypes();
+    AttrNameToTrustedType::const_iterator iter =
+        attribute_types->find(q_name.LocalName());
+    if (iter != attribute_types->end()) {
+      return {iter->value.first, "Element", property_name};
+    }
+
+    if (IsTrustedTypesEventHandlerAttribute(q_name)) {
+      return {SpecificTrustedType::kScript, "Element", property_name};
+    }
+
+    return {SpecificTrustedType::kNone, "Element", property_name};
+  }
+}
+
+String Element::TrustedTypesCheckForAttribute(
+    const QualifiedName& q_name,
+    const V8TrustedType* value,
+    const char* legacy_sink_name,
+    ExceptionState& exception_state) const {
+  auto data = GetTrustedTypeDataForAttribute(q_name, legacy_sink_name);
+  return TrustedTypesCheckFor(std::get<0>(data), value, GetExecutionContext(),
+                              std::get<1>(data), std::get<2>(data),
+                              exception_state);
+}
+
+String Element::TrustedTypesCheckForAttribute(
+    const QualifiedName& q_name,
+    const AtomicString& value,
+    const char* legacy_sink_name,
+    ExceptionState& exception_state) const {
+  auto data = GetTrustedTypeDataForAttribute(q_name, legacy_sink_name);
+  return TrustedTypesCheckFor(std::get<0>(data), value, GetExecutionContext(),
+                              std::get<1>(data), std::get<2>(data),
+                              exception_state);
+}
+
+String Element::TrustedTypesCheckForAttribute(
+    const QualifiedName& q_name,
+    String value,
+    const char* legacy_sink_name,
+    ExceptionState& exception_state) const {
+  auto data = GetTrustedTypeDataForAttribute(q_name, legacy_sink_name);
+  return TrustedTypesCheckFor(std::get<0>(data), std::move(value),
+                              GetExecutionContext(), std::get<1>(data),
+                              std::get<2>(data), exception_state);
 }
 
 void Element::ProcessElementRenderBlocking(const AtomicString& id_or_name) {
@@ -6947,9 +7030,8 @@ void Element::setAttributeNS(const AtomicString& namespace_uri,
     return;
   }
 
-  AtomicString trusted_value(TrustedTypesCheckFor(
-      ExpectedTrustedTypeForAttribute(*parsed_name), std::move(value),
-      GetExecutionContext(), "Element", "setAttributeNS", exception_state));
+  AtomicString trusted_value(TrustedTypesCheckForAttribute(
+      *parsed_name, std::move(value), "setAttributeNS", exception_state));
   if (exception_state.HadException()) {
     return;
   }
@@ -6967,9 +7049,8 @@ void Element::setAttributeNS(const AtomicString& namespace_uri,
     return;
   }
 
-  AtomicString value(TrustedTypesCheckFor(
-      ExpectedTrustedTypeForAttribute(*parsed_name), trusted_string,
-      GetExecutionContext(), "Element", "setAttributeNS", exception_state));
+  AtomicString value(TrustedTypesCheckForAttribute(
+      *parsed_name, trusted_string, "setAttributeNS", exception_state));
   if (exception_state.HadException()) {
     return;
   }
@@ -11819,9 +11900,8 @@ void Element::SetAttributeWithValidation(Attr* attribute,
     // Note: originalElement is this. We already remember that.
 
     // Step 2.2: Let verifiedValue be [..] verify attribute value [...].
-    AtomicString verified_value = AtomicString(TrustedTypesCheckFor(
-        ExpectedTrustedTypeForAttribute(attribute->GetQualifiedName()), value,
-        GetExecutionContext(), "Element", "setAttribute", exception_state));
+    AtomicString verified_value = AtomicString(TrustedTypesCheckForAttribute(
+        attribute->GetQualifiedName(), value, "setAttribute", exception_state));
     if (exception_state.HadException()) {
       return;
     }
@@ -11852,9 +11932,8 @@ void Element::SetAttributeWithValidation(Attr* attribute,
   const QualifiedName name = attribute->GetQualifiedName();
   SynchronizeAttribute(name);
 
-  AtomicString trusted_value(TrustedTypesCheckFor(
-      ExpectedTrustedTypeForAttribute(name), value, GetExecutionContext(),
-      "Element", "setAttribute", exception_state));
+  AtomicString trusted_value(TrustedTypesCheckForAttribute(
+      name, value, "setAttribute", exception_state));
   if (exception_state.HadException()) {
     return;
   }
@@ -11887,10 +11966,8 @@ void Element::SetAttributeHinted(AtomicString local_name,
 
   auto [index, q_name] =
       LookupAttributeQNameHinted(std::move(local_name), hint);
-
-  AtomicString trusted_value(TrustedTypesCheckFor(
-      ExpectedTrustedTypeForAttribute(q_name), std::move(value),
-      GetExecutionContext(), "Element", "setAttribute", exception_state));
+  AtomicString trusted_value(TrustedTypesCheckForAttribute(
+      q_name, std::move(value), "setAttribute", exception_state));
   if (exception_state.HadException()) {
     return;
   }
@@ -11917,9 +11994,8 @@ void Element::SetAttributeHinted(AtomicString local_name,
 
   auto [index, q_name] =
       LookupAttributeQNameHinted(std::move(local_name), hint);
-  AtomicString value(TrustedTypesCheckFor(
-      ExpectedTrustedTypeForAttribute(q_name), trusted_string,
-      GetExecutionContext(), "Element", "setAttribute", exception_state));
+  AtomicString value(TrustedTypesCheckForAttribute(
+      q_name, trusted_string, "setAttribute", exception_state));
   if (exception_state.HadException()) {
     return;
   }
@@ -11985,9 +12061,8 @@ ALWAYS_INLINE void Element::SetAttributeInternal(
 
 Attr* Element::setAttributeNode(Attr* attr_node,
                                 ExceptionState& exception_state) {
-  AtomicString value(TrustedTypesCheckFor(
-      ExpectedTrustedTypeForAttribute(attr_node->GetQualifiedName()),
-      attr_node->value(), GetExecutionContext(), "Element", "setAttributeNode",
+  AtomicString value(TrustedTypesCheckForAttribute(
+      attr_node->GetQualifiedName(), attr_node->value(), "setAttributeNode",
       exception_state));
   if (exception_state.HadException()) {
     return nullptr;

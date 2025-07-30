@@ -464,7 +464,12 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
        IDS_NTP_MICROSOFT_AUTHENTICATION_SUBHEADING},
       {"modulesMicrosoftAuthSignIn",
        IDS_NTP_MICROSOFT_AUTHENTICATION_SIGN_IN_BUTTON_TEXT},
+      {"modulesTabGroupsCreateNewTabGroup", IDS_CREATE_NEW_TAB_GROUP},
       {"modulesTabGroupsTitle", IDS_NTP_MODULES_TAB_GROUPS_TITLE},
+      {"modulesTabGroupsZeroStateTitle",
+       IDS_NTP_MODULES_TAB_GROUPS_ZERO_STATE_TITLE},
+      {"modulesTabGroupsZeroStateText",
+       IDS_NTP_MODULES_TAB_GROUPS_ZERO_STATE_TEXT},
 
       // Middle slot promo.
       {"undoDismissPromoButtonToast", IDS_NTP_UNDO_DISMISS_PROMO_BUTTON_TOAST},
@@ -533,8 +538,9 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
                      composebox_config.max_num_files());
 
   source->AddBoolean("searchboxShowComposeEntrypoint",
-                     ntp_composebox::IsNtpSearchboxComposeEntrypointEnabled(
-                         g_browser_process) &&
+                     (ntp_composebox::IsNtpSearchboxComposeEntrypointEnabled(
+                          g_browser_process) ||
+                      ntp_composebox::FeatureConfig::Get().enabled) &&
                          omnibox::IsAimAllowedByPolicy(profile->GetPrefs()));
   source->AddBoolean("searchboxShowComposebox",
                      ntp_composebox::FeatureConfig::Get().enabled &&
@@ -1049,12 +1055,15 @@ void NewTabPageUI::OnLoad() {
   const bool modules_enabled = ntp::HasModulesEnabled(
       module_id_details_, IdentityManagerFactory::GetForProfile(profile_));
   update.Set("modulesEnabled", modules_enabled);
-  const bool show_ntp_promos =
-      !modules_enabled && user_education::features::NtpBrowserPromosEnabled() &&
+
+  const auto* ntp_promo_controller =
       UserEducationServiceFactory::GetForBrowserContext(profile_)
-          ->ntp_promo_controller()
-          ->HasShowablePromos(profile_);
+          ->ntp_promo_controller();
+  const bool show_ntp_promos =
+      !modules_enabled && ntp_promo_controller &&
+      ntp_promo_controller->HasShowablePromos(profile_);
   update.Set("browserPromosEnabled", show_ntp_promos);
+
   content::WebUIDataSource::Update(profile_, chrome::kChromeUINewTabPageHost,
                                    std::move(update));
 }

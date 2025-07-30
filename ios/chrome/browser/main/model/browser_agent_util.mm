@@ -90,10 +90,13 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
   }
 
   // TODO(crbug.com/433229469): Once kLimitBrowserAgentsForInactiveBrowser is
-  // fully launched the variable browser_is_inactive can be removed as it will
-  // always be false. Cleanup the variable and its use when the feature launch.
+  // fully launched the variables browser_is_inactive and browser_is_temporary
+  // can be removed as they will always be false. Cleanup the variables and
+  // their use when the feature launch.
   const bool browser_is_off_record = browser->GetProfile()->IsOffTheRecord();
   const bool browser_is_inactive = browser->IsInactive();
+  const bool browser_is_temporary =
+      browser->type() == Browser::Type::kTemporary;
 
   LiveTabContextBrowserAgent::CreateForBrowser(browser);
   TabInsertionBrowserAgent::CreateForBrowser(browser);
@@ -103,8 +106,14 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
   AppLauncherBrowserAgent::CreateForBrowser(browser);
   OmniboxPositionBrowserAgent::CreateForBrowser(browser);
 
-  if (!browser_is_inactive) {
+  // Only create the FullscreenBrowserAgent and ReaderModeBrowserAgent for
+  // regular and incognito Browser (since the other Browser do not present the
+  // WebStates, and may not create the tab helpers which would lead to crashes).
+  if (!browser_is_inactive && !browser_is_temporary) {
     FullscreenController::CreateForBrowser(browser);
+    if (IsReaderModeAvailable()) {
+      ReaderModeBrowserAgent::CreateForBrowser(browser);
+    }
   }
 
   // LensBrowserAgent must be created before WebNavigationBrowserAgent.
@@ -143,11 +152,6 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
 
   WebStateListMetricsBrowserAgent::CreateForBrowser(
       browser, SessionMetrics::FromProfile(browser->GetProfile()));
-
-  if (IsReaderModeAvailable()) {
-    ReaderModeBrowserAgent::CreateForBrowser(browser,
-                                             browser->GetWebStateList());
-  }
 
   // Normal profiles are the only ones to get tab usage recorder.
   if (!browser_is_off_record) {

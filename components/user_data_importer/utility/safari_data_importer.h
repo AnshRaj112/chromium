@@ -9,8 +9,8 @@
 #include "base/threading/sequence_bound.h"
 #include "components/password_manager/core/browser/import/password_importer.h"
 #include "components/user_data_importer/utility/bookmark_parser.h"
+#include "components/user_data_importer/utility/parsing_ffi/lib.rs.h"
 #include "components/user_data_importer/utility/safari_data_import_client.h"
-#include "components/user_data_importer/utility/zip_ffi_glue.rs.h"
 
 namespace autofill {
 class CreditCard;
@@ -58,7 +58,7 @@ class SafariDataImporter {
                      history::HistoryService* history_service,
                      bookmarks::BookmarkModel* bookmark_model,
                      ReadingListModel* reading_list_model,
-                     std::unique_ptr<BookmarkParser> bookmark_parser,
+                     scoped_refptr<BookmarkParser> bookmark_parser,
                      std::string app_locale);
   ~SafariDataImporter();
 
@@ -151,9 +151,9 @@ class SafariDataImporter {
   // contained in one or more files with total size `file_size_bytes`.
   void PrepareHistory(size_t file_size_bytes);
 
-  // Transforms the HistoryEntry objects into URLRow objects and uses the
+  // Transforms the SafariHistoryEntry objects into URLRow objects and uses the
   // history service to import them.
-  void ImportHistoryEntries(std::vector<HistoryEntry> history_entries);
+  void ImportHistoryEntries(std::vector<SafariHistoryEntry> history_entries);
 
   // Invoked once parsing of history is completed. Forwards the results to
   // `client_`.
@@ -161,6 +161,10 @@ class SafariDataImporter {
 
   // Imports Credit Cards to the Payments Data Manager.
   void ContinueImportPaymentCards();
+
+  // Imports bookmarks and reading list entries from pending data into the
+  // corresponding BookmarkModel and ReadingListModel.
+  void ContinueImportBookmarks();
 
   // Objects used by this importer to do work (esp. parsing)
 
@@ -193,7 +197,7 @@ class SafariDataImporter {
   const raw_ref<ReadingListModel> reading_list_model_;
 
   // The model-layer object used to parse bookmarks from an HTML file.
-  std::unique_ptr<BookmarkParser> bookmark_parser_;
+  scoped_refptr<BookmarkParser> bookmark_parser_;
 
   // Internal state
 

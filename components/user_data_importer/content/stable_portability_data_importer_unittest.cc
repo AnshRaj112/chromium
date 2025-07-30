@@ -4,50 +4,81 @@
 
 #include "components/user_data_importer/content/stable_portability_data_importer.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/test/run_until.h"
-#include "base/test/scoped_mock_clock_override.h"
 #include "base/test/task_environment.h"
 #include "base/time/default_clock.h"
+#include "base/time/time.h"
 #include "components/bookmarks/browser/bookmark_model.h"
+#include "components/bookmarks/browser/bookmark_test_util.h"
 #include "components/bookmarks/test/test_bookmark_client.h"
+#include "components/bookmarks/test/test_matchers.h"
 #include "components/history/core/browser/history_service.h"
 #include "components/history/core/test/history_service_test_util.h"
 #include "components/reading_list/core/fake_reading_list_model_storage.h"
 #include "components/reading_list/core/reading_list_model.h"
 #include "components/reading_list/core/reading_list_model_impl.h"
-#include "components/user_data_importer/utility/zip_ffi_glue.rs.h"
+#include "components/strings/grit/components_strings.h"
+#include "components/user_data_importer/content/content_bookmark_parser.h"
+#include "components/user_data_importer/content/content_bookmark_parser_in_utility_process.h"
+#include "components/user_data_importer/content/fake_bookmark_html_parser.h"
+#include "components/user_data_importer/mojom/bookmark_html_parser.mojom.h"
+#include "components/user_data_importer/utility/parsing_ffi/lib.rs.h"
 #include "content/public/test/browser_task_environment.h"
+#include "mojo/public/cpp/bindings/pending_remote.h"
+#include "mojo/public/cpp/bindings/receiver.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/abseil-cpp/absl/strings/str_format.h"
+#include "ui/base/l10n/l10n_util.h"
 
+using bookmarks::test::IsFolder;
+using bookmarks::test::IsUrlBookmark;
 using testing::ElementsAre;
 using testing::IsEmpty;
+using testing::UnorderedElementsAre;
 
 namespace user_data_importer {
 
 class StablePortabilityDataImporterTest : public testing::Test {
+ public:
+  StablePortabilityDataImporterTest() : receiver_(&fake_utility_parser_) {}
+
  protected:
   void SetUp() override {
     CHECK(history_dir_.CreateUniqueTempDir());
     history_service_ = history::CreateHistoryService(history_dir_.GetPath(),
                                                      /*create_db=*/false);
 
-    auto bookmark_client = std::make_unique<bookmarks::TestBookmarkClient>();
-    bookmark_model_ =
-        std::make_unique<bookmarks::BookmarkModel>(std::move(bookmark_client));
+    bookmark_model_ = bookmarks::TestBookmarkClient::CreateModel();
 
     auto storage = std::make_unique<FakeReadingListModelStorage>();
+    auto* storage_raw = storage.get();
     reading_list_model_ = std::make_unique<ReadingListModelImpl>(
         std::move(storage), syncer::StorageType::kUnspecified,
         syncer::WipeModelUponSyncDisabledBehavior::kNever,
         base::DefaultClock::GetInstance());
+    storage_raw->TriggerLoadCompletion();
 
+    mojo::PendingRemote<user_data_importer::mojom::BookmarkHtmlParser>
+        pending_remote{receiver_.BindNewPipeAndPassRemote()};
+    auto parser = base::MakeRefCounted<ContentBookmarkParser>();
+    parser->SetServiceForTesting(std::move(pending_remote));
     importer_ = std::make_unique<StablePortabilityDataImporter>(
-        *history_service_, *bookmark_model_, *reading_list_model_);
+        history_service_.get(), bookmark_model_.get(),
+        reading_list_model_.get(), std::move(parser));
   }
 
   void TearDown() override { task_environment_.RunUntilIdle(); }
@@ -62,13 +93,11 @@ class StablePortabilityDataImporterTest : public testing::Test {
 
   int GetNumberOfHistoryImported() const { return number_history_imported_; }
 
-  const std::vector<ImportedBookmarkEntry>& GetPendingBookmarks() const {
-    return importer_->pending_bookmarks_;
+  const bookmarks::BookmarkNode* GetOtherBookmarkNode() {
+    return bookmark_model_->other_node();
   }
 
-  const std::vector<ImportedBookmarkEntry>& GetPendingReadingList() const {
-    return importer_->pending_reading_list_;
-  }
+  const ReadingListModel& GetReadingListModel() { return *reading_list_model_; }
 
   const std::vector<StablePortabilityHistoryEntry>& GetPendingHistory() const {
     return importer_->pending_history_entries_;
@@ -104,8 +133,13 @@ class StablePortabilityDataImporterTest : public testing::Test {
   void ImportBookmarksFile(const base::FilePath& bookmarks_file) {
     PrepareCallbacks();
 
+    // Note: Some tests use an invalid (non-existent) file name, so `file` might
+    // be invalid here.
+    base::File file(bookmarks_file,
+                    base::File::FLAG_OPEN | base::File::FLAG_READ);
+
     importer_->ImportBookmarks(
-        bookmarks_file,
+        std::move(file),
         // Use of Unretained below is safe because the RunUntil loop below
         // guarantees this outlives the tasks.
         base::BindOnce(&StablePortabilityDataImporterTest::OnBookmarksConsumed,
@@ -118,8 +152,13 @@ class StablePortabilityDataImporterTest : public testing::Test {
   void ImportReadingListFile(const base::FilePath& reading_list_file) {
     PrepareCallbacks();
 
+    // Note: Some tests use an invalid (non-existent) file name, so `file` might
+    // be invalid here.
+    base::File file(reading_list_file,
+                    base::File::FLAG_OPEN | base::File::FLAG_READ);
+
     importer_->ImportReadingList(
-        reading_list_file,
+        std::move(file),
         // Use of Unretained below is safe because the RunUntil loop below
         // guarantees this outlives the tasks.
         base::BindOnce(
@@ -133,19 +172,18 @@ class StablePortabilityDataImporterTest : public testing::Test {
   void ImportHistoryFile(const base::FilePath& history_file) {
     PrepareCallbacks();
 
+    const size_t default_batch_size = 10;
     importer_->ImportHistory(
         history_file,
         // Use of Unretained below is safe because the RunUntil loop below
         // guarantees this outlives the tasks.
         base::BindOnce(&StablePortabilityDataImporterTest::OnHistoryConsumed,
                        base::Unretained(this)),
-        10);
+        default_batch_size);
 
     ASSERT_TRUE(
         base::test::RunUntil([&]() { return history_callback_called_; }));
   }
-
-  base::ScopedMockClockOverride clock_;
 
  private:
   void OnBookmarksConsumed(int number_imported) {
@@ -169,7 +207,10 @@ class StablePortabilityDataImporterTest : public testing::Test {
     history_callback_called_ = false;
   }
 
-  content::BrowserTaskEnvironment task_environment_;
+  content::BrowserTaskEnvironment task_environment_{
+      base::test::TaskEnvironment::TimeSource::MOCK_TIME};
+  FakeBookmarkHtmlParser fake_utility_parser_;
+  mojo::Receiver<user_data_importer::mojom::BookmarkHtmlParser> receiver_;
   base::ScopedTempDir history_dir_;
   std::unique_ptr<history::HistoryService> history_service_;
   std::unique_ptr<bookmarks::BookmarkModel> bookmark_model_;
@@ -196,24 +237,19 @@ TEST_F(StablePortabilityDataImporterTest, Bookmarks_Basic) {
       </DL>)");
   EXPECT_EQ(GetNumberOfBookmarksImported(), 2);
 
-  ASSERT_EQ(GetPendingBookmarks().size(), 2u);
-  ImportedBookmarkEntry entry = GetPendingBookmarks()[0];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Google");
-  EXPECT_EQ(entry.creation_time,
-            base::Time::FromSecondsSinceUnixEpoch(904914000));
-  EXPECT_EQ(entry.url, GURL("https://www.google.com/"));
-  EXPECT_THAT(entry.path, IsEmpty());
+  const bookmarks::BookmarkNode* other_node = GetOtherBookmarkNode();
+  EXPECT_THAT(
+      other_node->children(),
+      ElementsAre(IsFolder(
+          l10n_util::GetStringUTF16(IDS_IMPORTED_FOLDER),
+          ElementsAre(
+              IsUrlBookmark(u"Google", GURL("https://www.google.com/"),
+                            base::Time::FromSecondsSinceUnixEpoch(904914000)),
+              // No timestamp maps to current time.
+              IsUrlBookmark(u"Chromium", GURL("https://www.chromium.org/"),
+                            base::Time::Now())))));
 
-  entry = GetPendingBookmarks()[1];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Chromium");
-  // No timestamp maps to current time.
-  EXPECT_EQ(entry.creation_time, clock_.Now());
-  EXPECT_EQ(entry.url, GURL("https://www.chromium.org/"));
-  EXPECT_THAT(entry.path, IsEmpty());
-
-  EXPECT_EQ(GetPendingReadingList().size(), 0u);
+  EXPECT_EQ(GetReadingListModel().size(), 0u);
 }
 
 // Identical to the above test, but without the top-level <DL> tag enclosing it.
@@ -227,24 +263,19 @@ TEST_F(StablePortabilityDataImporterTest, Bookmarks_NoTopLevelDL) {
       <DT><A HREF="https://www.chromium.org/">Chromium</A>)");
   EXPECT_EQ(GetNumberOfBookmarksImported(), 2);
 
-  ASSERT_EQ(GetPendingBookmarks().size(), 2u);
-  ImportedBookmarkEntry entry = GetPendingBookmarks()[0];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Google");
-  EXPECT_EQ(entry.creation_time,
-            base::Time::FromSecondsSinceUnixEpoch(904914000));
-  EXPECT_EQ(entry.url, GURL("https://www.google.com/"));
-  EXPECT_THAT(entry.path, IsEmpty());
+  const bookmarks::BookmarkNode* other_node = GetOtherBookmarkNode();
+  EXPECT_THAT(
+      other_node->children(),
+      ElementsAre(IsFolder(
+          l10n_util::GetStringUTF16(IDS_IMPORTED_FOLDER),
+          ElementsAre(
+              IsUrlBookmark(u"Google", GURL("https://www.google.com/"),
+                            base::Time::FromSecondsSinceUnixEpoch(904914000)),
+              // No timestamp maps to current time.
+              IsUrlBookmark(u"Chromium", GURL("https://www.chromium.org/"),
+                            base::Time::Now())))));
 
-  entry = GetPendingBookmarks()[1];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Chromium");
-  // No timestamp maps to current time.
-  EXPECT_EQ(entry.creation_time, clock_.Now());
-  EXPECT_EQ(entry.url, GURL("https://www.chromium.org/"));
-  EXPECT_THAT(entry.path, IsEmpty());
-
-  EXPECT_EQ(GetPendingReadingList().size(), 0u);
+  EXPECT_EQ(GetReadingListModel().size(), 0u);
 }
 
 // Tests parsing an HTML file with folders, both empty and with bookmarks.
@@ -268,43 +299,32 @@ TEST_F(StablePortabilityDataImporterTest, Bookmarks_Folders) {
       <DL><p>
       </DL>
       </DL>)");
-  EXPECT_EQ(GetNumberOfBookmarksImported(), 4);
+  EXPECT_EQ(GetNumberOfBookmarksImported(), 3);
 
-  ASSERT_EQ(GetPendingBookmarks().size(), 4u);
+  const bookmarks::BookmarkNode* other_node = GetOtherBookmarkNode();
+  EXPECT_THAT(
+      other_node->children(),
+      ElementsAre(IsFolder(
+          l10n_util::GetStringUTF16(IDS_IMPORTED_FOLDER),
+          ElementsAre(
+              IsUrlBookmark(u"Google", GURL("https://www.google.com/"),
+                            base::Time::FromSecondsSinceUnixEpoch(904914000)),
+              IsFolder(
+                  u"Folder 1",
+                  ElementsAre(
+                      IsUrlBookmark(
+                          u"Example", GURL("https://www.example.com/"),
+                          base::Time::FromSecondsSinceUnixEpoch(915181200)),
+                      IsFolder(
+                          u"Folder 1.1",
+                          ElementsAre(IsUrlBookmark(
+                              u"Kitsune",
+                              GURL("https://en.wikipedia.org/wiki/Kitsune"),
+                              base::Time::FromSecondsSinceUnixEpoch(
+                                  1674205200)))))),
+              IsFolder(u"Empty Folder", ElementsAre())))));
 
-  ImportedBookmarkEntry entry = GetPendingBookmarks()[0];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Google");
-  EXPECT_EQ(entry.creation_time,
-            base::Time::FromSecondsSinceUnixEpoch(904914000));
-  EXPECT_EQ(entry.url, GURL("https://www.google.com/"));
-  EXPECT_THAT(entry.path, IsEmpty());
-
-  entry = GetPendingBookmarks()[1];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Example");
-  EXPECT_EQ(entry.creation_time,
-            base::Time::FromSecondsSinceUnixEpoch(915181200));
-  EXPECT_EQ(entry.url, GURL("https://www.example.com/"));
-  EXPECT_THAT(entry.path, ElementsAre(u"Folder 1"));
-
-  entry = GetPendingBookmarks()[2];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Kitsune");
-  EXPECT_EQ(entry.creation_time,
-            base::Time::FromSecondsSinceUnixEpoch(1674205200));
-  EXPECT_EQ(entry.url, GURL("https://en.wikipedia.org/wiki/Kitsune"));
-  EXPECT_THAT(entry.path, ElementsAre(u"Folder 1", u"Folder 1.1"));
-
-  entry = GetPendingBookmarks()[3];
-  EXPECT_TRUE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Empty Folder");
-  // No timestamp maps to current time.
-  EXPECT_EQ(entry.creation_time, clock_.Now());
-  EXPECT_TRUE(entry.url.is_empty());
-  EXPECT_THAT(entry.path, IsEmpty());
-
-  EXPECT_EQ(GetPendingReadingList().size(), 0u);
+  EXPECT_EQ(GetReadingListModel().size(), 0u);
 }
 
 // Tests parsing a simple HTML file with three reading list items.
@@ -322,33 +342,52 @@ TEST_F(StablePortabilityDataImporterTest, ReadingList) {
       </DL>)");
   EXPECT_EQ(GetNumberOfReadingListImported(), 3);
 
-  EXPECT_EQ(GetPendingReadingList().size(), 3u);
+  EXPECT_EQ(GetReadingListModel().size(), 3u);
 
-  ASSERT_EQ(GetPendingBookmarks().size(), 0u);
+  // "Imported" bookmarks folder should *not* have been created.
+  const bookmarks::BookmarkNode* other_node = GetOtherBookmarkNode();
+  EXPECT_THAT(other_node->children(), ElementsAre());
 
-  ImportedBookmarkEntry entry = GetPendingReadingList()[0];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Google");
-  EXPECT_EQ(entry.creation_time,
-            base::Time::FromSecondsSinceUnixEpoch(904914000));
-  EXPECT_EQ(entry.url, GURL("https://www.google.com/"));
-  EXPECT_THAT(entry.path, IsEmpty());
+  EXPECT_THAT(
+      GetReadingListModel().GetKeys(),
+      UnorderedElementsAre(GURL("https://www.google.com/"),
+                           GURL("https://en.wikipedia.org/wiki/The_Beach_Boys"),
+                           GURL("https://en.wikipedia.org/wiki/Brian_Wilson")));
 
-  entry = GetPendingReadingList()[1];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"The Beach Boys");
+  const ReadingListEntry* entry1 =
+      GetReadingListModel()
+          .GetEntryByURL(GURL("https://www.google.com/"))
+          .get();
+  ASSERT_TRUE(entry1);
+  EXPECT_EQ(entry1->Title(), "Google");
+  // TODO(crbug.com/431203204): Implement actually importing the creation time.
+  // Then the expectation should become
+  // `base::Time::FromSecondsSinceUnixEpoch(904914000)`.
+  EXPECT_EQ(
+      base::Time::UnixEpoch() + base::Microseconds(entry1->CreationTime()),
+      base::Time::Now());
+
+  const ReadingListEntry* entry2 =
+      GetReadingListModel()
+          .GetEntryByURL(GURL("https://en.wikipedia.org/wiki/The_Beach_Boys"))
+          .get();
+  ASSERT_TRUE(entry2);
+  EXPECT_EQ(entry2->Title(), "The Beach Boys");
   // No timestamp maps to current time.
-  EXPECT_EQ(entry.creation_time, clock_.Now());
-  EXPECT_EQ(entry.url, GURL("https://en.wikipedia.org/wiki/The_Beach_Boys"));
-  EXPECT_THAT(entry.path, IsEmpty());
+  EXPECT_EQ(
+      base::Time::UnixEpoch() + base::Microseconds(entry2->CreationTime()),
+      base::Time::Now());
 
-  entry = GetPendingReadingList()[2];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Brian Wilson");
+  const ReadingListEntry* entry3 =
+      GetReadingListModel()
+          .GetEntryByURL(GURL("https://en.wikipedia.org/wiki/Brian_Wilson"))
+          .get();
+  ASSERT_TRUE(entry3);
+  EXPECT_EQ(entry3->Title(), "Brian Wilson");
   // Invalid timestamp maps to current time.
-  EXPECT_EQ(entry.creation_time, clock_.Now());
-  EXPECT_EQ(entry.url, GURL("https://en.wikipedia.org/wiki/Brian_Wilson"));
-  EXPECT_THAT(entry.path, IsEmpty());
+  EXPECT_EQ(
+      base::Time::UnixEpoch() + base::Microseconds(entry3->CreationTime()),
+      base::Time::Now());
 }
 
 // Tests parsing an HTML with several not valid formats. The parser should still
@@ -378,29 +417,27 @@ TEST_F(StablePortabilityDataImporterTest, Bookmarks_MiscJunk) {
 
   EXPECT_EQ(GetNumberOfBookmarksImported(), 2);
 
-  ASSERT_EQ(GetPendingBookmarks().size(), 2u);
-
-  // <A>Google</A> was skipped for lack of URL.
-
-  // The folder contains a mix of invalid and valid entries. Ensure the valid
-  // ones are preserved.
-  ImportedBookmarkEntry entry = GetPendingBookmarks()[0];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Chromium");
-  // No timestamp maps to current time.
-  EXPECT_EQ(entry.creation_time, clock_.Now());
-  EXPECT_EQ(entry.url, GURL("https://www.chromium.org/"));
-  EXPECT_THAT(entry.path, ElementsAre(u"Folder 1"));
-
-  entry = GetPendingBookmarks()[1];
-  EXPECT_FALSE(entry.is_folder);
-  EXPECT_EQ(entry.title, u"Example");
-  // Invalid timestamp maps to current time.
-  EXPECT_EQ(entry.creation_time, clock_.Now());
-  EXPECT_EQ(entry.url, GURL("https://www.example.org/"));
-  EXPECT_THAT(entry.path, ElementsAre(u"Folder 1"));
-
-  // <A>Google Reader</A> was skipped for lack of URL.
+  const bookmarks::BookmarkNode* other_node = GetOtherBookmarkNode();
+  EXPECT_THAT(
+      other_node->children(),
+      ElementsAre(IsFolder(
+          l10n_util::GetStringUTF16(IDS_IMPORTED_FOLDER),
+          ElementsAre(
+              // <A>Google</A> was skipped for lack of URL.
+              IsFolder(u"Folder 1",
+                       // The folder contains a mix of invalid and valid
+                       // entries. Ensure the valid ones are preserved.
+                       ElementsAre(
+                           IsUrlBookmark(u"Chromium",
+                                         GURL("https://www.chromium.org/"),
+                                         // No timestamp maps to current time.
+                                         base::Time::Now()),
+                           IsUrlBookmark(
+                               u"Example", GURL("https://www.example.org/"),
+                               // Invalid timestamp maps to current time.
+                               base::Time::Now())
+                           // <A>Google Reader</A> was skipped for lack of URL.
+                           ))))));
 }
 
 // Tests parsing a simple JSON file with two history entries.
@@ -445,7 +482,61 @@ TEST_F(StablePortabilityDataImporterTest, History_Basic) {
   EXPECT_EQ(entry2.visit_count, 1u);
   EXPECT_EQ(entry2.typed_count, 0u);
 }
-// TODO(crbug.com/431493493) Cover all the other cases in the test plan.
+
+// Tests parsing an invalid JSON file.
+TEST_F(StablePortabilityDataImporterTest, History_InvalidJson) {
+  const char kHistoryJson[] = R"({
+    "metadata": {
+      "data_type": "history_visits"
+    },
+    "history_visits": [
+      {
+        "url": "https://www.google.com/",
+        "title": "Google",
+  })";  // Invalid JSON, missing closing brackets.
+  ImportHistory(kHistoryJson);
+  EXPECT_EQ(GetNumberOfHistoryImported(), 0);
+  EXPECT_THAT(GetPendingHistory(), IsEmpty());
+}
+
+// Tests parsing a valid JSON file with no history entries.
+TEST_F(StablePortabilityDataImporterTest, History_NoEntries) {
+  const char kHistoryJson[] = R"({
+    "metadata": {
+      "data_type": "history_visits"
+    },
+    "history_visits": []
+  })";
+  ImportHistory(kHistoryJson);
+  EXPECT_EQ(GetNumberOfHistoryImported(), 0);
+  EXPECT_THAT(GetPendingHistory(), IsEmpty());
+}
+
+// Tests parsing a large JSON file that is processed in chunks.
+TEST_F(StablePortabilityDataImporterTest, History_LargeFileInChunks) {
+  const int num_visits = 15;
+  std::vector<std::string> visits;
+  for (int i = 0; i < num_visits; ++i) {
+    // The chunk size is 10, so 15 items will require two chunks.
+    visits.push_back(absl::StrFormat(
+        R"({"url":"https://www.example.com/%d","title":"Title %d",)"
+        R"("visit_time_unix_epoch_usec":%d})",
+        i, i, 1674205200000000ULL + i));
+  }
+  std::string history_json =
+      R"({"metadata":{"data_type":"history_visits"},"history_visits":[)" +
+      base::JoinString(visits, ",") + "]}";
+
+  ImportHistory(history_json);
+  EXPECT_EQ(GetNumberOfHistoryImported(), num_visits);
+
+  for (int i = 0; i < num_visits; ++i) {
+    const auto& entry = GetPendingHistory()[i];
+    EXPECT_EQ(entry.url, "https://www.example.com/" + base::NumberToString(i));
+    EXPECT_EQ(entry.title, "Title " + base::NumberToString(i));
+    EXPECT_EQ(entry.visit_time_unix_epoch_usec, 1674205200000000ULL + i);
+  }
+}
 
 // Tests importing invalid files that do not exist.
 TEST_F(StablePortabilityDataImporterTest, CallbacksAreCalled) {

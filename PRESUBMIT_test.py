@@ -2977,10 +2977,18 @@ class BannedTypeCheckTest(unittest.TestCase):
                 'content/java/problematic/desktopandroid.java', [
                     'if (DeviceInfo.isDesktop()) {}'
                 ]),
+             MockFile(
+                'content/java/problematic/desktopandroid1.java', [
+                    'if (PackageManager.FEATURE_PC) {}'
+                ]),
+             MockFile(
+                'content/java/problematic/desktopandroid2.java', [
+                    'if (BuildConfig.IS_DESKTOP_ANDROID) {}'
+                ]),
         ]
 
         errors = PRESUBMIT.CheckNoBannedFunctions(input_api, MockOutputApi())
-        self.assertEqual(12, len(errors))
+        self.assertEqual(14, len(errors))
         self.assertTrue(
             'some/java/problematic/diskread.java' in errors[0].message)
         self.assertTrue(
@@ -3008,6 +3016,12 @@ class BannedTypeCheckTest(unittest.TestCase):
         self.assertTrue(
             'content/java/problematic/desktopandroid.java' in
             errors[11].message)
+        self.assertTrue(
+            'content/java/problematic/desktopandroid1.java' in
+            errors[12].message)
+        self.assertTrue(
+            'content/java/problematic/desktopandroid2.java' in
+            errors[13].message)
 
 
     def testBannedCppFunctions(self):
@@ -4566,12 +4580,32 @@ class SetNoParentTest(unittest.TestCase):
 
 class MojomStabilityCheckTest(unittest.TestCase):
 
-    def runTestWithAffectedFiles(self, affected_files):
+    def runTestWithAffectedFiles(self, affected_files, footers={}):
         mock_input_api = MockInputApi()
         mock_input_api.files = affected_files
+        mock_input_api.change.footers = footers
         mock_output_api = MockOutputApi()
         return PRESUBMIT.CheckStableMojomChanges(mock_input_api,
                                                  mock_output_api)
+
+    def testNoMojomChangePasses(self):
+        errors = self.runTestWithAffectedFiles([
+            MockAffectedFile('foo/foo.cc', ['// world'],
+                             old_contents=['// Hello'])
+        ])
+        self.assertEqual([], errors)
+
+    def testNoMojomChangeWithUnnecessaryFooterFails(self):
+        errors = self.runTestWithAffectedFiles([
+            MockAffectedFile('foo/foo.cc', ['// world'],
+                             old_contents=['// Hello'])
+        ],
+                                               footers={
+                                                   'No-Stable-Mojom-Checks':
+                                                   'true',
+                                               })
+        self.assertEqual(1, len(errors))
+        self.assertTrue('unnecessary git footer' in errors[0].message)
 
     def testSafeChangePasses(self):
         errors = self.runTestWithAffectedFiles([
@@ -4582,6 +4616,19 @@ class MojomStabilityCheckTest(unittest.TestCase):
         ])
         self.assertEqual([], errors)
 
+    def testSafeChangeWithUnnecessaryFooterFails(self):
+        errors = self.runTestWithAffectedFiles([
+            MockAffectedFile('foo/foo.mojom',
+                             ['[Stable] struct S { int32 x; };'],
+                             old_contents=['[Stable] struct S { int32 y; };'])
+        ],
+                                               footers={
+                                                   'No-Stable-Mojom-Checks':
+                                                   'true',
+                                               })
+        self.assertEqual(1, len(errors))
+        self.assertTrue('unnecessary git footer' in errors[0].message)
+
     def testBadChangeFails(self):
         errors = self.runTestWithAffectedFiles([
             MockAffectedFile('foo/foo.mojom',
@@ -4589,7 +4636,33 @@ class MojomStabilityCheckTest(unittest.TestCase):
                              old_contents=['[Stable] struct S {};'])
         ])
         self.assertEqual(1, len(errors))
-        self.assertTrue('not backward-compatible' in errors[0].message)
+        self.assertTrue('changed in a way that breaks backward compatibility.'
+                        in errors[0].message)
+
+    def testBadChangeButExplicitlyAllowed(self):
+        errors = self.runTestWithAffectedFiles([
+            MockAffectedFile('foo/foo.mojom',
+                             ['[Stable] struct S { int32 x; };'],
+                             old_contents=['[Stable] struct S {};'])
+        ],
+                                               footers={
+                                                   'No-Stable-Mojom-Checks':
+                                                   'true',
+                                               })
+        self.assertEqual([], errors)
+
+    def testBadChangeButExplicitlyAllowedWithWrongValue(self):
+        errors = self.runTestWithAffectedFiles([
+            MockAffectedFile('foo/foo.mojom',
+                             ['[Stable] struct S { int32 x; };'],
+                             old_contents=['[Stable] struct S {};'])
+        ],
+                                               footers={
+                                                   'No-Stable-Mojom-Checks':
+                                                   '🐮',
+                                               })
+        self.assertEqual(1, len(errors))
+        self.assertTrue('only accepts the value "true"' in errors[0].message)
 
     def testDeletedFile(self):
         """Regression test for https://crbug.com/1091407."""

@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -28,6 +29,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
 #include "base/test/gmock_callback_support.h"
+#include "base/test/gmock_expected_support.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/simple_test_clock.h"
@@ -14411,6 +14413,63 @@ TEST_P(HttpCacheNoVarySearchTest, ModeIsReadButRequiresValidation) {
   expect_fresh_response(*transaction2);
 }
 
+TEST_P(HttpCacheNoVarySearchTest, ExternalHitWithFeatureParamFalse) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeatureWithParameters(
+      features::kHttpCacheNoVarySearch,
+      base::FieldTrialParams{
+          {features::kHttpCacheNoVarySearchApplyToExternalHits.name, "false"}});
+
+  FetchIntoCache("q=john&a=10", "params=(\"a\")");
+
+  MockTransaction& transaction =
+      CreateMockTransaction("q=john", "params=(\"a\")");
+
+  MockHttpRequest request(transaction);
+
+  cache()->OnExternalCacheHit(request.url, request.method,
+                              request.network_isolation_key,
+                              (request.load_flags & LOAD_DO_NOT_SAVE_COOKIES));
+
+  ASSERT_OK_AND_ASSIGN(const std::string expected_cache_key,
+                       HttpCache::GenerateCacheKeyForRequest(&request));
+
+  EXPECT_THAT(mock_disk_cache()->GetExternalCacheHits(),
+              ElementsAre(expected_cache_key));
+}
+
+TEST_P(HttpCacheNoVarySearchTest, ExternalHitWithFeatureParamTrue) {
+  static constexpr std::string_view kNvsQuery = "q=john&a=10";
+
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeatureWithParameters(
+      features::kHttpCacheNoVarySearch,
+      {{features::kHttpCacheNoVarySearchApplyToExternalHits.name, "true"}});
+
+  FetchIntoCache(kNvsQuery, "params=(\"a\")");
+
+  MockTransaction& transaction =
+      CreateMockTransaction("q=john", "params=(\"a\")");
+
+  MockHttpRequest request(transaction);
+
+  cache()->OnExternalCacheHit(request.url, request.method,
+                              request.network_isolation_key,
+                              (request.load_flags & LOAD_DO_NOT_SAVE_COOKIES));
+
+  ASSERT_OK_AND_ASSIGN(const std::string new_url_cache_key,
+                       HttpCache::GenerateCacheKeyForRequest(&request));
+
+  GURL::Replacements replacements;
+  replacements.SetQueryStr(kNvsQuery);
+  request.url = request.url.ReplaceComponents(replacements);
+  ASSERT_OK_AND_ASSIGN(const std::string nvs_url_cache_key,
+                       HttpCache::GenerateCacheKeyForRequest(&request));
+
+  EXPECT_THAT(mock_disk_cache()->GetExternalCacheHits(),
+              ElementsAre(new_url_cache_key, nvs_url_cache_key));
+}
+
 INSTANTIATE_TEST_SUITE_P(All,
                          HttpCacheNoVarySearchTest,
                          ::testing::Bool(),
@@ -14436,6 +14495,7 @@ class HttpCacheNoVarySearchMockFileOperationsTest
   using Checkpoint = StrictMock<MockFunction<void()>>;
 
   void ConstructCache(std::optional<MockHttpCache>& http_cache) override {
+    construct_cache_called_ = true;
     auto file_operations = std::make_unique<StrictMockFileOperations>();
     file_operations_ = file_operations.get();
     auto writer = std::make_unique<StrictMockWriter>();
@@ -14453,11 +14513,13 @@ class HttpCacheNoVarySearchMockFileOperationsTest
 
       load_expectations_ +=
           EXPECT_CALL(*file_operations, Init).WillOnce(Return(true));
-      load_expectations_ +=
-          EXPECT_CALL(*file_operations, Load)
-              .WillOnce(DoAll(
-                  Invoke(maybe_block),
-                  Return(base::unexpected(base::File::FILE_ERROR_NOT_FOUND))));
+      if (expect_load_) {
+        load_expectations_ +=
+            EXPECT_CALL(*file_operations, Load)
+                .WillOnce(DoAll(Invoke(maybe_block),
+                                Return(base::unexpected(
+                                    base::File::FILE_ERROR_NOT_FOUND))));
+      }
       load_expectations_ += EXPECT_CALL(*file_operations, AtomicSave)
                                 .WillOnce(Return(base::ok()));
       load_expectations_ += EXPECT_CALL(*file_operations, CreateWriter)
@@ -14518,6 +14580,13 @@ class HttpCacheNoVarySearchMockFileOperationsTest
     return load_expectations_;
   }
 
+  // Sets whether or not an attempt to load the existing snapshot is expected.
+  void set_expect_load(bool expect_load) {
+    CHECK(!construct_cache_called_) << "set_expect_load() must be called in a "
+                                       "subclass before ConstructCache()";
+    expect_load_ = expect_load;
+  }
+
  private:
   base::RunLoop load_run_loop_;
   raw_ptr<StrictMockFileOperations> file_operations_ = nullptr;
@@ -14534,6 +14603,8 @@ class HttpCacheNoVarySearchMockFileOperationsTest
   base::TestWaitableEvent load_can_proceed_;
 
   bool initialized_backend_ = false;
+  bool expect_load_ = true;
+  bool construct_cache_called_ = false;
   std::atomic<bool> delay_load_ = false;
 };
 
@@ -14687,6 +14758,39 @@ TEST_P(HttpCacheNoVarySearchMockFileOperationsTest,
   EXPECT_FALSE(info.network_accessed);
   EXPECT_EQ(info.cache_entry_status, HttpResponseInfo::ENTRY_USED);
   EXPECT_EQ(info.headers->response_code(), 200);
+}
+
+class HttpCacheNoVarySearchFakePersistenceTest
+    : public HttpCacheNoVarySearchMockFileOperationsTest {
+ public:
+  void ConstructCache(std::optional<MockHttpCache>& http_cache) override {
+    fake_persistence_feature_list_.InitAndEnableFeatureWithParameters(
+        features::kHttpCacheNoVarySearch,
+        {{features::kHttpCacheNoVarySearchFakePersistence.name, "true"}});
+    set_expect_load(false);
+    HttpCacheNoVarySearchMockFileOperationsTest::ConstructCache(http_cache);
+  }
+
+ private:
+  base::test::ScopedFeatureList fake_persistence_feature_list_;
+};
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         HttpCacheNoVarySearchFakePersistenceTest,
+                         ::testing::Bool(),
+                         [](const auto& info) {
+                           return info.param ? "NotSplitCache" : "SplitCache";
+                         });
+
+TEST_P(HttpCacheNoVarySearchFakePersistenceTest, FakePersistenceWorks) {
+  // Nothing is persisted once load is complete.
+  EXPECT_CALL(writer(), Write).Times(0).After(load_expectations());
+
+  InitializeBackend();
+
+  WaitForLoad();
+
+  FetchIntoCache("q=fred&a=1", "params=(\"a\")");
 }
 
 }  // namespace net

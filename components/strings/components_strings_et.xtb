@@ -538,7 +538,6 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="1876399092304384674">Kuupäeva alusel</translation>
 <translation id="1877026089748256423">Chrome on aegunud</translation>
 <translation id="187918866476621466">Ava käivitamisel avatavad lehed</translation>
-<translation id="1880901968112404879">Kui soovite järgmisel korral kiiremini maksta, salvestage kaart, krüpteeritud turvakood ja arveldusaadress oma Google’i kontole</translation>
 <translation id="1883255238294161206">Ahenda loend</translation>
 <translation id="1884843295353628214">Džäss</translation>
 <translation id="1890171020361705182">Dinosaurusemäng. Pikslitest dinosaurus jookseb kõrbemaastikul ning väldib kaktuste ja pterodaktülostega kokkupõrkamist. Kui kuulete helimärguannet, siis puudutage, et takistustest üle hüpata.</translation>
@@ -716,7 +715,6 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="2183238148268545307">Videotarkvara</translation>
 <translation id="2183608646556468874">Telefoninumber</translation>
 <translation id="2184405333245229118">{COUNT,plural, =1{1 aadress}other{# aadressi}}</translation>
-<translation id="2187317261103489799">Tuvasta (vaikimisi)</translation>
 <translation id="2188375229972301266">Mitu auku all</translation>
 <translation id="218940509700321686">Komaeraldusega väärtused</translation>
 <translation id="2194856509914051091">Olulised aspektid</translation>
@@ -794,7 +792,6 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="2303437270440428119">OpenDocumenti arvutustabel</translation>
 <translation id="2305294852062272447">Kas salvestada juhiluba?</translation>
 <translation id="2306124309679506798">Kas lubada kaasahaarav kasutuskogemus?</translation>
-<translation id="2307711332257985952">Teie kodune ja töökoha aadress on nüüd Chrome'is saadaval</translation>
 <translation id="2310789833878085574">Salvesta ja täida automaatselt</translation>
 <translation id="2312234273148520048">Maitseained ja kastmed</translation>
 <translation id="2316087952091171402">Vähem kui <ph name="UPPER_ESTIMATE" />. Mõned saidid võivad teie järgmise külastuse ajal aeglasemalt laadida.</translation>
@@ -940,7 +937,6 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="2535659140340599600">{COUNT,plural, =1{ja veel 1}other{ja veel #}}</translation>
 <translation id="2536110899380797252">Lisa aadress</translation>
 <translation id="2537931901612099523">Teised, kes seda seadet kasutavad, ei näe teie tegevusi, et saaksite privaatsemalt sirvida. See ei muuda seda, kuidas teie külastatavad veebisaidid ja nende kasutatavad teenused (sh Google) andmeid koguvad. Allalaaditud failid ja järjehoidjad salvestatakse.</translation>
-<translation id="2539524384386349900">Tuvasta</translation>
 <translation id="2541219929084442027">Inkognito vahelehtedel kuvatavaid lehti ei talletata pärast inkognito vahelehtede sulgemist brauseri ajalukku, küpsistefailide salve ega otsinguajalukku. Allalaaditavad failid ja järjehoidjatesse lisatud sisu säilitatakse.</translation>
 <translation id="2542106216580219892">Surfamine</translation>
 <translation id="2543236854123609690"><ph name="ORIGIN" /> – täisekraanilt väljumiseks vajutage pikalt klahvi |<ph name="ACCELERATOR" />|</translation>
@@ -1210,6 +1206,7 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="3027915437837548462">SVG-kujutis</translation>
 <translation id="3030331669969285614">Need märgistused hoiavad ära või ennistavad probleeme põhjustava muudatuse ja on saadaval vaid piiratud aja.</translation>
 <translation id="3030542417256082866">Kas salvestada sõiduk?</translation>
+<translation id="3033200136993730761">Teie kodune aadress aitab teil Google'i teenustes asju ajada, näiteks saada Google Mapsis asjakohasemaid otsingutulemusi ja juhiseid. Saate oma aadressi muuta või kustutada <ph name="BEGIN_LINK" />oma Google'i kontol <ph name="ACCOUNT" /><ph name="END_LINK" />.</translation>
 <translation id="3034526003882782781">Kerimine ja suumimine on lubatud</translation>
 <translation id="3036894576201005614">Majapidamise puhastustarbed</translation>
 <translation id="3037177537145227281">Jälgite hinda</translation>
@@ -1332,7 +1329,6 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="3229041911291329567">Teie seadme ja brauseri versiooniteave</translation>
 <translation id="3229277193950731405">Kopeeri versioonistring</translation>
 <translation id="323107829343500871">Krediitkaardi <ph name="CREDIT_CARD" /> CVC sisestamine</translation>
-<translation id="3234666976984236645">Sellel saidil olulise sisu alati tuvastamine</translation>
 <translation id="323585066388831737">Helepunane</translation>
 <translation id="3235902901585019063">Kohalikud failid kustutatakse ajal <ph name="DATE_TIME" />. Veenduge, et kõik olulised ettevõtte- või isikuandmed oleksid väliselt salvestatud.</translation>
 <translation id="3236212803136366317">Kaardi hüved</translation>
@@ -1892,7 +1888,6 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="4147897805161313378">Google Photos</translation>
 <translation id="4148925816941278100">American Express</translation>
 <translation id="4150099059797363385">Ümbrik Hiina nr 4</translation>
-<translation id="4151403195736952345">Kasuta üldist vaikevalikut (tuvasta)</translation>
 <translation id="4152318981910038897">{COUNT,plural, =1{Leht 1}other{Leht {COUNT}}}</translation>
 <translation id="4152670763139331043">{NUM_TABS,plural, =1{1 vaheleht}other{# vahelehte}}</translation>
 <translation id="4153446078232988116"><ph name="SITE" /> ei toeta HTTPS-i turvalist ühendust</translation>
@@ -2908,6 +2903,7 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="5879272455334365707">Finantsplaneerimine ja -haldus</translation>
 <translation id="5879989559903563723">Pole külalisrežiimis lubatud</translation>
 <translation id="5880050725127890683">Avage Chrome'i ohutuskontroll</translation>
+<translation id="5880385758720707152">Täitke oma kodu ja töökoha aadressid Google'i kontolt automaatselt.</translation>
 <translation id="5884465125445718607">Ümbrik Hiina nr 6</translation>
 <translation id="5886961930368713749">Saatke võrdlusfunktsiooni kohta tagasisidet</translation>
 <translation id="5887400589839399685">Kaart on salvestatud</translation>
@@ -2917,6 +2913,7 @@ Vastasel korral blokeeritakse see teie privaatsusseadetes. See võimaldab teie k
 <translation id="5898767305816764989">Nupp Meeldib; vajutage sisestusklahvi, et esitada tagasiside, mille kohaselt <ph name="THUMBS_UP_SUGGESTION_BUTTON_FOCUSED_FRIENDLY_MATCH_TEXT" /> meeldib teile</translation>
 <translation id="5901630391730855834">Kollane</translation>
 <translation id="5903264686717710770">Pealkiri:</translation>
+<translation id="5905671155741555195">Teie töökoha aadress aitab teil Google'i teenustes asju ajada, näiteks saada Google Mapsis asjakohasemaid otsingutulemusi ja juhiseid. Saate oma aadressi muuta või kustutada <ph name="BEGIN_LINK" />oma Google'i kontol <ph name="ACCOUNT" /><ph name="END_LINK" />.</translation>
 <translation id="5908541034548427511"><ph name="TYPE_1" /> (sünkroonitud)</translation>
 <translation id="5910140988253729859">Võta automaattäide tagasi</translation>
 <translation id="5911020115933784199">Sündmused ja loetelud</translation>
@@ -3814,6 +3811,7 @@ Lisateave:
 <translation id="7403392780200267761">Selle vahelehe jagamine lingi jagamise, QR-koodi loomise, ülekandmise ja muu abil</translation>
 <translation id="7403591733719184120">Teie seadet <ph name="DEVICE_NAME" /> hallatakse</translation>
 <translation id="7405878640835614059"><ph name="ENROLLMENT_DOMAIN" /> on installinud rakendused, et pakkuda lisafunktsioone. Rakendustel on juurdepääs teie mõningatele andmetele.</translation>
+<translation id="740691708085211707">Kas soovite töökoha aadressi Chrome'i automaattäitest eemaldada?</translation>
 <translation id="7407424307057130981">&lt;p&gt;See viga ilmneb juhul, kui teie Windowsi arvutis on tarkvara Superfish.&lt;/p&gt;
       &lt;p&gt;Selleks et veebi pääseda, järgige tarkvara keelamiseks neid toiminguid. Vajate administraatoriõigusi.&lt;/p&gt;
       &lt;ol&gt;
@@ -3910,6 +3908,7 @@ Lisateave:
 <translation id="7534987659046836932">Ümbrik C7</translation>
 <translation id="7535087603100972091">Väärtus</translation>
 <translation id="753556296624075801">Funktsiooni pakub Google</translation>
+<translation id="753713322968419914">Kas soovite koduse aadressi Chrome'ist eemaldada?</translation>
 <translation id="7537536606612762813">Kohustuslik</translation>
 <translation id="7543525346216957623">Küsige vanematelt abi</translation>
 <translation id="7546409722674205727">Rakenduse <ph name="APP_NAME" /> käivitamine</translation>

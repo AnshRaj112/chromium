@@ -92,7 +92,6 @@ chromium-metrics-reviews@google.com.
     <variant name="LogInstantEvent"/>
     <variant name="MaybeRefreshUserStatus"/>
     <variant name="OnClosedCaptionsShown"/>
-    <variant name="OnRequestStarted"/>
     <variant name="OnResponseRated"/>
     <variant name="OnResponseStarted"/>
     <variant name="OnResponseStopped"/>
@@ -403,6 +402,18 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records the boolean result of calling MaybeReplaceNavigation. This is used
     to determine if a navigation was replaced with a media viewer.
+  </summary>
+</histogram>
+
+<histogram name="Glic.Media.TimestampRangeCount" units="count"
+    expires_after="2026-01-15">
+  <owner>liberato@chromium.org</owner>
+  <owner>chrome-media-ux@google.com</owner>
+  <summary>
+    Recorded when a speech recognition result is received. Records the number of
+    media timestamp ranges in the result. This can be greater than one, for
+    example, around seeks. Zero means that there was no timing information, or
+    the list of ranges was empty.
   </summary>
 </histogram>
 

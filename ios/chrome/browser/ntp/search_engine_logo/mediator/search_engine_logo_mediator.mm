@@ -14,7 +14,9 @@
 #import "ios/chrome/browser/google/model/google_logo_service.h"
 #import "ios/chrome/browser/google/model/google_logo_service_factory.h"
 #import "ios/chrome/browser/metrics/model/new_tab_page_uma.h"
+#import "ios/chrome/browser/ntp/search_engine_logo/ui/search_engine_logo_consumer.h"
 #import "ios/chrome/browser/ntp/search_engine_logo/ui/search_engine_logo_container_view.h"
+#import "ios/chrome/browser/ntp/search_engine_logo/ui/search_engine_logo_state.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
@@ -35,10 +37,6 @@
 // The container view used to display the Google logo or doodle.
 @property(strong, nonatomic, readonly)
     SearchEngineLogoContainerView* containerView;
-
-// Whether or not the doodle is being displayed.
-@property(nonatomic, readwrite, assign, getter=isShowingDoodle)
-    BOOL showingDoodle;
 
 // Shows the doodle UIImageView with a fade animation.
 - (void)updateLogo:(const search_provider_logos::Logo*)logo
@@ -97,10 +95,7 @@ void OnLogoAvailable(SearchEngineLogoMediator* mediator,
   std::unique_ptr<image_fetcher::IOSImageDataFetcherWrapper> _imageFetcher;
 }
 
-@synthesize showingLogo = _showingLogo;
 @synthesize containerView = _containerView;
-@synthesize showingDoodle = _showingDoodle;
-@synthesize doodleObserver = _doodleObserver;
 
 - (instancetype)initWithBrowser:(Browser*)browser
                        webState:(web::WebState*)webState {
@@ -110,9 +105,57 @@ void OnLogoAvailable(SearchEngineLogoMediator* mediator,
     _browser = browser;
     _profile = _browser->GetProfile();
     _webState = webState;
-    _showingLogo = YES;
+    _logoState = SearchEngineLogoState::kLogo;
   }
   return self;
+}
+
+- (void)disconnect {
+  _profile = nullptr;
+  _webState = nullptr;
+  _browser = nullptr;
+  _imageFetcher.reset();
+}
+
+- (UIView*)view {
+  return self.containerView;
+}
+
+- (void)setLogoState:(SearchEngineLogoState)state {
+  if (_logoState == state) {
+    return;
+  }
+  _logoState = state;
+  self.view.hidden = (_logoState == SearchEngineLogoState::kNone);
+}
+
+- (void)fetchDoodle {
+  GoogleLogoService* logoService =
+      GoogleLogoServiceFactory::GetForProfile(_profile);
+  const search_provider_logos::Logo logo = logoService->GetCachedLogo();
+  if (!logo.image.empty()) {
+    [self updateLogo:&logo animate:NO];
+  }
+  search_provider_logos::LogoCallbacks callbacks;
+  __weak __typeof(self) weakSelf = self;
+  callbacks.on_cached_decoded_logo_available =
+      base::BindOnce(&OnLogoAvailable, weakSelf);
+  callbacks.on_fresh_decoded_logo_available =
+      base::BindOnce(&OnLogoAvailable, weakSelf);
+  logoService->GetLogo(std::move(callbacks), false);
+}
+
+- (void)setWebState:(web::WebState*)webState {
+  _webState = webState;
+}
+
+- (void)setUsesMonochromeLogo:(BOOL)usesMonochromeLogo {
+  if (usesMonochromeLogo != _usesMonochromeLogo) {
+    _usesMonochromeLogo = usesMonochromeLogo;
+    if (self.containerView) {
+      self.containerView.shrunkLogoView.image = [self logoImage];
+    }
+  }
 }
 
 #pragma mark - Accessors
@@ -136,71 +179,11 @@ void OnLogoAvailable(SearchEngineLogoMediator* mediator,
   return _containerView;
 }
 
-#pragma mark - LogoVendor
-
-- (UIView*)view {
-  return self.containerView;
-}
-
-- (void)setShowingLogo:(BOOL)showingLogo {
-  if (_showingLogo == showingLogo) {
-    return;
-  }
-  _showingLogo = showingLogo;
-  self.view.hidden = !_showingLogo;
-}
-
-- (void)fetchDoodle {
-  GoogleLogoService* logoService =
-      GoogleLogoServiceFactory::GetForProfile(_profile);
-  const search_provider_logos::Logo logo = logoService->GetCachedLogo();
-  if (!logo.image.empty()) {
-    [self updateLogo:&logo animate:NO];
-  }
-  search_provider_logos::LogoCallbacks callbacks;
-  __weak __typeof(self) weakSelf = self;
-  callbacks.on_cached_decoded_logo_available =
-      base::BindOnce(&OnLogoAvailable, weakSelf);
-  callbacks.on_fresh_decoded_logo_available =
-      base::BindOnce(&OnLogoAvailable, weakSelf);
-  logoService->GetLogo(std::move(callbacks), false);
-}
-
-- (void)setShowingDoodle:(BOOL)showingDoodle {
-  _showingDoodle = showingDoodle;
-}
-
-- (void)setWebState:(web::WebState*)webState {
-  _webState = webState;
-}
-
-- (void)setUsesMonochromeLogo:(BOOL)usesMonochromeLogo {
-  if (usesMonochromeLogo != _usesMonochromeLogo) {
-    _usesMonochromeLogo = usesMonochromeLogo;
-    if (self.containerView) {
-      self.containerView.shrunkLogoView.image = [self logoImage];
-    }
-  }
-}
-
-- (void)disconnect {
-  _profile = nullptr;
-  _webState = nullptr;
-  _browser = nullptr;
-  _imageFetcher.reset();
-}
-
 #pragma mark - SearchEngineLogoContainerViewDelegate
 
 - (void)searchEngineLogoContainerViewDoodleWasTapped:
     (SearchEngineLogoContainerView*)containerView {
   [self handleDoodleTapped];
-}
-
-#pragma mark - LogoAnimationControllerOwnerOwner
-
-- (id<LogoAnimationControllerOwner>)logoAnimationControllerOwner {
-  return nil;
 }
 
 #pragma mark - VisibleForTesting
@@ -252,8 +235,8 @@ void OnLogoAvailable(SearchEngineLogoMediator* mediator,
       GoogleLogoServiceFactory::GetForProfile(_profile);
   if (!logo) {
     _fingerprint = "";
-    [self.containerView setStyle:SEARCH_ENGINE_LOGO_CONTAINER_VIEW_STYLE_LOGO
-                        animated:animate];
+    [self.containerView setLogoState:SearchEngineLogoState::kNone
+                            animated:animate];
     self.containerView.isAccessibilityElement = YES;
     return;
   }
@@ -279,13 +262,22 @@ void OnLogoAvailable(SearchEngineLogoMediator* mediator,
 
   // Animate this view seperately in case the doodle has updated multiple times.
   // This can happen when a particular doodle cycles thru multiple images.
+  SearchEngineLogoState logoState = SearchEngineLogoState::kNone;
+  switch (logo->metadata.type) {
+    case search_provider_logos::LogoType::SIMPLE:
+      logoState = SearchEngineLogoState::kLogo;
+      break;
+    case search_provider_logos::LogoType::ANIMATED:
+    case search_provider_logos::LogoType::INTERACTIVE:
+      logoState = SearchEngineLogoState::kDoodle;
+      break;
+  }
   __weak __typeof(self) weakSelf = self;
   [self.containerView
       setDoodleImage:doodle
             animated:animate
           animations:^{
-            weakSelf.showingDoodle = YES;
-            [weakSelf.doodleObserver doodleDisplayStateChanged:YES];
+            [weakSelf doodleAppearanceAnimationDidFinish:logoState];
           }];
 
   _onClickUrl = logo->metadata.on_click_url;
@@ -303,8 +295,13 @@ void OnLogoAvailable(SearchEngineLogoMediator* mediator,
       _animatedUrl.is_valid() ? SHOWN_LOGO_TYPE_CTA : SHOWN_LOGO_TYPE_STATIC,
       SHOWN_LOGO_TYPE_COUNT);
 
-  [self.containerView setStyle:SEARCH_ENGINE_LOGO_CONTAINER_VIEW_STYLE_DOODLE
-                      animated:animate];
+  [self.containerView setLogoState:logoState animated:animate];
+}
+
+// Called when the doodle's appearance animation completes.
+- (void)doodleAppearanceAnimationDidFinish:(SearchEngineLogoState)logoState {
+  self.logoState = logoState;
+  [self.consumer searchEngineLogoStateDidChange:logoState];
 }
 
 // Attempts to fetch an animated GIF for the doodle.

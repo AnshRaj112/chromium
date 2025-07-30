@@ -538,7 +538,6 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="1876399092304384674">Per data</translation>
 <translation id="1877026089748256423">Chrome non è aggiornato</translation>
 <translation id="187918866476621466">Apri pagine iniziali</translation>
-<translation id="1880901968112404879">Per pagare più velocemente la prossima volta, salva la carta, il codice di sicurezza criptato e l'indirizzo di fatturazione nel tuo Account Google</translation>
 <translation id="1883255238294161206">Comprimi elenco</translation>
 <translation id="1884843295353628214">Jazz</translation>
 <translation id="1890171020361705182">Gioco Dino. Un dinosauro pixelato corre in un ambiente desolato schivando cactus e pterodattili. Quando senti un segnale acustico, tocca per saltare gli ostacoli.</translation>
@@ -716,7 +715,6 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="2183238148268545307">Software per video</translation>
 <translation id="2183608646556468874">Numero di telefono</translation>
 <translation id="2184405333245229118">{COUNT,plural, =1{1 indirizzo}other{# indirizzi}}</translation>
-<translation id="2187317261103489799">Rileva (predefinita)</translation>
 <translation id="2188375229972301266">Perforatura multipla in basso</translation>
 <translation id="218940509700321686">Valori separati da virgola</translation>
 <translation id="2194856509914051091">Aspetti da considerare</translation>
@@ -731,7 +729,7 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="2213606439339815911">Recupero voci...</translation>
 <translation id="2213612003795704869">La pagina è stampata</translation>
 <translation id="2214086901479959524">Aggiorna Chrome per continuare a utilizzare i gruppi di schede condivisi</translation>
-<translation id="2215368073167343359">Compilazione automatica Google</translation>
+<translation id="2215368073167343359">Usa compilazione automatica Google</translation>
 <translation id="2215539479425228550">Alpinismo e arrampicata</translation>
 <translation id="2215727959747642672">Modifica di file</translation>
 <translation id="2215963164070968490">Cani</translation>
@@ -794,7 +792,6 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="2303437270440428119">Foglio di lavoro OpenDocument</translation>
 <translation id="2305294852062272447">Salvare la patente di guida?</translation>
 <translation id="2306124309679506798">Consentire un'esperienza immersiva?</translation>
-<translation id="2307711332257985952">I tuoi indirizzi di casa e di lavoro sono ora disponibili in Chrome</translation>
 <translation id="2310789833878085574">Salva e compila automaticamente</translation>
 <translation id="2312234273148520048">Salse e condimenti</translation>
 <translation id="2316087952091171402">Meno di <ph name="UPPER_ESTIMATE" />. Alcuni siti potrebbero caricarsi più lentamente alla prossima visita.</translation>
@@ -940,7 +937,6 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="2535659140340599600">{COUNT,plural, =1{e 1 altra}other{e altre #}}</translation>
 <translation id="2536110899380797252">Aggiungi indirizzo</translation>
 <translation id="2537931901612099523">Le altre persone che usano questo dispositivo non vedranno la tua attività, di conseguenza potrai navigare in modo più privato. La modalità di raccolta dei dati da parte dei siti web visitati e dei servizi utilizzati, incluso Google, rimane invariata. I download e i preferiti verranno salvati.</translation>
-<translation id="2539524384386349900">Rileva</translation>
 <translation id="2541219929084442027">Le pagine visualizzate nelle schede di navigazione in incognito non vengono memorizzate nella cronologia del browser, nello spazio di archiviazione dei cookie o nella cronologia delle ricerche dopo avere chiuso tutte le schede di navigazione in incognito. I file scaricati o i preferiti creati verranno conservati.</translation>
 <translation id="2542106216580219892">Surf</translation>
 <translation id="2543236854123609690"><ph name="ORIGIN" /> - Per uscire dalla modalità a schermo intero, tieni premuto |<ph name="ACCELERATOR" />|</translation>
@@ -1210,6 +1206,7 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="3027915437837548462">Immagine SVG</translation>
 <translation id="3030331669969285614">Questi flag impediscono o ripristinano una modifica che provoca un errore e saranno disponibili solo per un periodo di tempo limitato.</translation>
 <translation id="3030542417256082866">Salvare il veicolo?</translation>
+<translation id="3033200136993730761">Il tuo indirizzo di casa può aiutarti a svolgere attività sui servizi Google, ad esempio a ricevere risultati di ricerca più pertinenti e indicazioni stradali in Google Maps. Puoi modificare o eliminare il tuo indirizzo <ph name="BEGIN_LINK" />nel tuo Account Google <ph name="ACCOUNT" /><ph name="END_LINK" />.</translation>
 <translation id="3034526003882782781">Scorrimento e zoom consentiti</translation>
 <translation id="3036894576201005614">Forniture per la pulizia della casa</translation>
 <translation id="3037177537145227281">Monitoraggio del prezzo</translation>
@@ -1329,7 +1326,6 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="3229041911291329567">Informazioni sulla versione del dispositivo e del browser</translation>
 <translation id="3229277193950731405">Copia stringa di versione</translation>
 <translation id="323107829343500871">Inserisci il codice CVC della carta <ph name="CREDIT_CARD" /></translation>
-<translation id="3234666976984236645">Rileva sempre contenuti importanti di questo sito</translation>
 <translation id="323585066388831737">Rosso chiaro</translation>
 <translation id="3235902901585019063">I file locali verranno eliminati il giorno <ph name="DATE_TIME" />. Assicurati che tutti i dati aziendali o personali critici siano archiviati esternamente.</translation>
 <translation id="3236212803136366317">Vantaggi della carta</translation>
@@ -1889,7 +1885,6 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="4147897805161313378">Google Foto</translation>
 <translation id="4148925816941278100">American Express</translation>
 <translation id="4150099059797363385">Busta Chinese #4</translation>
-<translation id="4151403195736952345">Utilizza impostazioni predefinite globali (Rileva)</translation>
 <translation id="4152318981910038897">{COUNT,plural, =1{Pagina 1}other{Pagina {COUNT}}}</translation>
 <translation id="4152670763139331043">{NUM_TABS,plural, =1{1 scheda}other{# schede}}</translation>
 <translation id="4153446078232988116"><ph name="SITE" /> non supporta una connessione sicura con HTTPS</translation>
@@ -2905,6 +2900,7 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="5879272455334365707">Gestione e pianificazione finanziaria</translation>
 <translation id="5879989559903563723">Autorizzazione non consentita in modalità ospite</translation>
 <translation id="5880050725127890683">Vai al controllo di sicurezza di Chrome</translation>
+<translation id="5880385758720707152">Inserisci automaticamente gli indirizzi di casa e di lavoro dal tuo Account Google</translation>
 <translation id="5884465125445718607">Busta Chinese #6</translation>
 <translation id="5886961930368713749">Invia feedback su Confronta</translation>
 <translation id="5887400589839399685">Carta salvata</translation>
@@ -2914,6 +2910,7 @@ In caso contrario l'uso sarà bloccato dalle impostazioni sulla privacy. I conte
 <translation id="5898767305816764989">Pulsante Mi piace, premi Invio per inviare un feedback che indica che ti piace <ph name="THUMBS_UP_SUGGESTION_BUTTON_FOCUSED_FRIENDLY_MATCH_TEXT" /></translation>
 <translation id="5901630391730855834">Giallo</translation>
 <translation id="5903264686717710770">Titolo:</translation>
+<translation id="5905671155741555195">Il tuo indirizzo di lavoro può aiutarti a svolgere attività sui servizi Google, ad esempio a ricevere risultati di ricerca più pertinenti e indicazioni stradali in Google Maps. Puoi modificare o eliminare il tuo indirizzo <ph name="BEGIN_LINK" />nel tuo Account Google <ph name="ACCOUNT" /><ph name="END_LINK" />.</translation>
 <translation id="5908541034548427511"><ph name="TYPE_1" /> (sincronizzati)</translation>
 <translation id="5910140988253729859">Annulla la compilazione automatica</translation>
 <translation id="5911020115933784199">Eventi e spettacoli</translation>
@@ -3810,6 +3807,7 @@ Ulteriori dettagli:
 <translation id="7403392780200267761">Condividi questa scheda condividendo il link, creando un codice QR, mediante trasmissione e altro ancora</translation>
 <translation id="7403591733719184120">Il tuo dispositivo <ph name="DEVICE_NAME" /> è gestito</translation>
 <translation id="7405878640835614059"><ph name="ENROLLMENT_DOMAIN" /> ha installato applicazioni per funzioni aggiuntive. Le applicazioni hanno accesso ad alcuni tuoi dati.</translation>
+<translation id="740691708085211707">Rimuovere l'indirizzo di lavoro dalla compilazione automatica di Chrome?</translation>
 <translation id="7407424307057130981">&lt;p&gt;Vedrai questo errore se sul tuo computer Windows è installato il software Superfish.&lt;/p&gt;
     &lt;p&gt;Segui questi passaggi per disattivare temporaneamente il software in modo da riuscire a connetterti a Internet. Devi disporre dei privilegi di amministratore.&lt;/p&gt;
     &lt;ol&gt;
@@ -3906,6 +3904,7 @@ Ulteriori dettagli:
 <translation id="7534987659046836932">Busta C7</translation>
 <translation id="7535087603100972091">Valore</translation>
 <translation id="753556296624075801">Powered by Google</translation>
+<translation id="753713322968419914">Rimuovere l'indirizzo di casa dalla compilazione automatica di Chrome?</translation>
 <translation id="7537536606612762813">Obbligatorio</translation>
 <translation id="7543525346216957623">Chiedi a uno dei tuoi genitori</translation>
 <translation id="7546409722674205727">Avvio dell'app <ph name="APP_NAME" /> in corso…</translation>

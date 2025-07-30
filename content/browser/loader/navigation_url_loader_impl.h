@@ -109,6 +109,21 @@ class CONTENT_EXPORT NavigationURLLoaderImpl
       std::optional<net::CookieSettingOverrides> devtools_cookie_overrides,
       std::optional<net::CookieSettingOverrides> cookie_overrides);
 
+  // NavigationURLLoader implementation:
+  // Starts the loader by finalizing loader factories initialization and
+  // calling Restart().
+  // This is called only once (while Restart can be called multiple times).
+  // Sets `started_` true.
+  void Start() override;
+  void FollowRedirect(
+      std::vector<std::string> removed_headers,
+      net::HttpRequestHeaders modified_headers,
+      net::HttpRequestHeaders modified_cors_exempt_headers) override;
+  bool SetNavigationTimeout(base::TimeDelta timeout) override;
+  void CancelNavigationTimeout() override;
+
+  const network::ResourceRequest& GetResourceRequestForTesting() const;
+
  private:
   FRIEND_TEST_ALL_PREFIXES(NavigationURLLoaderImplTest,
                            OnAcceptCHFrameReceivedUKM);
@@ -225,15 +240,16 @@ class CONTENT_EXPORT NavigationURLLoaderImpl
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory);
 
   void ParseHeaders(const GURL& url,
-                    network::mojom::URLResponseHead* head,
-                    base::OnceClosure continuation);
+                    network::mojom::URLResponseHeadPtr head,
+                    base::OnceCallback<void(network::mojom::URLResponseHeadPtr)>
+                        continuation);
 
   void NotifyResponseStarted(
-      network::mojom::URLResponseHeadPtr response_head,
       network::mojom::URLLoaderClientEndpointsPtr url_loader_client_endpoints,
       mojo::ScopedDataPipeConsumerHandle response_body,
       const GlobalRequestID& global_request_id,
-      bool is_download);
+      bool is_download,
+      network::mojom::URLResponseHeadPtr response_head);
 
   void NotifyRequestRedirected(net::RedirectInfo redirect_info,
                                network::mojom::URLResponseHeadPtr response);
@@ -261,19 +277,6 @@ class CONTENT_EXPORT NavigationURLLoaderImpl
       OnAcceptCHFrameReceivedCallback callback) override;
   void Clone(mojo::PendingReceiver<network::mojom::AcceptCHFrameObserver>
                  listener) override;
-
-  // NavigationURLLoader implementation:
-  // Starts the loader by finalizing loader factories initialization and
-  // calling Restart().
-  // This is called only once (while Restart can be called multiple times).
-  // Sets `started_` true.
-  void Start() override;
-  void FollowRedirect(
-      const std::vector<std::string>& removed_headers,
-      const net::HttpRequestHeaders& modified_headers,
-      const net::HttpRequestHeaders& modified_cors_exempt_headers) override;
-  bool SetNavigationTimeout(base::TimeDelta timeout) override;
-  void CancelNavigationTimeout() override;
 
   // Records UKM for the navigation load.
   void RecordReceivedResponseUkmForOutermostMainFrame();
@@ -303,12 +306,6 @@ class CONTENT_EXPORT NavigationURLLoaderImpl
 
   scoped_refptr<network::SharedURLLoaderFactory> network_loader_factory_;
 
-  // Caches the modified request headers provided by clients during redirect,
-  // will be consumed by next `url_loader_->FollowRedirect()`.
-  std::vector<std::string> url_loader_removed_headers_;
-  net::HttpRequestHeaders url_loader_modified_headers_;
-  net::HttpRequestHeaders url_loader_modified_cors_exempt_headers_;
-
   SubresourceLoaderParams subresource_loader_params_;
 
   std::vector<std::unique_ptr<NavigationLoaderInterceptor>> interceptors_;
@@ -316,15 +313,6 @@ class CONTENT_EXPORT NavigationURLLoaderImpl
   // Set to true if the default URLLoader (network service) was used for the
   // current navigation.
   bool default_loader_used_ = false;
-
-  // URLLoaderClient receiver for loaders created for responses received from
-  // the network loader.
-  mojo::Receiver<network::mojom::URLLoaderClient> response_loader_receiver_{
-      this};
-
-  // URLLoader instance for response loaders, i.e loaders created for handling
-  // responses received from the network URLLoader.
-  mojo::PendingRemote<network::mojom::URLLoader> response_url_loader_;
 
   // Set to true if we receive a valid response from a URLLoader, i.e.
   // URLLoaderClient::OnReceiveResponse() is called.
@@ -350,7 +338,113 @@ class CONTENT_EXPORT NavigationURLLoaderImpl
   std::map<std::string, scoped_refptr<network::SharedURLLoaderFactory>>
       non_network_url_loader_factories_;
 
-  std::unique_ptr<blink::ThrottlingURLLoader> url_loader_;
+  // `NavigationURLLoaderImpl` performs the loading (receiving the
+  // `URLLoaderClient` callbacks and related operations) in multiple ways (e.g.
+  // through `url_loader_` or `response_loader_receiver_`). `LoaderHolder`
+  // centralizes these, to ensure that:
+  // - All related operations are cancelled when `Reset()` is called.
+  // - The state transitions are consistent.
+  //
+  // Note: This isn't a complete encapsulation. Some states and operations
+  // (especially related to https://crbug.com/434182226) are centralized and
+  // checked in `LoaderHolder`, while other operations are still performed
+  // directly via `url_loader()`.
+  class LoaderHolder final {
+   public:
+    explicit LoaderHolder(network::mojom::URLLoaderClient* receiver);
+    ~LoaderHolder();
+
+    blink::ThrottlingURLLoader* url_loader() const { return url_loader_.get(); }
+    mojo::PendingRemote<network::mojom::URLLoader>* response_url_loader() {
+      return &response_url_loader_;
+    }
+
+    // Cancel the current loading, if any.
+    // Any associated pending operations should be cancelled.
+    // TODO(https://crbug.com/434182226): Still some known pending operations
+    // are not cancelled. Actually cancel them.
+    void Reset();
+
+    // For starting loading via `url_loader` (transitioning from `kNone` to
+    // `kLoadingViaLoader`). THe caller should actually start the loading by
+    // calling `url_loader->Start()`.
+    void SetLoader(std::unique_ptr<blink::ThrottlingURLLoader> url_loader);
+
+    // Switches to loading via `pending_receiver` (transitioning from
+    // `kLoadingViaLoader` to `kLoadingViaReceiver`). The caller might already
+    // call `url_loader()->Unbind()` etc.
+    void BindReceiver(
+        mojo::PendingReceiver<network::mojom::URLLoaderClient> pending_receiver,
+        scoped_refptr<base::SequencedTaskRunner> task_runner);
+
+    // Unbind the endpoints from ``NavigationURLLoaderImpl`` to
+    // `URLLoaderClientEndpointsPtr` (transitioning to `kUnbound`).
+    [[nodiscard]] network::mojom::URLLoaderClientEndpointsPtr Unbind();
+
+    // Redirect handling: the expected sequence is:
+    // 1. `NavigationURLLoaderImpl::OnReceiveRedirect()`
+    // 2. `LoaderHolder::SetModifiedHeadersOnRedirect()`
+    // 3. Either:
+    //    - `LoaderHolder::FollowRedirect()`, when we want and can continue
+    //      using the current `url_loader` for the next redirect leg, or
+    //    - `LoaderHolder::ResetForFollowRedirect()` then
+    //      `LoaderHolder::SetLoader()`, when we start the next redirect leg
+    //      with a new loader.
+    // Also `LoaderHolder::Reset()` can be called at any time during this to
+    // cancel loading.
+    // TODO(https://crbug.com/434182226): Add `CHECK()`s to confirm these
+    // sequences.
+
+    // Cache the modified request headers provided by clients during redirect.
+    // They will be consumed by next `FollowRedirect()` or
+    // `ResetForFollowRedirect()`.
+    void SetModifiedHeadersOnRedirect(
+        std::vector<std::string> removed_headers,
+        net::HttpRequestHeaders modified_headers,
+        net::HttpRequestHeaders modified_cors_exempt_headers);
+
+    // Follows the redirect using the current `url_loader_`.
+    void FollowRedirect();
+
+    // Similar to `ResetLoader()`, but also calls
+    // `URLLoader::ResetForFollowRedirect()` if needed.
+    void ResetForFollowRedirect(network::ResourceRequest& resource_request);
+
+    bool receiver_is_bound_for_check() const;
+
+   private:
+    // `NavigationURLLoaderImpl`'s `URLLoaderClient` methods are called either
+    // via `url_loader_` or `response_loader_receiver_`.
+    std::unique_ptr<blink::ThrottlingURLLoader> url_loader_;
+    mojo::Receiver<network::mojom::URLLoaderClient> response_loader_receiver_;
+
+    // URLLoader instance for response loaders, i.e loaders created for handling
+    // responses received from the network URLLoader.
+    //
+    // NOTE: This looks like coupled with
+    // `LoaderHolder::response_loader_receiver_` but actually isn't, because
+    // `response_url_loader_` is never touched during
+    // `MaybeCreateLoaderForResponse()` (at least within Chromium codesearch).
+    // For now this is kept here as-is but probably can be removed.
+    mojo::PendingRemote<network::mojom::URLLoader> response_url_loader_;
+
+    struct ModifiedHeadersOnRedirect final {
+      ModifiedHeadersOnRedirect(
+          std::vector<std::string> removed_headers,
+          net::HttpRequestHeaders modified_headers,
+          net::HttpRequestHeaders modified_cors_exempt_headers);
+      ModifiedHeadersOnRedirect(const ModifiedHeadersOnRedirect&) = delete;
+      ModifiedHeadersOnRedirect(ModifiedHeadersOnRedirect&&) = delete;
+      ~ModifiedHeadersOnRedirect();
+
+      std::vector<std::string> removed_headers_;
+      net::HttpRequestHeaders modified_headers_;
+      net::HttpRequestHeaders modified_cors_exempt_headers_;
+    };
+    std::optional<ModifiedHeadersOnRedirect> modified_headers_on_redirect_;
+  };
+
+  LoaderHolder loader_holder_{this};
 
   std::unique_ptr<NavigationEarlyHintsManager> early_hints_manager_;
 

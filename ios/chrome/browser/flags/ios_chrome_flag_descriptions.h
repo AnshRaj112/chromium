@@ -272,6 +272,9 @@ extern const char kDownloadAutoDeletionDescription[];
 extern const char kDownloadedPDFOpeningName[];
 extern const char kDownloadedPDFOpeningDescription[];
 
+extern const char kDownloadListName[];
+extern const char kDownloadListDescription[];
+
 extern const char kEnableCompromisedPasswordsMutingName[];
 extern const char kEnableCompromisedPasswordsMutingDescription[];
 
@@ -339,9 +342,6 @@ extern const char kEnhancedCalendarDescription[];
 extern const char kEnhancedSafeBrowsingPromoName[];
 extern const char kEnhancedSafeBrowsingPromoDescription[];
 
-extern const char kEnterpriseRealtimeEventReportingOnIOSName[];
-extern const char kEnterpriseRealtimeEventReportingOnIOSDescription[];
-
 extern const char kFeedBackgroundRefreshName[];
 extern const char kFeedBackgroundRefreshDescription[];
 
@@ -366,8 +366,8 @@ extern const char kFullscreenImprovementDescription[];
 extern const char kFullscreenPromosManagerSkipInternalLimitsName[];
 extern const char kFullscreenPromosManagerSkipInternalLimitsDescription[];
 
-extern const char kFullscreenTransitionName[];
-extern const char kFullscreenTransitionDescription[];
+extern const char kFullscreenTransitionSpeedName[];
+extern const char kFullscreenTransitionSpeedDescription[];
 
 extern const char kFullscreenSmoothScrollingName[];
 extern const char kFullscreenSmoothScrollingDescription[];
@@ -495,6 +495,10 @@ extern const char kIOSReactivationNotificationsDescription[];
 
 extern const char kIOSExpandedTipsName[];
 extern const char kIOSExpandedTipsDescription[];
+
+// Name and description for the one-time default browser notification flag.
+extern const char kIOSOneTimeDefaultBrowserNotificationName[];
+extern const char kIOSOneTimeDefaultBrowserNotificationDescription[];
 
 extern const char kIOSProvidesAppNotificationSettingsName[];
 extern const char kIOSProvidesAppNotificationSettingsDescription[];
@@ -733,6 +737,9 @@ extern const char kOptimizationGuidePushNotificationClientDescription[];
 extern const char kPageActionMenuName[];
 extern const char kPageActionMenuDescription[];
 
+extern const char kGeminiCrossTabName[];
+extern const char kGeminiCrossTabDescription[];
+
 extern const char kBWGPromoConsentName[];
 extern const char kBWGPromoConsentDescription[];
 
@@ -867,9 +874,6 @@ extern const char kShopCardImpressionLimitsDescription[];
 
 extern const char kSetUpListShortenedDurationName[];
 extern const char kSetUpListShortenedDurationDescription[];
-
-extern const char kSetUpListWithoutSignInItemName[];
-extern const char kSetUpListWithoutSignInItemDescription[];
 
 extern const char kShareInWebContextMenuIOSName[];
 extern const char kShareInWebContextMenuIOSDescription[];

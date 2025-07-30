@@ -17,7 +17,6 @@
 #include "chrome/browser/apps/app_service/app_registry_cache_waiter.h"
 #include "chrome/browser/banners/test_app_banner_manager_desktop.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/actions/chrome_action_id.h"
 #include "chrome/browser/ui/test/test_browser_dialog.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
@@ -27,6 +26,8 @@
 #include "chrome/browser/ui/views/page_action/page_action_icon_controller.h"
 #include "chrome/browser/ui/views/page_action/page_action_icon_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/browser/user_education/user_education_service.h"
+#include "chrome/browser/user_education/user_education_service_factory.h"
 #include "chrome/browser/web_applications/link_capturing_features.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
@@ -119,10 +120,11 @@ class FeaturePromoDialogTest : public TestBase {
 
   // DialogBrowserTest:
   void ShowUi(const std::string& name) override {
-    auto* const interface = BrowserUserEducationInterface::From(browser());
     auto* const promo_controller =
-        interface->GetFeaturePromoControllerForTesting();
-    auto const context = interface->GetUserEducationContextForTesting();
+        UserEducationServiceFactory::GetForBrowserContext(browser()->profile())
+            ->GetFeaturePromoControllerForTesting();
+    auto const context = BrowserUserEducationInterface::From(browser())
+                             ->GetUserEducationContextForTesting();
     ASSERT_TRUE(promo_controller);
 
     // The browser may have already queued a promo for startup. Since the test
@@ -203,8 +205,10 @@ IN_PROC_BROWSER_TEST_F(FeaturePromoDialogTest, InvokeUi_IPH_DesktopPwaInstall) {
       webapps::TestAppBannerManagerDesktop::FromWebContents(web_contents);
   app_banner_manager->WaitForInstallableCheck();
   EXPECT_TRUE(BrowserView::GetBrowserViewForBrowser(browser())
-                  ->toolbar_button_provider()
-                  ->GetPageActionView(kActionInstallPwa)
+                  ->toolbar()
+                  ->location_bar()
+                  ->page_action_icon_controller()
+                  ->GetIconView(PageActionIconType::kPwaInstall)
                   ->GetVisible());
   browser()->window()->Activate();
   ui_test_utils::BrowserActivationWaiter(browser()).WaitForActivation();

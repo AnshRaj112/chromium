@@ -71,7 +71,6 @@ constexpr auto kPageActionProperties =
             {
                 .histogram_name = "PwaInstall",
                 .type = PageActionIconType::kPwaInstall,
-                .element_identifier = kInstallPwaElementId,
             },
         },
         {
@@ -113,6 +112,13 @@ constexpr auto kPageActionProperties =
                 .type = PageActionIconType::kCollaborationMessaging,
                 .element_identifier =
                     kCollaborationMessagingPageActionIconElementId,
+            },
+        },
+        {
+            kActionAutofillMandatoryReauth,
+            {
+                .histogram_name = "MandatoryReauth",
+                .type = PageActionIconType::kMandatoryReauth,
             },
         },
     });
